@@ -1,0 +1,25 @@
+{
+  "configPath": "C:\\Users\\Admin\\autoforge\\.trigger\\tmp\\build-Ov7dU1\\autoforge\\trigger.config.mjs",
+  "tasks": [
+    {
+      "id": "generate-application-job",
+      "maxDuration": 300,
+      "filePath": "src/trigger/jobs.ts",
+      "entryPoint": "C:\\Users\\Admin\\autoforge\\.trigger\\tmp\\build-Ov7dU1\\autoforge\\src\\trigger\\jobs.mjs"
+    },
+    {
+      "id": "code-generation-job",
+      "maxDuration": 300,
+      "filePath": "src/trigger/jobs.ts",
+      "entryPoint": "C:\\Users\\Admin\\autoforge\\.trigger\\tmp\\build-Ov7dU1\\autoforge\\src\\trigger\\jobs.mjs"
+    }
+  ],
+  "queues": [],
+  "workerEntryPoint": "C:\\Users\\Admin\\autoforge\\.trigger\\tmp\\build-Ov7dU1\\AppData\\Local\\npm-cache\\_npx\\f51a09bd0abf5f10\\node_modules\\trigger.dev\\dist\\esm\\entryPoints\\dev-run-worker.mjs",
+  "runtime": "node",
+  "runtimeVersion": "22.19.0",
+  "customConditions": [],
+  "timings": {
+    "src/trigger/jobs.ts": 82.35409999999979
+  }
+}

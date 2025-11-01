@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../../../../trigger.config.ts"],
+  "sourcesContent": ["import { defineConfig } from \"@trigger.dev/sdk\";\nimport { prismaExtension } from \"@trigger.dev/build/extensions/prisma\";\n\nexport default defineConfig({\n  // Your project ref from the Trigger.dev dashboard (e.g., \"proj_abc123\")\n  // You will get this after you run `npx trigger.dev@latest login`\n  project: \"proj_mnfxitvmyngjnqkeypsx\",\n\n  // Maximum duration for jobs (in seconds)\n  maxDuration: 300, // adjust as needed\n\n  // This tells Trigger.dev where to find your job files\n  dirs: [\"./src/trigger\"], \n\n  // This is the build extension from the docs. It's smart.\n  // It ensures your Prisma client is generated during deployment.\n  build: {},\n});\nexport const resolveEnvVars = undefined;"],
+  "mappings": ";;;;;;;;;AAAA;AAGA,IAAO,yBAAQ,aAAa;AAAA;AAAA;AAAA,EAG1B,SAAS;AAAA;AAAA,EAGT,aAAa;AAAA;AAAA;AAAA,EAGb,MAAM,CAAC,eAAe;AAAA;AAAA;AAAA,EAItB,OAAO,CAAC;AACV,CAAC;AACM,IAAM,iBAAiB;",
+  "names": []
+}

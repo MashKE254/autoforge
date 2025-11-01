@@ -1,48 +1,24 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
+// 1. Prisma Client Generator
+// This tells Prisma to generate the TypeScript client
 generator client {
   provider = "prisma-client-js"
 }
 
-// 1. Datasource Configuration
-// This is specifically configured for Vercel Postgres
-// It uses connection pooling for the app (DATABASE_URL)
-// and a direct connection for migrations (DATABASE_DIRECT_URL)
+// 2. Database Datasource
+// This is your database connection configuration
 datasource db {
-  provider = "postgresql"
-
-  // This is for the main application client (uses pooling)
-  url = env("DATABASE_URL")
-
-  // This is for migrations (needs a direct connection)
-  // Vercel/Neon does not support shadow databases, so we
-  // remove the shadowDatabaseUrl line.
+  provider  = "postgresql"
+  // This is the pooled connection string (for your app)
+  url       = env("DATABASE_URL")
+  // This is the direct connection string (for migrations)
   directUrl = env("DATABASE_DIRECT_URL")
 }
 
-
-// ---------------------------------
-// 2. AUTHENTICATION MODELS
-// These are required by the NextAuth.js Prisma Adapter
-// ---------------------------------
-
-model User {
-  id            String    @id @default(cuid())
-  name          String?
-  email         String?   @unique
-  emailVerified DateTime?
-  image         String?
-  
-  // --- RELATIONS ---
-  // Relates to the Account model for OAuth providers
-  accounts Account[]
-  // Relates to the Session model for database sessions
-  sessions Session[]
-  
-  // --- YOUR CUSTOM MODELS WILL GO HERE ---
-  // e.g., projects Project[]
-}
+// 3. NextAuth.js Authentication Models
+// These models are REQUIRED by the @auth/prisma-adapter
 
 model Account {
   id                String  @id @default(cuid())
@@ -50,19 +26,16 @@ model Account {
   type              String
   provider          String
   providerAccountId String
-  refresh_token     String?
-  access_token      String?
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
   expires_at        Int?
   token_type        String?
   scope             String?
-  id_token          String?
+  id_token          String? @db.Text
   session_state     String?
 
-  // --- RELATION ---
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // --- INDEXES ---
-  // This ensures a user can only have one account per provider
   @@unique([provider, providerAccountId])
 }
 
@@ -71,9 +44,20 @@ model Session {
   sessionToken String   @unique
   userId       String
   expires      DateTime
-  
-  // --- RELATION ---
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  accounts      Account[]
+  sessions      Session[]
+
+  // Link to the generation jobs
+  GenerationJob GenerationJob[]
 }
 
 model VerificationToken {
@@ -81,8 +65,35 @@ model VerificationToken {
   token      String   @unique
   expires    DateTime
 
-  // --- INDEXES ---
-  // This ensures a token is unique
   @@unique([identifier, token])
+}
+
+// 4. AutoForge Application Models
+// This is the new model for tracking generation jobs
+
+enum JobStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+model GenerationJob {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  status    JobStatus @default(PENDING)
+  prompt    String    @db.Text
+
+  // This will store the JSON plan from the LLM
+  planJson  String?   @db.Text
+
+  // This will store the final generated code, or error messages
+  result    String?   @db.Text
+
+  // Link to the user who created this job
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
