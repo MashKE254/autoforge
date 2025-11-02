@@ -126,17 +126,45 @@ export const generateApplicationJob = task({
 
       // This is a stricter prompt to prevent the "Unterminated JSON" error
       const prompt = `
-        Based on the following user prompt, generate a CONCISE, step-by-step technical plan for an AI to build the application.
-        The plan should be an array of objects, where each object has an "id", "title", "description", and a "status" (set to "pending").
-        Descriptions MUST be 1-2 sentences maximum.
+        You are an expert full-stack architect creating a PRODUCTION-READY Next.js 14 application.
+        
+        CRITICAL REQUIREMENTS:
+        1. Generate a COMPLETE, working Next.js 14 app with App Router
+        2. Use React Server Components and Client Components appropriately
+        3. Use Tailwind CSS for ALL styling (no vanilla CSS files)
+        4. Create a beautiful, modern, professional UI (like Vercel, Linear, or Stripe)
+        5. Include proper TypeScript types throughout
+        6. Make it IMMEDIATELY previewable in an iframe (single-page or multi-route)
+        7. Include responsive design (mobile, tablet, desktop)
+        8. Add smooth animations and transitions
+        9. Follow Next.js 14 best practices
+        
+        MUST GENERATE AT MINIMUM:
+        - Main App component (client component with "use client")
+        - Complete, working UI with all features
+        - Proper state management (useState, useEffect)
+        - Beautiful, professional design
+        - All functionality working without backend (use local state)
+        
+        DO NOT generate:
+        - Separate HTML/CSS/JS files (this is React/Next.js)
+        - Vanilla JavaScript files
+        - Multiple disconnected files
+        - Configuration-only files without UI
         
         User Prompt: "${job.prompt}"
         
-        Return ONLY a valid JSON array. Do not include any explanations, markdown formatting, or additional text.
-        Example format:
+        Generate a CONCISE, step-by-step plan (5-8 steps MAX) where:
+        - Step 1: "Create Main App Component" - The core UI/UX
+        - Step 2-4: Additional features/components
+        - Step 5-8: Enhancements, styling, polish
+        
+        Each step MUST result in actual React/TypeScript code, not config files.
+        
+        Return ONLY valid JSON array format:
         [
-          {"id": "1", "title": "Setup", "description": "Initialize project.", "status": "pending"},
-          {"id": "2", "title": "Backend", "description": "Create API.", "status": "pending"}
+          {"id": "1", "title": "Create Main App Component", "description": "Build the core UI with all primary features.", "status": "pending"},
+          {"id": "2", "title": "Add Feature X", "description": "Implement X functionality.", "status": "pending"}
         ]
       `;
 
@@ -331,79 +359,59 @@ async function aiRouter(
   const stepTitle = step.title.toLowerCase();
   const planString = JSON.stringify(fullPlan, null, 2);
 
-  // --- Route to OpenAI (GPT-4) for Backend/Logic/Schema ---
-  if (
-    stepTitle.includes("database") ||
-    stepTitle.includes("schema") ||
-    stepTitle.includes("backend") ||
-    stepTitle.includes("api route")
-  ) {
-    logger.info(`Routing to OpenAI: ${step.title}`);
-    const prompt = `
-      You are a world-class backend engineer. Based on the user's original prompt and the complete technical plan, generate the code for the following step.
-      
-      Original Prompt: "${originalPrompt}"
-      Full Plan: ${planString}
-      Current Step: "${step.title}"
-      Description: "${step.description}"
-      
-      Generate only the raw code for this step. Do not include any explanations, markdown, or pleasantries.
-    `;
-    
-    const completion = await openai.chat.completions.create({
-      messages: [{ role: "user", content: prompt }],
-      model: "gpt-4-turbo", // Use the best model for code
-    });
-    return completion.choices[0].message.content || "// OpenAI: No code generated";
-  }
+  // DEFAULT TO REACT/NEXT.JS COMPONENTS FOR EVERYTHING
+  logger.info(`Routing to OpenAI: ${step.title}`);
   
-  // --- Route to Anthropic (Claude 3) for Frontend/UI ---
-  if (
-    stepTitle.includes("frontend") ||
-    stepTitle.includes("ui") ||
-    stepTitle.includes("react component") ||
-    stepTitle.includes("tailwind")
-  ) {
-    logger.info(`Routing to Anthropic: ${step.title}`);
-    const prompt = `
-      You are a world-class frontend engineer specializing in React, Next.js, and Tailwind CSS. Based on the user's original prompt and the complete technical plan, generate the code for the following step.
-      
-      Original Prompt: "${originalPrompt}"
-      Full Plan: ${planString}
-      Current Step: "${step.title}"
-      Description: "${step.description}"
-      
-      Generate only the raw code (TSX/CSS) for this step. Do not include any explanations, markdown, or pleasantries.
-    `;
-    
-    const completion = await anthropic.messages.create({
-      model: "claude-sonnet-4-20250514", // Updated to latest Claude Sonnet 4
-      max_tokens: 8192,
-      messages: [{ role: "user", content: prompt }],
-    });
-    
-    // Handle the content array properly
-    const firstBlock = completion.content[0];
-    if (firstBlock.type === "text") {
-      return firstBlock.text;
-    }
-    return "<!-- Anthropic: No code generated -->";
-  }
-
-  // --- Default to Google (Gemini) for General Steps ---
-  logger.info(`Routing to Google: ${step.title}`);
   const prompt = `
-    You are a general-purpose AI engineer. Based on the user's original prompt and the complete technical plan, generate the code or configuration files for the following step.
+    You are an expert Next.js 14 developer creating PRODUCTION-READY code.
+    
+    CRITICAL REQUIREMENTS:
+    1. Generate COMPLETE, working React/TypeScript code
+    2. Use Next.js 14 App Router conventions
+    3. Use Tailwind CSS for ALL styling (no separate CSS files)
+    4. Create beautiful, modern, professional UI
+    5. Include proper TypeScript types
+    6. Use "use client" directive for interactive components
+    7. Make it work standalone (no external dependencies beyond React/Next.js basics)
+    8. Add smooth animations and micro-interactions
+    9. Make it responsive (mobile-first design)
+    
+    COMPONENT STRUCTURE:
+    - Export default function ComponentName()
+    - Include all imports at top
+    - Use React hooks (useState, useEffect) as needed
+    - Add proper error handling
+    - Include loading states
+    - Make it visually stunning
+    
+    DESIGN GUIDELINES:
+    - Use modern color palettes (blues, purples, gradients)
+    - Add shadows, rounded corners, and depth
+    - Include hover effects and transitions
+    - Make text readable with proper contrast
+    - Add icons where appropriate (use Lucide React or Unicode)
+    - Create clear visual hierarchy
     
     Original Prompt: "${originalPrompt}"
     Full Plan: ${planString}
     Current Step: "${step.title}"
     Description: "${step.description}"
     
-    Generate only the raw code (e.g., package.json, .gitignore, etc.) for this step. Do not include any explanations, markdown, or pleasantries.
+    Generate ONLY the raw TypeScript/TSX code for this component.
+    Do NOT include:
+    - Markdown code blocks
+    - Explanations or comments outside code
+    - "Here's the code" or similar text
+    - Multiple file suggestions
+    
+    Start directly with imports and code.
   `;
-
-  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-preview-09-2025" });
-  const result = await model.generateContent(prompt);
-  return result.response.text() || "// Gemini: No code generated";
-}
+  
+  const completion = await openai.chat.completions.create({
+    messages: [{ role: "user", content: prompt }],
+    model: "gpt-4-turbo",
+    temperature: 0.7,
+  });
+  
+  return completion.choices[0].message.content || "// No code generated";
+} 

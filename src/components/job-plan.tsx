@@ -54,7 +54,6 @@ export default function JobPlan({ initialJob, accessToken, jobId }: JobPlanProps
   const [error, setError] = useState<string | null>(null);
   const [isBuilding, setIsBuilding] = useState(false);
   const [buildRunId, setBuildRunId] = useState<string | null>(null);
-  const [usePolling, setUsePolling] = useState(false);
 
   // Check if we should start with build run ID
   useEffect(() => {
@@ -81,22 +80,23 @@ export default function JobPlan({ initialJob, accessToken, jobId }: JobPlanProps
 
   // This effect runs when the real-time `run` data changes OR we need to poll
   useEffect(() => {
-    // If we're building and not using realtime, poll the database
-    if (usePolling && isBuilding) {
+    // If we're building and not getting real-time updates, poll the database
+    if (isBuilding) {
       const pollInterval = setInterval(async () => {
         try {
           const response = await fetch(`/api/generate/status?jobId=${initialJob.id}`);
           const data = await response.json();
           
           if (data.job && data.job.planJson) {
-            setPlan(JSON.parse(data.job.planJson));
+            const parsedPlan = JSON.parse(data.job.planJson);
+            setPlan(parsedPlan);
             
             // Check if all steps are completed
-            const parsedPlan = JSON.parse(data.job.planJson);
             const allCompleted = parsedPlan.every((step: PlanStep) => step.status === "completed");
-            if (allCompleted) {
+            const anyFailed = parsedPlan.some((step: PlanStep) => step.status === "failed");
+            
+            if (allCompleted || anyFailed) {
               setIsBuilding(false);
-              setUsePolling(false);
               clearInterval(pollInterval);
             }
           }
@@ -107,7 +107,7 @@ export default function JobPlan({ initialJob, accessToken, jobId }: JobPlanProps
 
       return () => clearInterval(pollInterval);
     }
-  }, [usePolling, isBuilding, initialJob.id]);
+  }, [isBuilding, initialJob.id]);
 
   // This effect handles real-time updates
   useEffect(() => {
@@ -117,17 +117,15 @@ export default function JobPlan({ initialJob, accessToken, jobId }: JobPlanProps
     if (activeRun?.status === "COMPLETED") {
       if (activeRun.output && typeof activeRun.output === "object" && "plan" in activeRun.output) {
         currentPlanJson = activeRun.output.plan as string;
-      }
-    } else if (activeRun?.status === "EXECUTING") {
-      // For the code generation job, check the database payload
-      if (activeRun.payload && typeof activeRun.payload === "object") {
-        if ("planJson" in activeRun.payload) {
-          currentPlanJson = activeRun.payload.planJson as string;
-        } else if ("jobId" in activeRun.payload) {
-          // If we only have jobId in payload, we need to poll the database
-          setUsePolling(true);
+        // If build completed via real-time, stop polling
+        if (isBuilding) {
+          setIsBuilding(false);
         }
       }
+    } else if (activeRun?.status === "EXECUTING") {
+      // For the code generation job, the payload just has jobId
+      // We rely on polling for updates during execution
+      console.log("Build job executing, relying on polling for updates");
     }
     
     // Fallback to the initial job data if real-time data is not ready
@@ -138,13 +136,22 @@ export default function JobPlan({ initialJob, accessToken, jobId }: JobPlanProps
     // Try to parse whatever plan we found
     if (currentPlanJson) {
       try {
-        setPlan(JSON.parse(currentPlanJson));
+        const parsed = JSON.parse(currentPlanJson);
+        setPlan(parsed);
+        
+        // Check if all steps completed via real-time update
+        if (isBuilding && parsed.length > 0) {
+          const allCompleted = parsed.every((step: PlanStep) => step.status === "completed");
+          if (allCompleted) {
+            setIsBuilding(false);
+          }
+        }
       } catch (e) {
         console.error("Failed to parse plan:", e);
         setError("Failed to parse generation plan.");
       }
     }
-  }, [activeRun, initialJob.planJson]); // Rerun when the hook data or initial data changes
+  }, [activeRun, initialJob.planJson, isBuilding]); // Rerun when the hook data or initial data changes
 
   // This new function calls our "build" API
   const handleStartBuild = async () => {
@@ -168,15 +175,15 @@ export default function JobPlan({ initialJob, accessToken, jobId }: JobPlanProps
       // Store the build run ID for realtime updates
       if (data.triggerRunId) {
         setBuildRunId(data.triggerRunId);
-      } else {
-        // If no run ID, fall back to polling
-        setUsePolling(true);
+        console.log("Build started with run ID:", data.triggerRunId);
       }
       
-      // Update local plan status immediately
+      // Update local plan status immediately - start polling
       setPlan(prevPlan => 
         prevPlan.map(step => ({ ...step, status: 'running' as const }))
       );
+      
+      // Polling will start automatically via useEffect
 
     } catch (err: unknown) {
       if (err instanceof Error) {
@@ -329,14 +336,10 @@ export default function JobPlan({ initialJob, accessToken, jobId }: JobPlanProps
         <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
           This is the step-by-step plan for your application.
         </p>
-        {isBuilding && usePolling && (
-          <p className="mt-2 text-xs text-blue-600 dark:text-blue-400">
-            ⟳ Live updates via polling (checking every 2 seconds)
-          </p>
-        )}
-        {isBuilding && buildRunId && !usePolling && (
-          <p className="mt-2 text-xs text-blue-600 dark:text-blue-400">
-            ⚡ Live updates via real-time connection
+        {isBuilding && (
+          <p className="mt-2 text-xs text-blue-600 dark:text-blue-400 flex items-center gap-2">
+            <Loader className="h-3 w-3 animate-spin" />
+            Live updates - polling every 2 seconds
           </p>
         )}
         <div className="mt-6">{renderContent()}</div>
