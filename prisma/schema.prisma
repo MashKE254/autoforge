@@ -1,24 +1,13 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// 1. Prisma Client Generator
-// This tells Prisma to generate the TypeScript client
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
 }
 
-// 2. Database Datasource
-// This is your database connection configuration
 datasource db {
   provider  = "postgresql"
-  // This is the pooled connection string (for your app)
   url       = env("DATABASE_URL")
-  // This is the direct connection string (for migrations)
   directUrl = env("DATABASE_DIRECT_URL")
 }
-
-// 3. NextAuth.js Authentication Models
-// These models are REQUIRED by the @auth/prisma-adapter
 
 model Account {
   id                String  @id @default(cuid())
@@ -26,15 +15,14 @@ model Account {
   type              String
   provider          String
   providerAccountId String
-  refresh_token     String? @db.Text
-  access_token      String? @db.Text
+  refresh_token     String?
+  access_token      String?
   expires_at        Int?
   token_type        String?
   scope             String?
-  id_token          String? @db.Text
+  id_token          String?
   session_state     String?
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
 }
@@ -48,16 +36,16 @@ model Session {
 }
 
 model User {
-  id            String    @id @default(cuid())
-  name          String?
-  email         String?   @unique
-  emailVerified DateTime?
-  image         String?
-  accounts      Account[]
-  sessions      Session[]
-
-  // Link to the generation jobs
-  GenerationJob GenerationJob[]
+  id             String          @id @default(cuid())
+  name           String?
+  email          String?         @unique
+  emailVerified  DateTime?
+  image          String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @default(now()) @updatedAt
+  accounts       Account[]
+  generationJobs GenerationJob[]
+  sessions       Session[]
 }
 
 model VerificationToken {
@@ -68,32 +56,155 @@ model VerificationToken {
   @@unique([identifier, token])
 }
 
-// 4. AutoForge Application Models
-// This is the new model for tracking generation jobs
+model Module {
+  id           String                @id @default(cuid())
+  createdAt    DateTime              @default(now())
+  updatedAt    DateTime              @updatedAt
+  name         String                @unique
+  description  String
+  code         String
+  category     ModuleCategory
+  framework    String                @default("nextjs")
+  language     String                @default("typescript")
+  testCoverage Float                 @default(0)
+  successRate  Float                 @default(1.0)
+  usageCount   Int                   @default(0)
+  tags         String[]              @default([])
+  generations  GenerationModule[]
+  telemetry    GenerationTelemetry[]
+  dependents   ModuleDependency[]    @relation("ModuleUsedBy")
+  dependencies ModuleDependency[]    @relation("ModuleDepends")
+
+  @@index([category])
+  @@index([successRate])
+  @@index([usageCount])
+}
+
+model ModuleDependency {
+  id          String @id @default(cuid())
+  moduleId    String
+  dependsOnId String
+  dependsOn   Module @relation("ModuleUsedBy", fields: [dependsOnId], references: [id], onDelete: Cascade)
+  module      Module @relation("ModuleDepends", fields: [moduleId], references: [id], onDelete: Cascade)
+
+  @@unique([moduleId, dependsOnId])
+  @@index([moduleId])
+  @@index([dependsOnId])
+}
+
+model GenerationJob {
+  id                    String                @id @default(cuid())
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+  status                JobStatus             @default(PENDING)
+  prompt                String
+  planJson              String?
+  result                String?
+  userId                String
+  blueprint             String?
+  blueprintApprovedAt   DateTime?
+  blueprintGeneratedAt  DateTime?
+  completedModules      Int                   @default(0)
+  errorLog              String?
+  failedModules         Int                   @default(0)
+  generationCompletedAt DateTime?
+  generationStartedAt   DateTime?
+  totalModules          Int                   @default(0)
+  files                 GeneratedFile[]
+  user                  User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  modules               GenerationModule[]
+  telemetry             GenerationTelemetry[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model GenerationModule {
+  id              String        @id @default(cuid())
+  createdAt       DateTime      @default(now())
+  generationJobId String
+  moduleId        String
+  status          String        @default("pending")
+  generatedCode   String?
+  error           String?
+  generationJob   GenerationJob @relation(fields: [generationJobId], references: [id], onDelete: Cascade)
+  module          Module        @relation(fields: [moduleId], references: [id])
+
+  @@unique([generationJobId, moduleId])
+  @@index([generationJobId])
+  @@index([status])
+}
+
+model GeneratedFile {
+  id              String        @id @default(cuid())
+  createdAt       DateTime      @default(now())
+  generationJobId String
+  path            String
+  content         String
+  language        String
+  size            Int           @default(0)
+  generationJob   GenerationJob @relation(fields: [generationJobId], references: [id], onDelete: Cascade)
+
+  @@unique([generationJobId, path])
+  @@index([generationJobId])
+}
+
+model GenerationTelemetry {
+  id              String        @id @default(cuid())
+  createdAt       DateTime      @default(now())
+  generationJobId String
+  moduleId        String?
+  eventType       String
+  errorMessage    String?
+  stackTrace      String?
+  metadata        Json?
+  generationJob   GenerationJob @relation(fields: [generationJobId], references: [id], onDelete: Cascade)
+  module          Module?       @relation(fields: [moduleId], references: [id])
+
+  @@index([generationJobId])
+  @@index([moduleId])
+  @@index([eventType])
+  @@index([createdAt])
+}
+
+model ModuleImprovement {
+  id              String   @id @default(cuid())
+  createdAt       DateTime @default(now())
+  moduleId        String
+  oldVersion      String
+  newVersion      String
+  improvementType String
+  description     String
+  oldSuccessRate  Float
+  newSuccessRate  Float
+
+  @@index([moduleId])
+  @@index([createdAt])
+}
+
+enum ModuleCategory {
+  AUTH
+  PAYMENT
+  DATABASE
+  UI
+  API
+  WORKFLOW
+  AGENT
+  INFRASTRUCTURE
+  UTILITY
+  TESTING
+}
 
 enum JobStatus {
   PENDING
   RUNNING
   COMPLETED
   FAILED
+  BLUEPRINT_GENERATED
+  BLUEPRINT_APPROVED
+  COMPOSING
+  TESTING
+  DEPLOYING
+  CANCELLED
 }
-
-model GenerationJob {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  status    JobStatus @default(PENDING)
-  prompt    String    @db.Text
-
-  // This will store the JSON plan from the LLM
-  planJson  String?   @db.Text
-
-  // This will store the final generated code, or error messages
-  result    String?   @db.Text
-
-  // Link to the user who created this job
-  userId    String
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-

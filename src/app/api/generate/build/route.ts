@@ -1,38 +1,37 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
-import { tasks } from "@trigger.dev/sdk";
-
-// Use relative paths to import shared configs/clients
-// This avoids TypeScript alias/circular dependency errors
 import { authOptions } from "../../auth/[...nextauth]/route";
-import { prisma } from "../../../../lib/prisma";
+import { prisma } from "@/lib/prisma";
+import { tasks } from "@trigger.dev/sdk/v3";
 
-/**
- * API route to start the code generation (build) process.
- * This is called when the user clicks "Start Code Generation" on the job page.
- */
 export async function POST(request: Request) {
   try {
-    // 1. Get user session
-    const session = await getServerSession(authOptions);
+    console.log("🔨 /api/generate/build - Starting...");
 
-    // 2. Protect the route
+    // 1. Check authentication
+    const session = await getServerSession(authOptions);
     if (!session || !session.user || !session.user.id) {
+      console.error("❌ Unauthorized request");
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // 3. Parse the request body
+    console.log("✅ User authenticated:", session.user.id);
+
+    // 2. Parse request body
     const body = await request.json();
     const { jobId } = body;
 
     if (!jobId) {
+      console.error("❌ No jobId provided");
       return NextResponse.json(
         { error: "Job ID is required" },
         { status: 400 }
       );
     }
 
-    // 4. Validate that this job belongs to the current user
+    console.log("✅ Job ID received:", jobId);
+
+    // 3. Verify the job exists and belongs to the user
     const job = await prisma.generationJob.findFirst({
       where: {
         id: jobId,
@@ -41,37 +40,64 @@ export async function POST(request: Request) {
     });
 
     if (!job) {
+      console.error("❌ Job not found or unauthorized:", jobId);
       return NextResponse.json(
-        { error: "Job not found or you do not have permission" },
+        { error: "Job not found or unauthorized" },
         { status: 404 }
       );
     }
 
-    // 5. Trigger the new background job and get the run handle
-    const handle = await tasks.trigger("code-generation-job", {
-      jobId: jobId,
-    });
+    console.log("✅ Job found:", job.id);
 
-    // 6. Store the build run ID in the database
+    // 4. Check if the plan is ready
+    if (!job.planJson) {
+      console.error("❌ Plan not ready for job:", jobId);
+      return NextResponse.json(
+        { error: "Plan is not ready yet. Please wait for planning to complete." },
+        { status: 400 }
+      );
+    }
+
+    console.log("✅ Plan ready, proceeding with build...");
+
+    // 5. Trigger the code generation job
+    console.log("🚀 Triggering code-generation-job...");
+    
+    const handle = await tasks.trigger(
+      "code-generation-job",
+      { jobId: job.id }
+    );
+
+    console.log("✅ Build job started:", handle.id);
+
+    // 6. Store the build run ID
     await prisma.generationJob.update({
-      where: { id: jobId },
+      where: { id: job.id },
       data: {
         result: `buildRunId:${handle.id}`,
       },
     });
 
-    // 7. Return an immediate success response with the run ID
-    return NextResponse.json({ 
-      success: true, 
-      jobId: jobId,
+    console.log("✅ Build run ID stored:", handle.id);
+
+    // 7. Return success response
+    return NextResponse.json({
+      success: true,
+      jobId: job.id,
       triggerRunId: handle.id,
-    }, { status: 202 });
-  } catch (error) {
-    let errorMessage = "An unknown error occurred";
-    if (error instanceof Error) {
-      errorMessage = error.message;
-    }
-    console.error("Error in /api/generate/build:", errorMessage);
-    return NextResponse.json({ error: errorMessage }, { status: 500 });
+    });
+
+  } catch (error: unknown) {
+    console.error("❌ Error in /api/generate/build:", error);
+    
+    const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+    
+    return NextResponse.json(
+      { 
+        error: "Failed to start build process",
+        details: errorMessage,
+      },
+      { status: 500 }
+    );
   }
 }

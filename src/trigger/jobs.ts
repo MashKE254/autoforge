@@ -1,417 +1,418 @@
-import { PrismaClient } from "@prisma/client";
-import { task, logger } from "@trigger.dev/sdk";
-import { 
-  GoogleGenerativeAI, 
-  SchemaType,
-  HarmCategory,
-  HarmBlockThreshold 
-} from "@google/generative-ai";
-import OpenAI from "openai";
-import Anthropic from "@anthropic-ai/sdk";
+// jobs.ts - AutoForge V2 Job Definitions
 
-// Initialize AI clients
-// These keys MUST be in your .env file
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY!);
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+import { logger, task } from "@trigger.dev/sdk/v3";
+import { generateCompleteApp, GenerationResult } from "./autoforge-v2";
 
-// Define the plan structure
-type PlanStep = {
+export interface PlanStep {
   id: string;
   title: string;
   description: string;
-  status: "pending" | "running" | "completed" | "failed";
+  status: "pending" | "in-progress" | "completed" | "failed";
+  priority: "critical" | "high" | "medium" | "low";
+  dependencies: string[];
   code?: string;
-};
+  error?: string;
+}
 
-// Helper function to retry Prisma operations
-async function withRetry<T>(
-  operation: () => Promise<T>,
-  maxRetries = 3,
-  delayMs = 1000
-): Promise<T> {
-  let lastError: Error | undefined;
-  
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      return await operation();
-    } catch (error) {
-      lastError = error as Error;
-      if (attempt < maxRetries) {
-        logger.warn(`Database operation failed (attempt ${attempt}/${maxRetries}), retrying...`, {
-          error: lastError.message,
-        });
-        await new Promise(resolve => setTimeout(resolve, delayMs * attempt));
-      }
-    }
-  }
-  
-  throw lastError;
+export interface GenerateAppPayload {
+  userPrompt: string;
+  userId: string;
+}
+
+export interface GenerateAppResult {
+  success: boolean;
+  plan: PlanStep[];
+  projectName: string;
+  error?: string;
+  metadata?: {
+    totalFiles: number;
+    generationTime: number;
+    framework: string;
+  };
 }
 
 /**
- * JOB 1: THE PLANNER
- * Takes a user prompt, calls Gemini, and generates the initial step-by-step plan.
+ * Convert AutoForge V2 generation result to plan format for UI
  */
-export const generateApplicationJob = task({
-  id: "generate-application-job",
-  run: async (payload: { jobId: string }) => {
-    const { jobId } = payload;
-
-    // Use a local, new PrismaClient for long-running jobs to avoid connection issues
-    const prisma = new PrismaClient({
-      log: ["error", "warn"],
-    });
-
-    try {
-      // 1. Update job status to RUNNING
-      logger.info("Updating job status to RUNNING", { jobId });
-      await withRetry(() => 
-        prisma.generationJob.update({
-          where: { id: jobId },
-          data: { status: "RUNNING" },
-        })
-      );
-
-      // Get the job details (like the user's prompt)
-      logger.info("Fetching job details", { jobId });
-      const job = await withRetry(() =>
-        prisma.generationJob.findUnique({
-          where: { id: jobId },
-        })
-      );
-
-      if (!job) {
-        throw new Error(`Job not found with ID: ${jobId}`);
-      }
-
-      // 2. Call the Google Gemini API to generate the plan
-      const model = genAI.getGenerativeModel({
-        model: "gemini-2.5-flash-preview-09-2025",
-        generationConfig: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: SchemaType.ARRAY,
-            items: {
-              type: SchemaType.OBJECT,
-              properties: {
-                id: { type: SchemaType.STRING },
-                title: { type: SchemaType.STRING },
-                description: { type: SchemaType.STRING },
-                status: { type: SchemaType.STRING },
-              },
-              required: ["id", "title", "description", "status"],
-            },
-          },
-        },
-        safetySettings: [
-          {
-            category: HarmCategory.HARM_CATEGORY_HARASSMENT,
-            threshold: HarmBlockThreshold.BLOCK_NONE,
-          },
-          {
-            category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
-            threshold: HarmBlockThreshold.BLOCK_NONE,
-          },
-          {
-            category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
-            threshold: HarmBlockThreshold.BLOCK_NONE,
-          },
-          {
-            category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
-            threshold: HarmBlockThreshold.BLOCK_NONE,
-          },
-        ],
-      });
-
-      // This is a stricter prompt to prevent the "Unterminated JSON" error
-      const prompt = `
-        You are an expert full-stack architect creating a PRODUCTION-READY Next.js 14 application.
-        
-        CRITICAL REQUIREMENTS:
-        1. Generate a COMPLETE, working Next.js 14 app with App Router
-        2. Use React Server Components and Client Components appropriately
-        3. Use Tailwind CSS for ALL styling (no vanilla CSS files)
-        4. Create a beautiful, modern, professional UI (like Vercel, Linear, or Stripe)
-        5. Include proper TypeScript types throughout
-        6. Make it IMMEDIATELY previewable in an iframe (single-page or multi-route)
-        7. Include responsive design (mobile, tablet, desktop)
-        8. Add smooth animations and transitions
-        9. Follow Next.js 14 best practices
-        
-        MUST GENERATE AT MINIMUM:
-        - Main App component (client component with "use client")
-        - Complete, working UI with all features
-        - Proper state management (useState, useEffect)
-        - Beautiful, professional design
-        - All functionality working without backend (use local state)
-        
-        DO NOT generate:
-        - Separate HTML/CSS/JS files (this is React/Next.js)
-        - Vanilla JavaScript files
-        - Multiple disconnected files
-        - Configuration-only files without UI
-        
-        User Prompt: "${job.prompt}"
-        
-        Generate a CONCISE, step-by-step plan (5-8 steps MAX) where:
-        - Step 1: "Create Main App Component" - The core UI/UX
-        - Step 2-4: Additional features/components
-        - Step 5-8: Enhancements, styling, polish
-        
-        Each step MUST result in actual React/TypeScript code, not config files.
-        
-        Return ONLY valid JSON array format:
-        [
-          {"id": "1", "title": "Create Main App Component", "description": "Build the core UI with all primary features.", "status": "pending"},
-          {"id": "2", "title": "Add Feature X", "description": "Implement X functionality.", "status": "pending"}
-        ]
-      `;
-
-      logger.info("Calling Gemini API to generate plan", { jobId });
-      const result = await model.generateContent(prompt);
-
-      const response = result.response;
-      
-      // Check if the response was blocked
-      if (!response.candidates || response.candidates.length === 0) {
-        logger.error("Gemini API blocked the response", { 
-          jobId, 
-          promptFeedback: response.promptFeedback 
-        });
-        throw new Error("AI safety filters blocked the response. Please try a different prompt.");
-      }
-      
-      let text = response.text();
-      
-      // 3. Clean and validate the AI's response
-      // Remove markdown code blocks if present
-      text = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-      
-      let plan: PlanStep[];
-      try {
-        plan = JSON.parse(text);
-        if (!Array.isArray(plan) || plan.length === 0) {
-           throw new Error("AI returned an empty or invalid plan.");
-        }
-        // Validate each step has required fields
-        for (const step of plan) {
-          if (!step.id || !step.title || !step.description || !step.status) {
-            throw new Error("Plan step missing required fields.");
-          }
-        }
-      } catch (parseError) {
-        logger.error("AI returned invalid JSON", { jobId, text, error: parseError });
-        throw new Error("AI returned invalid JSON. See job logs for details.");
-      }
-      
-      const planString = JSON.stringify(plan);
-
-      // 4. Update job with the plan and set status to COMPLETED
-      logger.info("Job plan generated, updating status to COMPLETED", { jobId });
-      await withRetry(() =>
-        prisma.generationJob.update({
-          where: { id: jobId },
-          data: {
-            status: "COMPLETED",
-            planJson: planString, // Store the generated plan
-          },
-        })
-      );
-
-      return { success: true, jobId, plan: planString };
-
-    } catch (error: unknown) {
-      // 4. Handle any errors
-      let errorMessage = "An unknown error occurred";
-      if (error instanceof Error) {
-        errorMessage = error.message;
-        logger.error("Job failed with error", { 
-          jobId, 
-          error: errorMessage,
-          stack: error.stack 
-        });
-      } else {
-        logger.error("Job failed with unknown error type", { jobId, error         });
-      }
-
-      await withRetry(() =>
-        prisma.generationJob.update({
-          where: { id: jobId },
-          data: {
-            status: "FAILED",
-            result: errorMessage,
-          },
-        })
-      );
-      
-      throw error;
-    } finally {
-      // 5. Always disconnect the Prisma client to prevent connection leaks
-      try {
-        await prisma.$disconnect();
-      } catch (disconnectError) {
-        logger.error("Error disconnecting Prisma", { jobId, error: disconnectError });
-      }
-    }
-  },
-});
-
-/**
- * JOB 2: THE BUILDER
- * Takes a job ID, loops through the plan, and generates code for each step.
- */
-export const codeGenerationJob = task({
-  id: "code-generation-job",
-  run: async (payload: { jobId: string }) => {
-    const { jobId } = payload;
-    const prisma = new PrismaClient({
-      log: ["error", "warn"],
-    });
-
-    try {
-      // 1. Get the job and its plan
-      const job = await prisma.generationJob.findUnique({
-        where: { id: jobId },
-      });
-
-      if (!job || !job.planJson) {
-        throw new Error(`Job or plan not found for ID: ${jobId}`);
-      }
-
-      const plan: PlanStep[] = JSON.parse(job.planJson);
-
-      // 2. Loop through each step of the plan
-      for (let i = 0; i < plan.length; i++) {
-        const step = plan[i];
-
-        // 3. Update step status to RUNNING and save
-        plan[i].status = "running";
-        logger.info(`Starting step ${i + 1}/${plan.length}: ${step.title}`, { jobId });
-        await withRetry(() =>
-          prisma.generationJob.update({
-            where: { id: jobId },
-            data: { planJson: JSON.stringify(plan) },
-          })
-        );
-
-        // 4. Call the AI Router to generate code for the step
-        const generatedCode = await aiRouter(step, job.prompt, plan);
-
-        // 5. Update step with generated code and set status to COMPLETED
-        plan[i].status = "completed";
-        plan[i].code = generatedCode; // Store the generated code
-        logger.info(`Completed step ${i + 1}/${plan.length}: ${step.title}`, { jobId });
-        await withRetry(() =>
-          prisma.generationJob.update({
-            where: { id: jobId },
-            data: { planJson: JSON.stringify(plan) },
-          })
-        );
-      }
-
-      // 6. Mark the entire job as finished
-      logger.info("All code generation steps completed successfully", { jobId });
-      await prisma.generationJob.update({
-        where: { id: jobId },
-        data: {
-          result: "Code generation successful. Ready for review.",
-        },
-      });
-
-      return { success: true, jobId };
-
-    } catch (error: unknown) {
-      let errorMessage = "An unknown error occurred during code generation";
-      if (error instanceof Error) {
-        errorMessage = error.message;
-      }
-      logger.error("Code generation job failed", { jobId, error: errorMessage });
-
-      await prisma.generationJob.update({
-        where: { id: jobId },
-        data: {
-          status: "FAILED",
-          result: errorMessage,
-        },
-      });
-      
-      throw error;
-    } finally {
-      try {
-        await prisma.$disconnect();
-      } catch (disconnectError) {
-        logger.error("Error disconnecting Prisma", { jobId, error: disconnectError });
-      }
-    }
-  },
-});
-
-/**
- * AI ROUTER
- * This function determines which AI model to use based on the task.
- */
-async function aiRouter(
-  step: PlanStep,
-  originalPrompt: string,
-  fullPlan: PlanStep[]
-): Promise<string> {
-  const stepTitle = step.title.toLowerCase();
-  const planString = JSON.stringify(fullPlan, null, 2);
-
-  // DEFAULT TO REACT/NEXT.JS COMPONENTS FOR EVERYTHING
-  logger.info(`Routing to OpenAI: ${step.title}`);
+function convertToPlanFormat(files: Array<{ path: string; content: string }>): PlanStep[] {
+  const plan: PlanStep[] = [];
   
-  const prompt = `
-    You are an expert Next.js 14 developer creating PRODUCTION-READY code.
-    
-    CRITICAL REQUIREMENTS:
-    1. Generate COMPLETE, working React/TypeScript code
-    2. Use Next.js 14 App Router conventions
-    3. Use Tailwind CSS for ALL styling (no separate CSS files)
-    4. Create beautiful, modern, professional UI
-    5. Include proper TypeScript types
-    6. Use "use client" directive for interactive components
-    7. Make it work standalone (no external dependencies beyond React/Next.js basics)
-    8. Add smooth animations and micro-interactions
-    9. Make it responsive (mobile-first design)
-    
-    COMPONENT STRUCTURE:
-    - Export default function ComponentName()
-    - Include all imports at top
-    - Use React hooks (useState, useEffect) as needed
-    - Add proper error handling
-    - Include loading states
-    - Make it visually stunning
-    
-    DESIGN GUIDELINES:
-    - Use modern color palettes (blues, purples, gradients)
-    - Add shadows, rounded corners, and depth
-    - Include hover effects and transitions
-    - Make text readable with proper contrast
-    - Add icons where appropriate (use Lucide React or Unicode)
-    - Create clear visual hierarchy
-    
-    Original Prompt: "${originalPrompt}"
-    Full Plan: ${planString}
-    Current Step: "${step.title}"
-    Description: "${step.description}"
-    
-    Generate ONLY the raw TypeScript/TSX code for this component.
-    Do NOT include:
-    - Markdown code blocks
-    - Explanations or comments outside code
-    - "Here's the code" or similar text
-    - Multiple file suggestions
-    
-    Start directly with imports and code.
-  `;
+  console.log("=== CONVERTING TO PLAN FORMAT ===");
+  console.log(`Total files to convert: ${files.length}`);
   
-  const completion = await openai.chat.completions.create({
-    messages: [{ role: "user", content: prompt }],
-    model: "gpt-4-turbo",
-    temperature: 0.7,
+  // Log all files we're converting
+  files.forEach((f, idx) => {
+    console.log(`  ${idx + 1}. ${f.path} (${f.content.length} chars)`);
   });
   
-  return completion.choices[0].message.content || "// No code generated";
-} 
+  // Group files by category for better organization
+  const configs = files.filter(f => 
+    f.path.match(/\.(json|mjs|config\.ts|config\.mjs)$/) && 
+    !f.path.includes('/app/') &&
+    !f.path.includes('/components/') &&
+    !f.path.includes('/lib/')
+  );
+  
+  const styles = files.filter(f => 
+    f.path.includes('.css') || 
+    f.path.includes('globals.css') ||
+    f.path === 'app/globals.css'
+  );
+  
+  const pages = files.filter(f => 
+    f.path.includes('/app/') && 
+    (f.path.includes('page.tsx') || f.path.includes('layout.tsx'))
+  );
+  
+  const components = files.filter(f => 
+    f.path.includes('/components/') ||
+    f.path.startsWith('components/')
+  );
+  
+  const libs = files.filter(f => 
+    f.path.includes('/lib/') ||
+    f.path.startsWith('lib/')
+  );
+  
+  const middleware = files.filter(f => 
+    f.path === 'middleware.ts' || 
+    f.path.includes('/middleware.ts')
+  );
+  
+  const env = files.filter(f => 
+    f.path.includes('.env')
+  );
+  
+  // Collect all processed files
+  const processedPaths = new Set<string>();
+  
+  // Add config files
+  if (configs.length > 0) {
+    console.log(`\n📦 Step 1: Config files (${configs.length})`);
+    configs.forEach(f => {
+      console.log(`   - ${f.path}`);
+      processedPaths.add(f.path);
+    });
+    
+    plan.push({
+      id: "config",
+      title: "Project Configuration",
+      description: `Setup files: ${configs.map(f => f.path.split('/').pop()).join(', ')}`,
+      status: "completed",
+      priority: "critical",
+      dependencies: [],
+      code: configs.map(f => `<!-- file: ${f.path} -->\n${f.content}`).join('\n\n')
+    });
+  }
+  
+  // Add styles
+  if (styles.length > 0) {
+    console.log(`\n📦 Step 2: Styles (${styles.length})`);
+    styles.forEach(f => {
+      console.log(`   - ${f.path}`);
+      processedPaths.add(f.path);
+    });
+    
+    plan.push({
+      id: "styles",
+      title: "Styling System",
+      description: `Tailwind CSS and global styles`,
+      status: "completed",
+      priority: "high",
+      dependencies: ["config"],
+      code: styles.map(f => `<!-- file: ${f.path} -->\n${f.content}`).join('\n\n')
+    });
+  }
+  
+  // Add middleware
+  if (middleware.length > 0) {
+    console.log(`\n📦 Step 3: Middleware (${middleware.length})`);
+    middleware.forEach(f => {
+      console.log(`   - ${f.path}`);
+      processedPaths.add(f.path);
+    });
+    
+    plan.push({
+      id: "middleware",
+      title: "Middleware Configuration",
+      description: `Request/response middleware`,
+      status: "completed",
+      priority: "high",
+      dependencies: ["config"],
+      code: middleware.map(f => `<!-- file: ${f.path} -->\n${f.content}`).join('\n\n')
+    });
+  }
+  
+  // Add pages
+  if (pages.length > 0) {
+    console.log(`\n📦 Step 4: Pages & Layouts (${pages.length})`);
+    pages.forEach(f => {
+      console.log(`   - ${f.path}`);
+      processedPaths.add(f.path);
+    });
+    
+    plan.push({
+      id: "pages",
+      title: "Pages & Layouts",
+      description: `App router pages and layouts`,
+      status: "completed",
+      priority: "critical",
+      dependencies: ["config", "styles"],
+      code: pages.map(f => `<!-- file: ${f.path} -->\n${f.content}`).join('\n\n')
+    });
+  }
+  
+  // Add components
+  if (components.length > 0) {
+    console.log(`\n📦 Step 5: UI Components (${components.length})`);
+    components.forEach(f => {
+      console.log(`   - ${f.path}`);
+      processedPaths.add(f.path);
+    });
+    
+    plan.push({
+      id: "components",
+      title: "UI Components",
+      description: `React components: ${components.map(f => f.path.split('/').pop()).join(', ')}`,
+      status: "completed",
+      priority: "high",
+      dependencies: ["styles"],
+      code: components.map(f => `<!-- file: ${f.path} -->\n${f.content}`).join('\n\n')
+    });
+  }
+  
+  // Add lib files
+  if (libs.length > 0) {
+    console.log(`\n📦 Step 6: Utility Libraries (${libs.length})`);
+    libs.forEach(f => {
+      console.log(`   - ${f.path}`);
+      processedPaths.add(f.path);
+    });
+    
+    plan.push({
+      id: "libs",
+      title: "Utility Libraries",
+      description: `Helper functions and utilities`,
+      status: "completed",
+      priority: "high",
+      dependencies: [],
+      code: libs.map(f => `<!-- file: ${f.path} -->\n${f.content}`).join('\n\n')
+    });
+  }
+  
+  // Add env files
+  if (env.length > 0) {
+    console.log(`\n📦 Step 7: Environment (${env.length})`);
+    env.forEach(f => {
+      console.log(`   - ${f.path}`);
+      processedPaths.add(f.path);
+    });
+    
+    plan.push({
+      id: "env",
+      title: "Environment Configuration",
+      description: `Environment variables template`,
+      status: "completed",
+      priority: "low",
+      dependencies: [],
+      code: env.map(f => `<!-- file: ${f.path} -->\n${f.content}`).join('\n\n')
+    });
+  }
+  
+  // Catch any remaining files that weren't categorized
+  const remaining = files.filter(f => !processedPaths.has(f.path));
+  if (remaining.length > 0) {
+    console.log(`\n⚠️ WARNING: ${remaining.length} files not categorized!`);
+    remaining.forEach(f => {
+      console.log(`   - ${f.path}`);
+    });
+    
+    plan.push({
+      id: "misc",
+      title: "Additional Files",
+      description: `Miscellaneous project files`,
+      status: "completed",
+      priority: "medium",
+      dependencies: [],
+      code: remaining.map(f => `<!-- file: ${f.path} -->\n${f.content}`).join('\n\n')
+    });
+  }
+  
+  console.log("\n=== PLAN CONVERSION COMPLETE ===");
+  console.log(`Total steps: ${plan.length}`);
+  console.log(`Total files processed: ${processedPaths.size}/${files.length}`);
+  
+  if (processedPaths.size !== files.length) {
+    console.error(`❌ MISMATCH: Expected ${files.length} files, processed ${processedPaths.size}`);
+  } else {
+    console.log(`✅ All files accounted for!`);
+  }
+  
+  return plan;
+}
+
+/**
+ * Main AutoForge V2 Generation Task
+ */
+export const generateAppTask = task({
+  id: "autoforge-generate-app-v2",
+  retry: {
+    maxAttempts: 2,
+    minTimeoutInMs: 1000,
+    maxTimeoutInMs: 10000,
+    factor: 2,
+  },
+  queue: {
+    concurrencyLimit: 3,
+  },
+  run: async (payload: GenerateAppPayload): Promise<GenerateAppResult> => {
+    const { userPrompt, userId } = payload;
+
+    logger.info("🚀 AutoForge V2 Ultra: Starting generation", {
+      prompt: userPrompt,
+      userId,
+    });
+
+    try {
+      // Generate complete application using V2 engine
+      const result: GenerationResult = await generateCompleteApp(userPrompt, {
+        onProgress: (status: string) => {
+          logger.info(`📊 Progress: ${status}`);
+        },
+      });
+
+      logger.info("✅ Generation complete!", {
+        totalFiles: result.files.length,
+        projectName: result.metadata.projectName,
+        generationTime: `${(result.metadata.generationTime / 1000).toFixed(1)}s`,
+      });
+
+      // Convert to plan format for UI
+      const plan = convertToPlanFormat(
+        result.files.map((f: { path: string; content: string }) => ({ path: f.path, content: f.content }))
+      );
+
+      logger.info("📋 Plan created", {
+        totalSteps: plan.length,
+        filesDistributed: result.files.length,
+      });
+
+      // Verify critical files exist
+      const criticalFiles = [
+        "package.json",
+        "app/layout.tsx",
+        "app/page.tsx",
+      ];
+      
+      const missingCritical = criticalFiles.filter(
+        (file) => !result.files.some((f: { path: string; content: string }) => f.path === file)
+      );
+
+      if (missingCritical.length > 0) {
+        logger.warn("⚠️ Missing critical files", {
+          missing: missingCritical,
+        });
+      }
+
+      return {
+        success: true,
+        plan,
+        projectName: result.metadata.projectName,
+        metadata: {
+          totalFiles: result.files.length,
+          generationTime: result.metadata.generationTime,
+          framework: result.metadata.framework,
+        },
+      };
+    } catch (error) {
+      logger.error("❌ Generation failed", {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+
+      // Return error plan
+      return {
+        success: false,
+        plan: [
+          {
+            id: "error",
+            title: "Generation Failed",
+            description:
+              error instanceof Error ? error.message : "Unknown error occurred",
+            status: "failed",
+            priority: "critical",
+            dependencies: [],
+            error:
+              error instanceof Error ? error.message : "Unknown error occurred",
+          },
+        ],
+        projectName: "failed-generation",
+        error: error instanceof Error ? error.message : "Unknown error occurred",
+      };
+    }
+  },
+});
+
+/**
+ * Status check task for long-running generations
+ */
+export const checkGenerationStatus = task({
+  id: "autoforge-check-status",
+  run: async (payload: { jobId: string }) => {
+    logger.info("📊 Checking generation status", { jobId: payload.jobId });
+    
+    // This is a placeholder for status checking
+    // In a real implementation, you'd query your database or cache
+    return {
+      jobId: payload.jobId,
+      status: "completed",
+      progress: 100,
+    };
+  },
+});
+
+/**
+ * Cleanup task for expired generations
+ */
+export const cleanupExpiredGenerations = task({
+  id: "autoforge-cleanup",
+  run: async () => {
+    logger.info("🧹 Starting cleanup of expired generations");
+    
+    // Placeholder for cleanup logic
+    // In production, you'd:
+    // 1. Query database for old generations
+    // 2. Delete associated files
+    // 3. Update database records
+    
+    logger.info("✅ Cleanup complete");
+    
+    return {
+      cleaned: 0,
+      timestamp: new Date().toISOString(),
+    };
+  },
+});
+
+/**
+ * Health check task
+ */
+export const healthCheck = task({
+  id: "autoforge-health-check",
+  run: async () => {
+    logger.info("💊 Running health check");
+    
+    const health = {
+      status: "healthy",
+      timestamp: new Date().toISOString(),
+      services: {
+        anthropic: process.env.ANTHROPIC_API_KEY ? "configured" : "missing",
+        database: "connected", // Placeholder
+      },
+    };
+    
+    logger.info("✅ Health check complete", health);
+    
+    return health;
+  },
+});

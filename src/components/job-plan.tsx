@@ -13,9 +13,9 @@ import {
   XCircle,
   ChevronRight,
   AlertCircle,
+  WifiOff,
 } from "lucide-react";
 
-// Export this type so generation-interface.tsx can use it
 export type PlanStep = {
   id: string;
   title: string;
@@ -24,8 +24,8 @@ export type PlanStep = {
   code?: string;
 };
 
-// These are the "in progress" statuses from Trigger.dev
-const inProgressStatuses = [
+// Trigger.dev status categories
+const IN_PROGRESS_STATUSES = [
   "PENDING_VERSION",
   "QUEUED",
   "DEQUEUED",
@@ -34,8 +34,7 @@ const inProgressStatuses = [
   "DELAYED",
 ];
 
-// These are the "failure" statuses from Trigger.dev
-const failureStatuses = [
+const FAILURE_STATUSES = [
   "CANCELED",
   "CRASHED",
   "SYSTEM_FAILURE",
@@ -46,117 +45,161 @@ const failureStatuses = [
 interface JobPlanProps {
   initialJob: GenerationJob;
   accessToken: string;
-  jobId: string; // This should be the Trigger.dev run ID
+  jobId: string;
 }
 
 export default function JobPlan({ initialJob, accessToken, jobId }: JobPlanProps) {
   const [plan, setPlan] = useState<PlanStep[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isBuilding, setIsBuilding] = useState(false);
-  const [buildRunId, setBuildRunId] = useState<string | null>(null);
+  const [activeRunId, setActiveRunId] = useState<string | null>(null);
+  const [realtimeEnabled, setRealtimeEnabled] = useState(true);
+  const [pollingActive, setPollingActive] = useState(false);
 
-  // Check if we should start with build run ID
+  // Initialize active run ID from job
   useEffect(() => {
+    // Check for build run ID first
     if (initialJob.result && initialJob.result.startsWith("buildRunId:")) {
       const runId = initialJob.result.replace("buildRunId:", "");
-      setBuildRunId(runId);
+      setActiveRunId(runId);
+      setIsBuilding(true);
     }
-  }, [initialJob.result]);
+    // Otherwise use the planning run ID
+    else if (jobId && jobId.startsWith("run_")) {
+      setActiveRunId(jobId);
+    }
+  }, [initialJob.result, jobId]);
 
-  // This is the real-time hook for the PLAN generation
-  const { run: planRun } = useRealtimeRun(
-    jobId && jobId.startsWith("run_") && !buildRunId ? jobId : undefined,
-    { accessToken, enabled: !!(jobId && jobId.startsWith("run_") && !buildRunId) }
+  // Enhanced real-time hook with error handling
+  const { run, error: realtimeError } = useRealtimeRun(
+    activeRunId && activeRunId.startsWith("run_") && realtimeEnabled ? activeRunId : undefined,
+    { 
+      accessToken,
+      enabled: !!(activeRunId && activeRunId.startsWith("run_") && accessToken && realtimeEnabled),
+    }
   );
 
-  // This is the real-time hook for the BUILD/CODE generation
-  const { run: buildRun } = useRealtimeRun(
-    buildRunId && buildRunId.startsWith("run_") ? buildRunId : undefined,
-    { accessToken, enabled: !!(buildRunId && buildRunId.startsWith("run_")) }
-  );
-
-  // Use the appropriate run based on what's active
-  const activeRun = buildRun || planRun;
-
-  // This effect runs when the real-time `run` data changes OR we need to poll
+  // Handle realtime errors
   useEffect(() => {
-    // If we're building and not getting real-time updates, poll the database
-    if (isBuilding) {
-      const pollInterval = setInterval(async () => {
-        try {
-          const response = await fetch(`/api/generate/status?jobId=${initialJob.id}`);
-          const data = await response.json();
-          
-          if (data.job && data.job.planJson) {
-            const parsedPlan = JSON.parse(data.job.planJson);
-            setPlan(parsedPlan);
-            
-            // Check if all steps are completed
-            const allCompleted = parsedPlan.every((step: PlanStep) => step.status === "completed");
-            const anyFailed = parsedPlan.some((step: PlanStep) => step.status === "failed");
-            
-            if (allCompleted || anyFailed) {
-              setIsBuilding(false);
-              clearInterval(pollInterval);
-            }
-          }
-        } catch (err) {
-          console.error("Polling error:", err);
-        }
-      }, 2000); // Poll every 2 seconds
-
-      return () => clearInterval(pollInterval);
+    if (realtimeError) {
+      console.error("❌ Realtime connection error:", realtimeError);
+      // Disable realtime and fall back to polling
+      setRealtimeEnabled(false);
+      setPollingActive(true);
+      console.log("🔄 Falling back to polling mode");
     }
-  }, [isBuilding, initialJob.id]);
+  }, [realtimeError]);
 
-  // This effect handles real-time updates
+  // Parse initial plan from job
   useEffect(() => {
-    // Attempt to parse the plan from the latest run data first
-    let currentPlanJson: string | null = null;
-
-    if (activeRun?.status === "COMPLETED") {
-      if (activeRun.output && typeof activeRun.output === "object" && "plan" in activeRun.output) {
-        currentPlanJson = activeRun.output.plan as string;
-        // If build completed via real-time, stop polling
-        if (isBuilding) {
-          setIsBuilding(false);
-        }
-      }
-    } else if (activeRun?.status === "EXECUTING") {
-      // For the code generation job, the payload just has jobId
-      // We rely on polling for updates during execution
-      console.log("Build job executing, relying on polling for updates");
-    }
-    
-    // Fallback to the initial job data if real-time data is not ready
-    if (!currentPlanJson && initialJob.planJson) {
-      currentPlanJson = initialJob.planJson;
-    }
-
-    // Try to parse whatever plan we found
-    if (currentPlanJson) {
+    if (initialJob.planJson) {
       try {
-        const parsed = JSON.parse(currentPlanJson);
+        const parsed = JSON.parse(initialJob.planJson);
         setPlan(parsed);
-        
-        // Check if all steps completed via real-time update
-        if (isBuilding && parsed.length > 0) {
-          const allCompleted = parsed.every((step: PlanStep) => step.status === "completed");
-          if (allCompleted) {
-            setIsBuilding(false);
-          }
-        }
       } catch (e) {
-        console.error("Failed to parse plan:", e);
+        console.error("Failed to parse initial plan:", e);
         setError("Failed to parse generation plan.");
       }
     }
-  }, [activeRun, initialJob.planJson, isBuilding]); // Rerun when the hook data or initial data changes
+  }, [initialJob.planJson]);
 
-  // This new function calls our "build" API
+  // Handle real-time updates from Trigger.dev
+  useEffect(() => {
+    if (!run) return;
+
+    // Check for failures
+    if (FAILURE_STATUSES.includes(run.status)) {
+      const errorOutput = run.output as { error?: string } | undefined;
+      setError(errorOutput?.error || "Job failed during execution");
+      setIsBuilding(false);
+      return;
+    }
+
+    // Check for completion
+    if (run.status === "COMPLETED") {
+      if (run.output && typeof run.output === "object" && "plan" in run.output) {
+        try {
+          const parsedPlan = JSON.parse(run.output.plan as string);
+          setPlan(parsedPlan);
+          setIsBuilding(false);
+        } catch (e) {
+          console.error("Failed to parse plan from run output:", e);
+          setError("Failed to parse the generated plan.");
+        }
+      } else {
+        setIsBuilding(false);
+      }
+    }
+  }, [run]);
+
+  // Enhanced polling fallback (always active when building OR when realtime is disabled)
+  useEffect(() => {
+    if (!isBuilding && !pollingActive) return;
+
+    console.log("🔄 Starting polling...");
+    let pollAttempts = 0;
+    const maxAttempts = 100; // 100 * 2 seconds = 3.3 minutes max
+
+    const pollInterval = setInterval(async () => {
+      try {
+        pollAttempts++;
+        
+        if (pollAttempts > maxAttempts) {
+          console.warn("⚠️ Max polling attempts reached");
+          clearInterval(pollInterval);
+          setError("Polling timeout. The job may still be running. Please refresh the page.");
+          return;
+        }
+
+        const response = await fetch(`/api/generate/status?jobId=${initialJob.id}`);
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        
+        if (data.job?.planJson) {
+          const parsedPlan = JSON.parse(data.job.planJson);
+          setPlan(parsedPlan);
+          
+          // Check if build is complete
+          const allCompleted = parsedPlan.every((step: PlanStep) => 
+            step.status === "completed"
+          );
+          const anyFailed = parsedPlan.some((step: PlanStep) => 
+            step.status === "failed"
+          );
+          
+          if (allCompleted || anyFailed) {
+            console.log("✅ Build complete");
+            setIsBuilding(false);
+            setPollingActive(false);
+            clearInterval(pollInterval);
+            
+            if (anyFailed) {
+              const failedCount = parsedPlan.filter((s: PlanStep) => s.status === "failed").length;
+              setError(`${failedCount} step(s) failed during generation. Fallback code was generated. You can still edit the code in the AI Workspace.`);
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Polling error:", err);
+        // Don't set error state for individual polling failures, just log them
+        // The interval will keep trying
+      }
+    }, 2000); // Poll every 2 seconds
+
+    return () => {
+      console.log("🛑 Stopping polling");
+      clearInterval(pollInterval);
+    };
+  }, [isBuilding, pollingActive, initialJob.id]);
+
   const handleStartBuild = async () => {
     setIsBuilding(true);
     setError(null);
+    setPollingActive(true);
 
     try {
       const response = await fetch("/api/generate/build", {
@@ -172,18 +215,16 @@ export default function JobPlan({ initialJob, accessToken, jobId }: JobPlanProps
       
       const data = await response.json();
       
-      // Store the build run ID for realtime updates
+      // Switch to build run for real-time updates
       if (data.triggerRunId) {
-        setBuildRunId(data.triggerRunId);
-        console.log("Build started with run ID:", data.triggerRunId);
+        setActiveRunId(data.triggerRunId);
+        console.log("✅ Build started with run ID:", data.triggerRunId);
       }
       
-      // Update local plan status immediately - start polling
+      // Optimistically update plan status
       setPlan(prevPlan => 
         prevPlan.map(step => ({ ...step, status: 'running' as const }))
       );
-      
-      // Polling will start automatically via useEffect
 
     } catch (err: unknown) {
       if (err instanceof Error) {
@@ -192,6 +233,7 @@ export default function JobPlan({ initialJob, accessToken, jobId }: JobPlanProps
         setError("An unknown error occurred.");
       }
       setIsBuilding(false);
+      setPollingActive(false);
     }
   };
 
@@ -217,7 +259,7 @@ export default function JobPlan({ initialJob, accessToken, jobId }: JobPlanProps
           </Badge>
         );
       case "failed":
-         return (
+        return (
           <Badge variant="destructive">
             <XCircle className="mr-1 h-3 w-3" />
             Failed
@@ -230,9 +272,8 @@ export default function JobPlan({ initialJob, accessToken, jobId }: JobPlanProps
   };
 
   const renderContent = () => {
-    // 1. Show main loading skeletons if the *plan* is not ready yet
-    // We check the run status from the hook (if available)
-    if (activeRun && inProgressStatuses.includes(activeRun.status) && !plan.length) {
+    // Show loading state if plan generation is in progress
+    if (run && IN_PROGRESS_STATUSES.includes(run.status) && !plan.length) {
       return (
         <div className="space-y-4">
           <Skeleton className="h-16 w-full" />
@@ -242,27 +283,31 @@ export default function JobPlan({ initialJob, accessToken, jobId }: JobPlanProps
       );
     }
 
-    // 2. Show an error if the *plan generation* failed
-    if (activeRun && failureStatuses.includes(activeRun.status)) {
-      const errorOutput = activeRun.output as { error?: string } | undefined;
+    // Show error if plan generation failed
+    if (error) {
       return (
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Generation Failed</AlertTitle>
+          <AlertTitle>Generation Issue</AlertTitle>
           <AlertDescription>
-            {errorOutput?.error || "An unknown error occurred during generation."}
+            {error}
+            {error.includes("fallback") && (
+              <p className="mt-2 text-xs">
+                💡 Tip: You can edit and improve the generated code in the AI Workspace below.
+              </p>
+            )}
           </AlertDescription>
         </Alert>
       );
     }
 
-    // 3. Show the plan if it's ready (either from initialJob or from the hook)
+    // Show the plan
     if (plan.length > 0) {
       return (
         <div className="flow-root">
           <ul role="list" className="-mb-8">
             {plan.map((step, stepIdx) => (
-              <li key={step.id}> {/* Use stable step.id for the key */}
+              <li key={step.id}>
                 <div className="relative pb-8">
                   {stepIdx !== plan.length - 1 ? (
                     <span
@@ -275,11 +320,15 @@ export default function JobPlan({ initialJob, accessToken, jobId }: JobPlanProps
                       <div className="relative px-1">
                         <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-100 ring-8 ring-white dark:bg-gray-800 dark:ring-gray-900">
                           {step.status === "completed" ? (
-                             <CheckCircle className="h-5 w-5 text-green-500" />
+                            <CheckCircle className="h-5 w-5 text-green-500" />
+                          ) : step.status === "running" ? (
+                            <Loader className="h-5 w-5 text-blue-500 animate-spin" />
+                          ) : step.status === "failed" ? (
+                            <XCircle className="h-5 w-5 text-red-500" />
                           ) : (
-                             <span className="text-gray-500 dark:text-gray-400">
-                               {String(stepIdx + 1).padStart(2, "0")}
-                             </span>
+                            <span className="text-gray-500 dark:text-gray-400">
+                              {String(stepIdx + 1).padStart(2, "0")}
+                            </span>
                           )}
                         </div>
                       </div>
@@ -304,28 +353,22 @@ export default function JobPlan({ initialJob, accessToken, jobId }: JobPlanProps
       );
     }
     
-    // 4. Fallback for when we have no run data and no plan
-    if (!activeRun && !plan.length) {
-      return (
-        <div className="space-y-4">
-          <Skeleton className="h-16 w-full" />
-          <Skeleton className="h-16 w-full" />
-          <Skeleton className="h-16 w-full" />
-        </div>
-      );
-    }
-    
-    // 5. Fallback for when the job is COMPLETED but plan is empty
+    // Fallback for no data
     return (
-       <Alert>
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>No Plan Generated</AlertTitle>
-          <AlertDescription>
-            The generation job completed, but the AI did not return a valid plan.
-          </AlertDescription>
-        </Alert>
+      <Alert>
+        <AlertCircle className="h-4 w-4" />
+        <AlertTitle>No Plan Generated</AlertTitle>
+        <AlertDescription>
+          Waiting for the AI to generate a plan...
+        </AlertDescription>
+      </Alert>
     );
   };
+
+  // Check if plan is complete and ready to build
+  const isPlanComplete = plan.length > 0 && 
+    plan.every(step => step.status === "completed" || step.status === "pending") &&
+    !isBuilding;
 
   return (
     <div className="flex flex-col gap-6">
@@ -334,26 +377,30 @@ export default function JobPlan({ initialJob, accessToken, jobId }: JobPlanProps
           Generation Pipeline
         </h2>
         <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-          This is the step-by-step plan for your application.
+          {isBuilding ? "Building your application..." : "Step-by-step plan for your application"}
         </p>
+        
+        {/* Connection status indicator */}
         {isBuilding && (
-          <p className="mt-2 text-xs text-blue-600 dark:text-blue-400 flex items-center gap-2">
-            <Loader className="h-3 w-3 animate-spin" />
-            Live updates - polling every 2 seconds
-          </p>
+          <div className="mt-2 flex items-center gap-2">
+            {realtimeEnabled && !realtimeError ? (
+              <p className="text-xs text-blue-600 dark:text-blue-400 flex items-center gap-2">
+                <Loader className="h-3 w-3 animate-spin" />
+                Live updates enabled
+              </p>
+            ) : (
+              <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-2">
+                <WifiOff className="h-3 w-3" />
+                Using polling mode
+              </p>
+            )}
+          </div>
         )}
+        
         <div className="mt-6">{renderContent()}</div>
       </div>
 
-      {error && (
-         <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Error</AlertTitle>
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
-
-      {((activeRun?.status === "COMPLETED" && plan.length > 0) || (initialJob.status === "COMPLETED" && plan.length > 0 && !isBuilding)) && (
+      {isPlanComplete && (
         <Button
           size="lg"
           className="w-full"

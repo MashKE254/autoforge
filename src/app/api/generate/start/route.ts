@@ -1,73 +1,101 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
-import { tasks } from "@trigger.dev/sdk";
-
-// Use relative paths to import shared configs/clients
 import { authOptions } from "../../auth/[...nextauth]/route";
-import { prisma } from "../../../../lib/prisma";
+import { prisma } from "@/lib/prisma";
+import { tasks } from "@trigger.dev/sdk/v3";
 
-/**
- * API route to start the generation job
- */
 export async function POST(request: Request) {
   try {
-    // 1. Get user session
-    const session = await getServerSession(authOptions);
+    console.log("📝 /api/generate/start - Starting...");
 
-    // 2. Protect the route
+    // 1. Check authentication
+    const session = await getServerSession(authOptions);
     if (!session || !session.user || !session.user.id) {
+      console.error("❌ Unauthorized request");
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // 3. Parse the request body
-    const body = await request.json();
-    const { prompt } = body;
+    console.log("✅ User authenticated:", session.user.id);
 
-    if (!prompt || typeof prompt !== "string") {
+    // 2. Parse and validate request body
+    const body = await request.json();
+    const { prompt, originalPrompt } = body;
+
+    if (!prompt || typeof prompt !== "string" || prompt.trim().length === 0) {
+      console.error("❌ Invalid prompt");
       return NextResponse.json(
-        { error: "Prompt is required and must be a string" },
+        { error: "Valid prompt is required" },
         { status: 400 }
       );
     }
 
-    // 4. Create a job record in the database
+    console.log("✅ Prompt received:", prompt.substring(0, 50) + "...");
+
+    // Check if this is an enhanced prompt
+    const isEnhanced = originalPrompt && originalPrompt !== prompt;
+    
+    if (isEnhanced) {
+      console.log("🧠 GPT-4 enhanced prompt detected");
+      console.log("   Original length:", originalPrompt.length);
+      console.log("   Enhanced length:", prompt.length);
+      console.log("   Expansion ratio:", (prompt.length / originalPrompt.length).toFixed(1) + "x");
+    } else {
+      console.log("📝 Using original prompt (no enhancement)");
+    }
+
+    // 3. Create the job in database with enhancement tracking
     const job = await prisma.generationJob.create({
       data: {
-        prompt,
-        status: "PENDING",
         userId: session.user.id,
+        prompt: prompt.trim(), // The prompt to use for generation (enhanced or original)
+        enhancedPrompt: isEnhanced ? prompt.trim() : null, // Store enhanced version if used
+        enhancementUsed: isEnhanced, // Track if enhancement was used
+        status: "PENDING",
       },
     });
 
-    // 5. Trigger the background job and get the run handle
-    const handle = await tasks.trigger("generate-application-job", {
-      jobId: job.id,
-    });
+    console.log("✅ Job created in database:", job.id);
+    console.log("   Enhancement used:", isEnhanced);
 
-    // 6. Store the Trigger.dev run ID in the database
+    // 4. Trigger the Trigger.dev job
+    console.log("🚀 Triggering generate-application-job...");
+    
+    const handle = await tasks.trigger(
+      "generate-application-job",
+      { jobId: job.id }
+    );
+
+    console.log("✅ Trigger.dev job started:", handle.id);
+
+    // 5. CRITICAL: Store the Trigger.dev run ID in the database
     await prisma.generationJob.update({
       where: { id: job.id },
       data: {
-        // Store the run ID in the result field temporarily
-        // or add a new field called triggerRunId to your schema
         result: `triggerRunId:${handle.id}`,
       },
     });
 
-    // 7. Return both the job ID and the Trigger.dev run ID
+    console.log("✅ Trigger run ID stored:", handle.id);
+
+    // 6. Return success response
+    return NextResponse.json({
+      success: true,
+      jobId: job.id,
+      triggerRunId: handle.id,
+      enhancementUsed: isEnhanced, // Let frontend know if enhancement was used
+    });
+
+  } catch (error: unknown) {
+    console.error("❌ Error in /api/generate/start:", error);
+    
+    const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+    
     return NextResponse.json(
       { 
-        jobId: job.id,
-        triggerRunId: handle.id, // This is what we need for realtime
+        error: "Failed to start generation job",
+        details: errorMessage,
       },
-      { status: 202 }
+      { status: 500 }
     );
-  } catch (error) {
-    let errorMessage = "An unknown error occurred";
-    if (error instanceof Error) {
-      errorMessage = error.message;
-    }
-    console.error("Error in /api/generate/start:", errorMessage);
-    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
