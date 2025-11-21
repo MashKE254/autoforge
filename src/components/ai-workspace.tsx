@@ -1,5 +1,5 @@
 "use client";
-
+//src/components/ai-workspace.tsx
 import { useState, useRef, useEffect, useCallback } from "react";
 import Editor from "@monaco-editor/react";
 import { Button } from "@/components/ui/button";
@@ -28,18 +28,15 @@ import {
   Zap,
   Rocket,
   WifiOff,
+  Share2,
+  Copy,
+  ExternalLink,
 } from "lucide-react";
 import { PlanStep } from "./job-plan";
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
 import { WebContainer, FileSystemTree } from "@webcontainer/api";
 import WebContainerManager from "@/lib/webcontainer-manager";
-
-interface ParsedFile {
-  path: string;
-  content: string;
-  language: string;
-}
 
 interface AIWorkspaceProps {
   plan: PlanStep[];
@@ -154,7 +151,7 @@ function detectLanguageFromPath(path: string): string {
 /**
  * ENHANCED FILE EXTRACTOR - Handles XML markers and code fences
  */
-function extractFilesFromStep(code: string, stepId: string): FileNode[] {
+function extractFilesFromStep(code: string): FileNode[] {
   const files: FileNode[] = [];
   
   // Strategy 1: XML-style markers (current plan format)
@@ -235,10 +232,15 @@ Your ${plan.length}-step implementation plan is ready. Let me know if you want t
   const [terminalOutput, setTerminalOutput] = useState<string[]>([]);
   const [isInstalling, setIsInstalling] = useState(false);
   const [serverProcess, setServerProcess] = useState<{ kill: () => void } | null>(null);
-  const [installProgress, setInstallProgress] = useState(0);
+  const [installProgress] = useState(0);
   const [isDeploying, setIsDeploying] = useState(false);
   const [isComplete, setIsComplete] = useState(false);
   const [missingFiles, setMissingFiles] = useState<string[]>([]);
+  
+  // NEW: Shareable preview and deployment state
+  const [shareableUrl, setShareableUrl] = useState<string | null>(null);
+  const [deploymentUrl, setDeploymentUrl] = useState<string | null>(null);
+  const [isCreatingPreview, setIsCreatingPreview] = useState(false);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -326,6 +328,130 @@ Your ${plan.length}-step implementation plan is ready. Let me know if you want t
     return true;
   }, [files, addTerminalOutput]);
 
+  /**
+   * NEW: Create shareable preview link
+   */
+  const handleCreateShareablePreview = async () => {
+    try {
+      setIsCreatingPreview(true);
+      addTerminalOutput("🔗 Creating shareable preview link...");
+
+      const response = await fetch('/api/preview/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jobId }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to create preview');
+      }
+
+      const data = await response.json();
+      setShareableUrl(data.shareableUrl);
+
+      addTerminalOutput(`✅ Shareable link created!`);
+      addTerminalOutput(`🔗 ${data.shareableUrl}`);
+      addTerminalOutput(`📅 Expires in 24 hours (${data.filesCount} files)`);
+      addTerminalOutput('');
+
+      // Copy to clipboard
+      try {
+        await navigator.clipboard.writeText(data.shareableUrl);
+        addTerminalOutput("📋 Link copied to clipboard!");
+      } catch {
+        addTerminalOutput("💡 Copy the link from above");
+      }
+    } catch (error) {
+      addTerminalOutput(`❌ Failed to create shareable link: ${error}`);
+    } finally {
+      setIsCreatingPreview(false);
+    }
+  };
+
+  /**
+   * NEW: Poll deployment status until ready
+   */
+  const pollDeploymentStatus = async () => {
+    const maxAttempts = 60; // 5 minutes max (5s intervals)
+    
+    for (let i = 0; i < maxAttempts; i++) {
+      // Wait 5 seconds
+      await new Promise(resolve => setTimeout(resolve, 5000));
+
+      try {
+        const response = await fetch(`/api/deploy/vercel?jobId=${jobId}`);
+        const data = await response.json();
+
+        if (data.deployment.status === 'ready') {
+          return;
+        }
+
+        if (data.deployment.status === 'error') {
+          throw new Error(data.deployment.buildLogs || 'Build failed');
+        }
+
+        addTerminalOutput(`⏳ Building... (${i + 1}/${maxAttempts})`);
+      } catch (error) {
+        // Continue polling even if one check fails
+        console.error('Status check error:', error);
+      }
+    }
+
+    throw new Error('Deployment timeout - took longer than 5 minutes');
+  };
+
+  /**
+   * NEW: Deploy to Vercel production (REAL implementation)
+   */
+  const handleDeployToProduction = async () => {
+    try {
+      setIsDeploying(true);
+      addTerminalOutput("🚀 Starting production deployment to Vercel...");
+      addTerminalOutput("📦 Packaging all generated files...");
+      addTerminalOutput('');
+
+      const response = await fetch('/api/deploy/vercel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jobId,
+          envVars: {
+            // Add environment variables if needed
+            // DATABASE_URL: 'your-production-db-url',
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Deployment failed');
+      }
+
+      const data = await response.json();
+      
+      addTerminalOutput("✅ Deployment created!");
+      addTerminalOutput(`🆔 Deployment ID: ${data.deploymentId}`);
+      addTerminalOutput("⏳ Building on Vercel (this takes 2-3 minutes)...");
+      addTerminalOutput(`🔍 Inspector: ${data.inspectorUrl}`);
+      addTerminalOutput('');
+
+      // Poll for status
+      await pollDeploymentStatus();
+
+      setDeploymentUrl(data.url);
+      addTerminalOutput('');
+      addTerminalOutput(`🎉 DEPLOYMENT COMPLETE!`);
+      addTerminalOutput(`🌍 Your app is live at: ${data.url}`);
+      addTerminalOutput('');
+    } catch (error) {
+      addTerminalOutput('');
+      addTerminalOutput(`❌ Deployment failed: ${error}`);
+    } finally {
+      setIsDeploying(false);
+    }
+  };
+
   useEffect(() => {
     if (initAttempted.current) return;
     initAttempted.current = true;
@@ -338,9 +464,9 @@ Your ${plan.length}-step implementation plan is ready. Let me know if you want t
           return;
         }
 
-        if (WebContainerManager.hasInstance()) {
+        if (WebContainerManager.instance !== null) {
           addTerminalOutput("♻️  Reusing existing WebContainer instance...");
-          const existingInstance = WebContainerManager.getExistingInstance();
+          const existingInstance = WebContainerManager.instance;
           if (existingInstance) {
             setWebContainer(existingInstance);
             setIsContainerReady(true);
@@ -352,8 +478,8 @@ Your ${plan.length}-step implementation plan is ready. Let me know if you want t
 
         addTerminalOutput("🔧 Booting WebContainer instance...");
         addTerminalOutput("⏳ Initial boot may take 15-30 seconds...");
-        
-        const container = await WebContainerManager.getInstance();
+
+        const container = await WebContainerManager.boot();
         
         setWebContainer(container);
         addTerminalOutput("✅ WebContainer ready for enterprise-scale applications!");
@@ -402,8 +528,8 @@ Your ${plan.length}-step implementation plan is ready. Let me know if you want t
       if (step.code && step.status === "completed") {
         console.log(`\n📦 Processing step ${stepIndex + 1}: ${step.id}`);
         console.log("Code length:", step.code.length);
-        
-        const extractedFiles = extractFilesFromStep(step.code, step.id);
+
+        const extractedFiles = extractFilesFromStep(step.code);
         
         console.log(`   Found ${extractedFiles.length} files in this step`);
         
@@ -755,6 +881,7 @@ npm run dev -- --port 3000 --hostname 0.0.0.0
     return () => {
       mounted = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [webContainer, isContainerReady, files.length, buildFileSystemTree, addTerminalOutput, startDevServer]);
 
   const handleStopServer = () => {
@@ -857,18 +984,6 @@ AutoForge V2: Faster than v0.dev, smarter than Bolt.new
     const blob = await zip.generateAsync({ type: "blob" });
     saveAs(blob, `${projectName}.zip`);
     addTerminalOutput(`📦 Downloaded ${files.length} files as ${projectName}.zip`);
-  };
-
-  const handleDeployToProduction = async () => {
-    setIsDeploying(true);
-    addTerminalOutput("🚀 Starting production deployment...");
-    addTerminalOutput("📦 Packaging application...");
-    addTerminalOutput("🔐 Authenticating with Vercel...");
-    addTerminalOutput("📤 Uploading files...");
-    addTerminalOutput("⚡ Building on Vercel...");
-    addTerminalOutput("✅ Deployment complete!");
-    addTerminalOutput("🌍 Your app is live at: https://your-app.vercel.app");
-    setIsDeploying(false);
   };
 
   const handleSendMessage = async () => {
@@ -1000,18 +1115,49 @@ AutoForge V2: Faster than v0.dev, smarter than Bolt.new
               Stop
             </Button>
           )}
-          {previewUrl && (
-            <Button 
-              variant="default" 
-              size="sm" 
-              onClick={handleDeployToProduction}
-              disabled={isDeploying}
-              className="bg-gradient-to-r from-green-600 to-emerald-600"
-            >
-              <Rocket className="h-3 w-3 mr-1" />
-              {isDeploying ? "Deploying..." : "Deploy Live"}
-            </Button>
-          )}
+          
+          {/* NEW: Share Preview Button */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleCreateShareablePreview}
+            disabled={!isComplete || isCreatingPreview}
+            className="border-purple-200"
+          >
+            {isCreatingPreview ? (
+              <>
+                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                Creating...
+              </>
+            ) : (
+              <>
+                <Share2 className="h-3 w-3 mr-1" />
+                Share Preview
+              </>
+            )}
+          </Button>
+
+          {/* UPDATED: Real Vercel Deployment Button */}
+          <Button
+            variant="default"
+            size="sm"
+            onClick={handleDeployToProduction}
+            disabled={!isComplete || isDeploying}
+            className="bg-gradient-to-r from-green-600 to-emerald-600"
+          >
+            {isDeploying ? (
+              <>
+                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                Deploying...
+              </>
+            ) : (
+              <>
+                <Rocket className="h-3 w-3 mr-1" />
+                Deploy Live
+              </>
+            )}
+          </Button>
+
           <Button variant="default" size="sm" onClick={handleDownload} className="bg-gradient-to-r from-blue-600 to-purple-600">
             <Download className="h-3 w-3 mr-1" />
             Download
@@ -1064,6 +1210,75 @@ AutoForge V2: Faster than v0.dev, smarter than Bolt.new
             Some essential files were missing: {missingFiles.join(", ")}. Auto-generated defaults were added.
           </AlertDescription>
         </Alert>
+      )}
+
+      {/* NEW: Show shareable URL when created */}
+      {shareableUrl && (
+        <div className="mx-3 mb-3 p-3 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-medium text-purple-900 dark:text-purple-300 mb-1">
+                🔗 Shareable Preview Link Created!
+              </p>
+              <code className="text-xs text-purple-700 dark:text-purple-400 block truncate">
+                {shareableUrl}
+              </code>
+              <p className="text-xs text-purple-600 dark:text-purple-400 mt-1">
+                Valid for 24 hours • Anyone with this link can view
+              </p>
+            </div>
+            <div className="flex gap-1 flex-shrink-0">
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => navigator.clipboard.writeText(shareableUrl)}
+                className="h-8"
+              >
+                <Copy className="h-3 w-3" />
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => window.open(shareableUrl, '_blank')}
+                className="h-8"
+              >
+                <ExternalLink className="h-3 w-3" />
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* NEW: Show deployment URL when ready */}
+      {deploymentUrl && (
+        <div className="mx-3 mb-3 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-medium text-green-900 dark:text-green-300 mb-1">
+                🎉 Production Deployment Complete!
+              </p>
+              <a
+                href={deploymentUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-green-700 dark:text-green-400 underline hover:text-green-800 dark:hover:text-green-300 block truncate"
+              >
+                {deploymentUrl}
+              </a>
+              <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+                Your app is now live on Vercel 🚀
+              </p>
+            </div>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => window.open(deploymentUrl, '_blank')}
+              className="h-8 flex-shrink-0"
+            >
+              <ExternalLink className="h-3 w-3" />
+            </Button>
+          </div>
+        </div>
       )}
 
       {isInstalling && installProgress > 0 && (

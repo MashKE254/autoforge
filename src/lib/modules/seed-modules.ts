@@ -1,4 +1,4 @@
-import { moduleSeeder } from '../src/lib/modules/module-seeder';
+import { moduleSeeder } from './module-seeder';
 import { ModuleCategory } from '@prisma/client';
 
 async function main() {

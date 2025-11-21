@@ -98,6 +98,8 @@ model GenerationJob {
   updatedAt             DateTime              @updatedAt
   status                JobStatus             @default(PENDING)
   prompt                String
+  enhancedPrompt        String?
+  enhancementUsed       Boolean               @default(false)
   planJson              String?
   result                String?
   userId                String
@@ -114,6 +116,8 @@ model GenerationJob {
   user                  User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
   modules               GenerationModule[]
   telemetry             GenerationTelemetry[]
+  previewSessions       PreviewSession[]
+  deployments           Deployment[]
 
   @@index([userId])
   @@index([status])
@@ -181,6 +185,48 @@ model ModuleImprovement {
 
   @@index([moduleId])
   @@index([createdAt])
+}
+
+// NEW MODELS FOR PREVIEW AND DEPLOYMENT
+
+model PreviewSession {
+  id              String        @id @default(cuid())
+  createdAt       DateTime      @default(now())
+  expiresAt       DateTime
+  generationJobId String
+  files           Json          // Stores the file structure and content
+  accessCount     Int           @default(0)
+  lastAccessedAt  DateTime?
+  generationJob   GenerationJob @relation(fields: [generationJobId], references: [id], onDelete: Cascade)
+
+  @@index([generationJobId])
+  @@index([expiresAt])
+}
+
+model Deployment {
+  id                String        @id @default(cuid())
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  generationJobId   String
+  vercelDeploymentId String?      @unique
+  vercelProjectId   String?
+  deploymentUrl     String?
+  status            DeploymentStatus @default(PENDING)
+  errorMessage      String?
+  buildLogs         String?
+  generationJob     GenerationJob @relation(fields: [generationJobId], references: [id], onDelete: Cascade)
+
+  @@index([generationJobId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+enum DeploymentStatus {
+  PENDING
+  BUILDING
+  READY
+  ERROR
+  CANCELLED
 }
 
 enum ModuleCategory {
