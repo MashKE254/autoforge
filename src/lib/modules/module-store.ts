@@ -1,5 +1,8 @@
 import { prisma } from '@/lib/prisma';
-import { Module, ModuleCategory, Prisma } from '@prisma/client';
+import { Module } from '@/types/prisma-types';
+import { Prisma } from '@prisma/client';
+
+type ModuleCategory = 'AUTH' | 'PAYMENT' | 'DATABASE' | 'UI' | 'API' | 'WORKFLOW' | 'AGENT' | 'INFRASTRUCTURE' | 'UTILITY' | 'TESTING';
 
 export interface ModuleSearchOptions {
   category?: ModuleCategory;

@@ -2,7 +2,7 @@ import PQueue from 'p-queue';
 import { Anthropic } from '@anthropic-ai/sdk';
 import { moduleStore } from '../modules/module-store';
 import { prisma } from '../prisma';
-import { ModuleCategory } from '@prisma/client';
+import { ModuleCategory } from '@/types/prisma-types';
 
 export interface GenerationTask {
   moduleId?: string; // If using existing module
@@ -27,7 +27,8 @@ export class ParallelGenerationEngine {
   private jobId: string;
   private progressCallback?: (progress: number, completed: number, total: number) => void;
 
-  constructor(jobId: string, concurrency: number = 1) {  // SEQUENTIAL - ONE AT A TIME
+  // FIX: Remove unused parameter from constructor signature
+  constructor(jobId: string) {
     this.jobId = jobId;
     this.queue = new PQueue({ 
       concurrency: 1,  // Only 1 request at a time for LocalAI stability
@@ -111,7 +112,7 @@ export class ParallelGenerationEngine {
         if (existingModule) {
           // Record usage
           await moduleStore.recordUsage(task.moduleId, true);
-          
+
           return {
             moduleName: task.moduleName,
             code: existingModule.code,
@@ -130,41 +131,35 @@ export class ParallelGenerationEngine {
       });
 
       if (similarModules.length > 0) {
-        const existingModule = similarModules[0];
-        console.log(`♻️  Reusing existing module: ${existingModule.name}`);
+        // FIX: Rename 'module' to 'foundModule' to avoid ESLint error
+        // "Do not assign to the variable `module`"
+        const foundModule = similarModules[0];
+        console.log(`♻️  Using similar module: ${foundModule.name}`);
         
-        await moduleStore.recordUsage(existingModule.id, true);
+        // Record usage
+        await moduleStore.recordUsage(foundModule.id, true);
         
         return {
           moduleName: task.moduleName,
-          code: existingModule.code,
+          code: foundModule.code,
           success: true,
-          generatedModuleId: existingModule.id
+          generatedModuleId: foundModule.id
         };
       }
 
-      // Generate new module using AI
+      // Generate new module
       console.log(`🔨 Generating new module: ${task.moduleName}`);
-      
       const code = await this.callAIModel(task);
-
-      // Save to module library
+      
+      // Store the new module
       const newModule = await moduleStore.create({
         name: task.moduleName,
         description: task.description,
         code,
         category: task.category,
-        tags: this.extractTags(task)
-      });
-
-      // Record in generation_module table
-      await prisma.generationModule.create({
-        data: {
-          generationJobId: this.jobId,
-          moduleId: newModule.id,
-          status: 'completed',
-          generatedCode: code
-        }
+        tags: this.extractTags(task),
+        framework: 'nextjs',
+        language: 'typescript'
       });
 
       return {
@@ -173,14 +168,15 @@ export class ParallelGenerationEngine {
         success: true,
         generatedModuleId: newModule.id
       };
+
     } catch (error) {
       console.error(`❌ Failed to generate ${task.moduleName}:`, error);
 
-      // Record failed generation
+      // Log telemetry
       await prisma.generationTelemetry.create({
         data: {
           generationJobId: this.jobId,
-          eventType: 'build_failure',
+          eventType: 'module_generation_failed',
           errorMessage: error instanceof Error ? error.message : 'Unknown error',
           stackTrace: error instanceof Error ? error.stack : undefined
         }

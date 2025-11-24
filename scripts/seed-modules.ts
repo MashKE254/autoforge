@@ -1,5 +1,6 @@
 import { moduleSeeder } from '../src/lib/modules/module-seeder';
-import { ModuleCategory } from '@prisma/client';
+
+type ModuleCategory = 'AUTH' | 'PAYMENT' | 'DATABASE' | 'UI' | 'API' | 'WORKFLOW' | 'AGENT' | 'INFRASTRUCTURE' | 'UTILITY' | 'TESTING';
 
 async function main() {
   const args = process.argv.slice(2);

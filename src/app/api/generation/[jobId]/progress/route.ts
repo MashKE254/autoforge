@@ -2,12 +2,26 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { prisma } from '@/lib/prisma';
 
+// Define types for the data structures
+interface ModuleWithInfo {
+  module: {
+    name: string;
+    category: string;
+  };
+  status: string;
+}
+
+interface TelemetryEntry {
+  errorMessage: string | null;
+  createdAt: Date;
+}
+
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ jobId: string }> }  // Promise type
+  { params }: { params: Promise<{ jobId: string }> }
 ) {
   try {
-    const { jobId } = await params;  // Await params
+    const { jobId } = await params;
     
     // Authentication
     const session = await getServerSession();
@@ -102,12 +116,14 @@ export async function GET(
       completedModules,
       failedModules: job.failedModules || 0,
       estimatedTimeRemaining,
-      modules: job.modules.map(m => ({
+      // FIX: Add proper type annotation for 'm' parameter
+      modules: job.modules.map((m: ModuleWithInfo) => ({
         name: m.module.name,
         category: m.module.category,
         status: m.status
       })),
-      errors: job.telemetry.map(t => ({
+      // FIX: Add proper type annotation for 't' parameter
+      errors: job.telemetry.map((t: TelemetryEntry) => ({
         message: t.errorMessage,
         timestamp: t.createdAt
       })),

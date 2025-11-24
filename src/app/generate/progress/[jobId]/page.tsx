@@ -16,7 +16,8 @@ import {
   Zap,
   Package,
   Download,
-  Home
+  Home,
+  Play
 } from 'lucide-react';
 
 interface ProgressData {
@@ -57,9 +58,13 @@ export default function ProgressPage({
         if (response.ok) {
           setData(result);
 
-          // Don't auto-redirect when completed - let user download first
-          if (result.status === 'FAILED') {
+          // Check for completion states and stop polling
+          if (result.status === 'COMPLETED') {
             clearInterval(interval);
+            console.log('✅ Generation complete! Ready to view workspace.');
+          } else if (result.status === 'FAILED') {
+            clearInterval(interval);
+            console.log('❌ Generation failed.');
           }
         }
       } catch (error) {
@@ -75,7 +80,9 @@ export default function ProgressPage({
     // Poll every 2 seconds
     const interval = setInterval(fetchProgress, 2000);
 
-    return () => clearInterval(interval);
+    return () => {
+      if (interval) clearInterval(interval);
+    };
   }, [jobId]);
 
   const handleDownload = async () => {
@@ -107,6 +114,10 @@ export default function ProgressPage({
     } finally {
       setDownloading(false);
     }
+  };
+
+  const handleOpenWorkspace = () => {
+    router.push(`/generate/result/${jobId}`);
   };
 
   if (loading) {
@@ -142,12 +153,12 @@ export default function ProgressPage({
         <h1 className="text-4xl font-bold mb-2 flex items-center gap-3">
           <Zap className="w-10 h-10 text-primary" />
           {isGenerating && 'Generating Application...'}
-          {isCompleted && 'Generation Complete!'}
+          {isCompleted && '🎉 Generation Complete!'}
           {isFailed && 'Generation Failed'}
         </h1>
         <p className="text-muted-foreground text-lg">
           {isGenerating && 'Please wait while we create your application'}
-          {isCompleted && 'Your application is ready to download!'}
+          {isCompleted && 'Your application is ready! Open the AI Workspace to preview and edit.'}
           {isFailed && 'Something went wrong during generation'}
         </p>
       </div>
@@ -181,58 +192,86 @@ export default function ProgressPage({
             <div>
               <p className="text-sm text-muted-foreground mb-1">Time Remaining</p>
               <p className="text-2xl font-bold">
-                {isCompleted ? 'Done!' : data.estimatedTimeRemaining}
+                {isCompleted ? 'Done!' : data.estimatedTimeRemaining || 'Calculating...'}
               </p>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Module Status */}
+      {/* Action Buttons - Show prominently when complete */}
+      {isCompleted && (
+        <Card className="mb-8 border-green-500 bg-green-50 dark:bg-green-950/20">
+          <CardContent className="pt-6">
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Button 
+                size="lg" 
+                onClick={handleOpenWorkspace}
+                className="gap-2 text-lg px-8 py-6"
+              >
+                <Play className="w-5 h-5" />
+                Open AI Workspace
+              </Button>
+              <Button 
+                size="lg" 
+                variant="outline"
+                onClick={handleDownload}
+                disabled={downloading}
+                className="gap-2"
+              >
+                {downloading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Download className="w-4 h-4" />
+                )}
+                Download ZIP
+              </Button>
+              <Button 
+                size="lg" 
+                variant="outline"
+                onClick={() => router.push('/dashboard')}
+                className="gap-2"
+              >
+                <Home className="w-4 h-4" />
+                Dashboard
+              </Button>
+            </div>
+            <p className="text-center text-sm text-muted-foreground mt-4">
+              The AI Workspace includes a live preview, code editor, and AI chat to modify your app.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Module List */}
       <Card className="mb-8">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Package className="w-5 h-5" />
-            Module Generation Status
+            Generated Modules ({data.completedModules}/{data.totalModules})
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <ScrollArea className="h-[400px] pr-4">
+          <ScrollArea className="h-[300px]">
             <div className="space-y-2">
-              {data.modules.map((module, i) => (
+              {data.modules.map((module, index) => (
                 <div
-                  key={i}
-                  className="flex items-center justify-between p-3 border rounded-lg"
+                  key={index}
+                  className="flex items-center justify-between p-3 bg-muted/50 rounded-lg"
                 >
                   <div className="flex items-center gap-3">
-                    {module.status === 'completed' && (
+                    {module.status === 'completed' ? (
                       <CheckCircle className="w-5 h-5 text-green-500" />
-                    )}
-                    {module.status === 'generating' && (
-                      <Loader2 className="w-5 h-5 text-blue-500 animate-spin" />
-                    )}
-                    {module.status === 'pending' && (
+                    ) : module.status === 'running' ? (
+                      <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
+                    ) : module.status === 'failed' ? (
+                      <AlertCircle className="w-5 h-5 text-red-500" />
+                    ) : (
                       <Clock className="w-5 h-5 text-gray-400" />
                     )}
-                    {module.status === 'failed' && (
-                      <AlertCircle className="w-5 h-5 text-red-500" />
-                    )}
-                    <div>
-                      <p className="font-medium">{module.name}</p>
-                      <p className="text-sm text-muted-foreground capitalize">
-                        {module.category.toLowerCase()}
-                      </p>
-                    </div>
+                    <span className="font-medium">{module.name}</span>
                   </div>
-                  <Badge
-                    variant={
-                      module.status === 'completed' ? 'default' :
-                      module.status === 'failed' ? 'destructive' :
-                      'secondary'
-                    }
-                  >
-                    {module.status}
-                  </Badge>
+                  <Badge variant="outline">{module.category}</Badge>
                 </div>
               ))}
             </div>
@@ -240,25 +279,22 @@ export default function ProgressPage({
         </CardContent>
       </Card>
 
-      {/* Errors */}
-      {data.errors.length > 0 && (
-        <Card className="mb-8">
+      {/* Errors Section */}
+      {data.errors && data.errors.length > 0 && (
+        <Card className="mb-8 border-red-200">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-red-600">
               <AlertCircle className="w-5 h-5" />
-              Errors
+              Errors ({data.errors.length})
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <ScrollArea className="h-[200px] pr-4">
+            <ScrollArea className="h-[200px]">
               <div className="space-y-2">
-                {data.errors.map((error, i) => (
-                  <Alert key={i} variant="destructive">
+                {data.errors.map((error, index) => (
+                  <Alert key={index} variant="destructive">
                     <AlertDescription>
-                      <p className="font-medium">{error.message}</p>
-                      <p className="text-xs mt-1">
-                        {new Date(error.timestamp).toLocaleString()}
-                      </p>
+                      {error.message || 'Unknown error'}
                     </AlertDescription>
                   </Alert>
                 ))}
@@ -268,60 +304,18 @@ export default function ProgressPage({
         </Card>
       )}
 
-      {/* Action Buttons */}
-      {isCompleted && (
-        <Card className="bg-green-50 border-green-200">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-xl font-bold text-green-900 mb-1">
-                  🎉 Your Application is Ready!
-                </h3>
-                <p className="text-green-700">
-                  Download your complete application and start developing
-                </p>
-              </div>
-              <div className="flex gap-3">
-                <Button
-                  onClick={() => router.push('/dashboard')}
-                  variant="outline"
-                  size="lg"
-                >
-                  <Home className="w-5 h-5 mr-2" />
-                  Dashboard
-                </Button>
-                <Button
-                  onClick={handleDownload}
-                  disabled={downloading}
-                  size="lg"
-                  className="bg-green-600 hover:bg-green-700"
-                >
-                  {downloading ? (
-                    <>
-                      <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                      Downloading...
-                    </>
-                  ) : (
-                    <>
-                      <Download className="w-5 h-5 mr-2" />
-                      Download Application
-                    </>
-                  )}
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Generating status */}
-      {isGenerating && (
-        <Alert>
-          <Loader2 className="h-4 w-4 animate-spin" />
-          <AlertDescription>
-            Generation in progress... This page will update automatically.
-          </AlertDescription>
-        </Alert>
+      {/* Bottom Actions for non-complete states */}
+      {!isCompleted && (
+        <div className="flex justify-center gap-4">
+          <Button 
+            variant="outline" 
+            onClick={() => router.push('/dashboard')}
+            className="gap-2"
+          >
+            <Home className="w-4 h-4" />
+            Back to Dashboard
+          </Button>
+        </div>
       )}
     </div>
   );

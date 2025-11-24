@@ -1,6 +1,7 @@
 import { Anthropic } from '@anthropic-ai/sdk';
 import { moduleStore } from './module-store';
-import { ModuleCategory } from '@prisma/client';
+
+type ModuleCategory = 'AUTH' | 'PAYMENT' | 'DATABASE' | 'UI' | 'API' | 'WORKFLOW' | 'AGENT' | 'INFRASTRUCTURE' | 'UTILITY' | 'TESTING';
 
 interface ModuleTemplate {
   name: string;

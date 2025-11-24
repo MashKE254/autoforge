@@ -16,7 +16,8 @@ if (process.env.NODE_ENV !== 'production') {
     .then(() => {
       console.log('✅ Database connected successfully');
     })
-    .catch((err) => {
+    // FIX: Add proper type annotation for 'err' parameter
+    .catch((err: Error) => {
       console.error('❌ Database connection failed:', err.message);
       console.log('💡 Check your database at: https://console.neon.tech');
     });

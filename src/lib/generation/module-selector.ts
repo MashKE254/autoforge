@@ -1,8 +1,21 @@
 import { Anthropic } from '@anthropic-ai/sdk';
 import { moduleStore } from '../modules/module-store';
-import { Blueprint, BlueprintModule } from './blueprint-generator';
+import { Blueprint } from './blueprint-generator';
 import { GenerationTask } from './parallel-engine';
-import { ModuleCategory } from '@prisma/client';
+
+// Import the enum from the generated Prisma client
+// Note: After running `npx prisma generate`, this enum will be available
+type ModuleCategory = 
+  | 'AUTH'
+  | 'PAYMENT'
+  | 'DATABASE'
+  | 'UI'
+  | 'API'
+  | 'WORKFLOW'
+  | 'AGENT'
+  | 'INFRASTRUCTURE'
+  | 'UTILITY'
+  | 'TESTING';
 
 export class ModuleSelector {
   private client: Anthropic;

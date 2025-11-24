@@ -1,68 +1,72 @@
+// src/app/job/[jobId]/page.tsx
+import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
-import { redirect } from "next/navigation";
-import { auth } from "@trigger.dev/sdk";
-
-// Use relative paths to import shared configs/clients
-import { authOptions } from "../../api/auth/[...nextauth]/route";
-import { prisma } from "../../../lib/prisma";
-
-// Import the Client Components
-import JobPlan from "../../../components/job-plan";
-import AIWorkspace from "../../../components/ai-workspace";
-import { Badge } from "@/components/ui/badge";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { redirect, notFound } from "next/navigation";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Sparkles, FileCode } from "lucide-react";
+import JobPlan from "@/components/job-plan";
+import AIWorkspace from "@/components/ai-workspace";
+import type { PlanStep } from "@/components/job-plan";
 
-// This is the new page prop type - params is now a Promise in Next.js 15
-interface JobPageProps {
-  params: Promise<{
-    jobId: string;
-  }>;
+// Define the file type
+interface GeneratedFileData {
+  path: string;
+  content: string;
+  language: string;
 }
 
-export default async function JobPage({ params }: JobPageProps) {
-  
-  // Get the user's session
+// Define the file type from Prisma query
+interface GeneratedFile {
+  path: string;
+  content: string;
+  language: string;
+}
+
+export default async function JobPage({
+  params,
+}: {
+  params: Promise<{ jobId: string }>;
+}) {
   const session = await getServerSession(authOptions);
-  if (!session || !session.user || !session.user.id) {
-    redirect("/api/auth/signin");
+  if (!session?.user) {
+    redirect("/");
   }
 
-  // Await params before destructuring jobId
   const { jobId } = await params;
 
-  // Generate the one-time access token for the real-time hook
-  // FIX: Added more permissions to avoid 403 error
-  const publicAccessToken = await auth.createPublicToken({
-    scopes: {
-      read: {
-        runs: ["*"],
-        // Add these additional permissions
-        batch: ["*"],
-        tags: ["*"],
-      },
-    },
-    // Add expiration for security
-    expirationTime: "1h",
-  });
-
-  // Fetch the initial job data
-  const initialJob = await prisma.generationJob.findFirst({
+  // Get the job with FILES from database
+  const initialJob = await prisma.generationJob.findUnique({
     where: {
       id: jobId,
       userId: session.user.id,
     },
+    include: {
+      files: true,  // ✅ Include the generated files!
+    },
   });
 
-  // Handle not found
   if (!initialJob) {
+    notFound();
+  }
+
+  // Get public access token for Trigger.dev realtime (if using Trigger.dev)
+  let publicAccessToken = "";
+  try {
+    // You may need to implement this based on your Trigger.dev setup
+    publicAccessToken = process.env.TRIGGER_PUBLIC_ACCESS_TOKEN || "";
+  } catch (error) {
+    console.warn("Could not get Trigger.dev access token:", error);
+  }
+
+  // Check if job is in a terminal state
+  if (initialJob.status === "PENDING") {
     return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="rounded-lg border border-red-500 bg-red-50 p-8 text-red-700 dark:bg-red-900/30">
-          <h2 className="text-2xl font-bold">Job Not Found</h2>
-          <p className="mt-2">
-            The job you are looking for does not exist or you do not have
-            permission to view it.
+      <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold mb-4">Job Pending</h1>
+          <p className="text-gray-600">
+            This job hasn&apos;t started yet. Please wait for blueprint approval.
           </p>
         </div>
       </div>
@@ -79,20 +83,50 @@ export default async function JobPage({ params }: JobPageProps) {
     console.warn("No Trigger.dev run ID found for job:", jobId);
   }
 
-  // Parse the plan to pass to components
-  let parsedPlan = [];
+  // Parse the plan to pass to components with proper typing
+  let parsedPlan: PlanStep[] = [];
   if (initialJob.planJson) {
     try {
-      parsedPlan = JSON.parse(initialJob.planJson);
+      const rawPlan = JSON.parse(initialJob.planJson) as Array<{
+        id?: string;
+        title?: string;
+        description?: string;
+        status?: string;
+        code?: string;
+        dependencies?: string[];
+      }>;
+      
+      // Map to properly typed PlanStep array
+      parsedPlan = rawPlan.map((step, index) => ({
+        id: step.id || `step-${index}`,
+        title: step.title || `Step ${index + 1}`,
+        description: step.description || '',
+        status: (step.status as PlanStep['status']) || 'pending',
+        code: step.code,
+        dependencies: step.dependencies || []
+      }));
+      
       console.log("📋 Parsed plan:", parsedPlan.length, "steps");
     } catch (e) {
       console.error("Failed to parse plan JSON:", e);
     }
   }
 
+  // ✅ FIX: Extract the actual files from the database with proper typing
+  const initialFiles: GeneratedFileData[] = (initialJob.files as GeneratedFile[]).map((f) => ({
+    path: f.path,
+    content: f.content,
+    language: f.language,
+  }));
+
+  console.log(`📁 Job has ${initialFiles.length} files in database`);
+  if (initialFiles.length > 0) {
+    console.log('Files:', initialFiles.map(f => f.path).join(', '));
+  }
+
   // Check if all steps are completed
   const allStepsCompleted = parsedPlan.length > 0 && 
-    parsedPlan.every((step: { status: string }) => step.status === "completed");
+    parsedPlan.every((step) => step.status === "completed");
 
   console.log("✅ All steps completed:", allStepsCompleted);
 
@@ -122,50 +156,32 @@ export default async function JobPage({ params }: JobPageProps) {
           <div className="flex items-start justify-between">
             <div>
               <h1 className="text-2xl font-bold leading-7 text-gray-900 dark:text-white">
-                Job Details
+                Generation Job
               </h1>
-              <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-gray-500 dark:text-gray-400">
-                <div>
-                  <span className="font-medium text-gray-700 dark:text-gray-300">
-                    Job ID:
-                  </span>{" "}
-                  <span className="font-mono">{initialJob.id}</span>
-                </div>
-                <div className="h-4 w-px bg-gray-300 dark:bg-gray-700" />
-                <div>
-                  <span className="font-medium text-gray-700 dark:text-gray-300">
-                    Created:
-                  </span>{" "}
-                  {formatDate(initialJob.createdAt)}
-                </div>
-              </div>
+              <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                Created {formatDate(initialJob.createdAt)}
+              </p>
             </div>
-            
-            {/* Status Badge */}
-            <div>
-              {initialJob.status === "COMPLETED" && allStepsCompleted && (
-                <Badge className="bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300">
-                  ✓ Complete
-                </Badge>
-              )}
-              {initialJob.status === "RUNNING" && (
-                <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300">
-                  ⟳ Running
-                </Badge>
-              )}
-              {initialJob.status === "FAILED" && (
-                <Badge className="bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300">
-                  ✗ Failed
-                </Badge>
+            <div className="flex items-center gap-2">
+              <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ${
+                initialJob.status === 'COMPLETED' 
+                  ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
+                  : initialJob.status === 'FAILED'
+                  ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
+                  : 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300'
+              }`}>
+                {initialJob.status}
+              </span>
+              {initialFiles.length > 0 && (
+                <span className="inline-flex items-center rounded-full px-3 py-1 text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300">
+                  {initialFiles.length} files
+                </span>
               )}
             </div>
           </div>
-
           <div className="mt-4">
-            <h3 className="text-md font-semibold text-gray-900 dark:text-white">
-              Original Prompt:
-            </h3>
-            <p className="mt-2 rounded-md bg-gray-50 p-4 text-sm text-gray-600 dark:bg-gray-800/50 dark:text-gray-300">
+            <h2 className="text-sm font-medium text-gray-500 dark:text-gray-400">Prompt</h2>
+            <p className="mt-1 text-gray-900 dark:text-white">
               {initialJob.prompt}
             </p>
           </div>
@@ -180,7 +196,7 @@ export default async function JobPage({ params }: JobPageProps) {
           />
         </div>
 
-        {/* AI Workspace - Always show (remove condition) */}
+        {/* AI Workspace - Always show */}
         <div className="rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900/50 overflow-hidden">
           <Tabs defaultValue="workspace" className="w-full">
             <TabsList className="w-full justify-start border-b rounded-none bg-gray-50 dark:bg-gray-900">
@@ -190,7 +206,7 @@ export default async function JobPage({ params }: JobPageProps) {
               </TabsTrigger>
               <TabsTrigger value="files" className="gap-2">
                 <FileCode className="h-4 w-4" />
-                Download Files
+                Files ({initialFiles.length})
               </TabsTrigger>
             </TabsList>
             
@@ -199,15 +215,36 @@ export default async function JobPage({ params }: JobPageProps) {
                 plan={parsedPlan}
                 projectName={initialJob.prompt.slice(0, 30).replace(/[^a-z0-9]/gi, '-').toLowerCase()}
                 jobId={initialJob.id}
+                initialFiles={initialFiles}
               />
             </TabsContent>
             
             <TabsContent value="files" className="m-0 p-6">
-              <div className="text-center text-gray-500 dark:text-gray-400">
-                <FileCode className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p className="mb-4">Use the AI Workspace to edit and download your files</p>
-                <p className="text-sm">Click the Download button in the AI Workspace toolbar</p>
-              </div>
+              {initialFiles.length > 0 ? (
+                <div className="space-y-2">
+                  <h3 className="font-medium mb-3">Generated Files ({initialFiles.length})</h3>
+                  {initialFiles.map((file) => (
+                    <div
+                      key={file.path}
+                      className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded"
+                    >
+                      <div className="flex items-center gap-2">
+                        <FileCode className="h-4 w-4 text-gray-500" />
+                        <span className="text-sm font-mono">{file.path}</span>
+                      </div>
+                      <span className="text-xs text-gray-500">
+                        {(file.content.length / 1024).toFixed(1)} KB
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center text-gray-500 dark:text-gray-400">
+                  <FileCode className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p className="mb-4">No files generated yet</p>
+                  <p className="text-sm">Files will appear here once generation completes</p>
+                </div>
+              )}
             </TabsContent>
           </Tabs>
         </div>

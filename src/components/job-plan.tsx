@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { useRealtimeRun } from "@trigger.dev/react-hooks";
-import { type GenerationJob } from "@prisma/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -16,12 +15,37 @@ import {
   WifiOff,
 } from "lucide-react";
 
+// Define GenerationJob type locally instead of importing from @prisma/client
+// This matches the Prisma schema definition
+interface GenerationJob {
+  id: string;
+  createdAt: Date;
+  updatedAt: Date;
+  status: string;
+  prompt: string;
+  enhancedPrompt: string | null;
+  enhancementUsed: boolean;
+  planJson: string | null;
+  result: string | null;
+  userId: string;
+  blueprint: string | null;
+  blueprintApprovedAt: Date | null;
+  blueprintGeneratedAt: Date | null;
+  completedModules: number;
+  errorLog: string | null;
+  failedModules: number;
+  generationCompletedAt: Date | null;
+  generationStartedAt: Date | null;
+  totalModules: number;
+}
+
 export type PlanStep = {
   id: string;
   title: string;
   description: string;
   status: "pending" | "running" | "completed" | "failed";
   code?: string;
+  dependencies?: string[];
 };
 
 // Trigger.dev status categories

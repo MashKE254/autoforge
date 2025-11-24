@@ -1,12 +1,15 @@
-// API Route: Create Shareable Preview
-// POST /api/preview/create
-// Creates a shareable preview link that anyone can view
-
 import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
 import { prisma } from '@/lib/prisma';
 import { nanoid } from 'nanoid';
-import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+
+// Type for file data from database
+interface FileData {
+  path: string;
+  content: string;
+  language: string;
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -71,8 +74,9 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    // FIX: Add proper type annotation for 'f' parameter
     // Create snapshot of files
-    const filesSnapshot = job.files.map(f => ({
+    const filesSnapshot = job.files.map((f: FileData) => ({
       path: f.path,
       content: f.content,
       language: f.language,

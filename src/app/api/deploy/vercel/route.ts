@@ -1,16 +1,17 @@
-// API Route: Deploy to Vercel
-// POST /api/deploy/vercel
-// Deploys generated app to Vercel production
-
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import { VercelDeployment } from '@/lib/deployment/vercel';
 import { getServerSession } from 'next-auth';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { prisma } from '@/lib/prisma';
+import { authOptions } from '../../auth/[...nextauth]/route';
+
+// Type definition for file data
+interface GeneratedFile {
+  path: string;
+  content: string;
+  language: string;
+}
 
 export async function POST(request: NextRequest) {
   try {
-    // Verify authentication
     const session = await getServerSession(authOptions);
     if (!session?.user) {
       return NextResponse.json(
@@ -19,11 +20,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { jobId, envVars } = await request.json();
+    const { jobId } = await request.json();
 
     if (!jobId) {
       return NextResponse.json(
-        { error: 'Job ID is required' },
+        { error: 'Job ID required' },
         { status: 400 }
       );
     }
@@ -32,7 +33,7 @@ export async function POST(request: NextRequest) {
     const job = await prisma.generationJob.findUnique({
       where: {
         id: jobId,
-        userId: session.user.id, // Ensure user owns this job
+        userId: session.user.id,
       },
       include: { files: true },
     });
@@ -51,64 +52,89 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if already deployed
+    // Check for existing deployment
     const existingDeployment = await prisma.deployment.findFirst({
       where: {
         generationJobId: jobId,
-        status: { in: ['BUILDING', 'READY'] },
+        status: { in: ['PENDING', 'BUILDING', 'READY'] },
       },
-      orderBy: { createdAt: 'desc' },
     });
 
-    if (existingDeployment && existingDeployment.status === 'READY') {
+    if (existingDeployment && existingDeployment.deploymentUrl) {
       return NextResponse.json({
         success: true,
-        deploymentId: existingDeployment.vercelDeploymentId,
-        url: existingDeployment.deploymentUrl,
-        status: 'ready',
-        message: 'App already deployed',
+        deploymentId: existingDeployment.id,
+        deploymentUrl: existingDeployment.deploymentUrl,
+        status: existingDeployment.status,
+        message: 'Using existing deployment',
       });
     }
 
-    // Extract project name from prompt (first 30 chars, sanitized)
-    const projectName = job.prompt
-      .slice(0, 30)
-      .toLowerCase()
-      .replace(/[^a-z0-9\s]/g, '')
-      .replace(/\s+/g, '-')
-      .replace(/^-+|-+$/g, '')
-      || 'generated-app';
-
-    console.log(`🚀 Starting deployment for job ${jobId}`);
-    console.log(`📝 Project name: ${projectName}`);
-    console.log(`📦 Files: ${job.files.length}`);
-
-    // Deploy to Vercel
-    const deployer = new VercelDeployment();
-    const deployment = await deployer.deploy({
-      jobId,
-      projectName,
-      files: job.files.map(f => ({
-        path: f.path,
-        content: f.content,
-      })),
-      envVars: envVars || undefined,
+    // Create new deployment record
+    const deployment = await prisma.deployment.create({
+      data: {
+        generationJobId: jobId,
+        status: 'PENDING',
+      },
     });
 
-    console.log(`✅ Deployment initiated: ${deployment.url}`);
+    // Prepare files for Vercel
+    const vercelFiles: Record<string, { file: string }> = {};
+    
+    // FIX: Add proper type annotation for 'f' parameter
+    job.files.forEach((f: GeneratedFile) => {
+      vercelFiles[f.path] = {
+        file: f.content,
+      };
+    });
+
+    // Deploy to Vercel
+    const vercelResponse = await fetch('https://api.vercel.com/v13/deployments', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${process.env.VERCEL_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        name: `autoforge-${jobId.slice(0, 8)}`,
+        files: vercelFiles,
+        projectSettings: {
+          framework: 'nextjs',
+          buildCommand: 'npm run build',
+          outputDirectory: '.next',
+        },
+      }),
+    });
+
+    if (!vercelResponse.ok) {
+      const error = await vercelResponse.text();
+      throw new Error(`Vercel deployment failed: ${error}`);
+    }
+
+    const vercelData = await vercelResponse.json();
+
+    // Update deployment record
+    await prisma.deployment.update({
+      where: { id: deployment.id },
+      data: {
+        vercelDeploymentId: vercelData.id,
+        vercelProjectId: vercelData.projectId,
+        deploymentUrl: `https://${vercelData.url}`,
+        status: 'BUILDING',
+      },
+    });
 
     return NextResponse.json({
       success: true,
-      deploymentId: deployment.deploymentId,
-      url: deployment.url,
-      inspectorUrl: deployment.inspectorUrl,
-      status: 'building',
+      deploymentId: deployment.id,
+      deploymentUrl: `https://${vercelData.url}`,
+      status: 'BUILDING',
     });
   } catch (error) {
-    console.error('❌ Deployment error:', error);
+    console.error('Deployment error:', error);
     return NextResponse.json(
       {
-        error: error instanceof Error ? error.message : 'Deployment failed',
+        error: error instanceof Error ? error.message : 'Failed to deploy',
       },
       { status: 500 }
     );
@@ -118,81 +144,82 @@ export async function POST(request: NextRequest) {
 // GET: Check deployment status
 export async function GET(request: NextRequest) {
   try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
     const searchParams = request.nextUrl.searchParams;
     const jobId = searchParams.get('jobId');
-    const deploymentId = searchParams.get('deploymentId');
 
-    if (!jobId && !deploymentId) {
+    if (!jobId) {
       return NextResponse.json(
-        { error: 'Job ID or Deployment ID required' },
+        { error: 'Job ID required' },
         { status: 400 }
       );
     }
 
-    // Find deployment
     const deployment = await prisma.deployment.findFirst({
-      where: deploymentId
-        ? { vercelDeploymentId: deploymentId }
-        : { generationJobId: jobId! },
+      where: {
+        generationJobId: jobId,
+      },
       orderBy: { createdAt: 'desc' },
     });
 
     if (!deployment) {
-      return NextResponse.json(
-        { error: 'No deployment found' },
-        { status: 404 }
-      );
+      return NextResponse.json({
+        exists: false,
+      });
     }
 
-    // If still building, check Vercel status
-    if (deployment.status === 'BUILDING') {
-      try {
-        const deployer = new VercelDeployment();
-        const vercelStatus = await deployer.getDeploymentStatus(
-          deployment.vercelDeploymentId!
-        );
+    // Check Vercel status if deployment is building
+    if (deployment.status === 'BUILDING' && deployment.vercelDeploymentId) {
+      const vercelResponse = await fetch(
+        `https://api.vercel.com/v13/deployments/${deployment.vercelDeploymentId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${process.env.VERCEL_TOKEN}`,
+          },
+        }
+      );
 
-        console.log(`📊 Deployment status: ${vercelStatus.readyState}`);
-
-        // Update database based on Vercel status
-        if (vercelStatus.readyState === 'READY') {
+      if (vercelResponse.ok) {
+        const vercelData = await vercelResponse.json();
+        
+        // Update status based on Vercel response
+        if (vercelData.readyState === 'READY') {
           await prisma.deployment.update({
             where: { id: deployment.id },
             data: { status: 'READY' },
           });
           deployment.status = 'READY';
-        } else if (vercelStatus.readyState === 'ERROR') {
+        } else if (vercelData.readyState === 'ERROR') {
           await prisma.deployment.update({
             where: { id: deployment.id },
             data: {
               status: 'ERROR',
-              errorMessage: vercelStatus.error?.message || 'Build failed',
-              buildLogs: vercelStatus.error?.message || 'Build failed',
+              errorMessage: vercelData.error?.message || 'Deployment failed',
             },
           });
           deployment.status = 'ERROR';
         }
-      } catch (error) {
-        console.error('Failed to check Vercel status:', error);
-        // Don't fail the request, just return cached status
       }
     }
 
     return NextResponse.json({
-      success: true,
-      deployment: {
-        id: deployment.id,
-        deploymentId: deployment.vercelDeploymentId,
-        url: deployment.deploymentUrl,
-        status: deployment.status,
-        buildLogs: deployment.buildLogs,
-        createdAt: deployment.createdAt,
-      },
+      exists: true,
+      deploymentId: deployment.id,
+      deploymentUrl: deployment.deploymentUrl,
+      status: deployment.status,
+      errorMessage: deployment.errorMessage,
     });
   } catch (error) {
-    console.error('❌ Status check error:', error);
+    console.error('Get deployment status error:', error);
     return NextResponse.json(
-      { error: 'Failed to check deployment status' },
+      { error: 'Failed to get deployment status' },
       { status: 500 }
     );
   }

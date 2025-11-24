@@ -2,20 +2,44 @@
 import { prisma } from '@/lib/prisma';
 import { notFound } from 'next/navigation';
 import AIWorkspace from '@/components/ai-workspace';
-import type { PlanStep } from '@/components/job-plan'; // Import the correct type
+import type { PlanStep } from '@/components/job-plan';
 
 interface PageProps {
   params: Promise<{ jobId: string }>;
 }
 
+// Define the file type for passing to AIWorkspace
+interface GeneratedFileData {
+  path: string;
+  content: string;
+  language: string;
+}
+
+// Define the module type from Prisma query
+interface ModuleWithRelation {
+  module: {
+    id: string;
+    name: string;
+    description: string;
+  };
+  generatedCode: string | null;
+}
+
+// Define the file type from Prisma query
+interface GeneratedFile {
+  path: string;
+  content: string;
+  language: string;
+}
+
 export default async function GenerationResultPage({ params }: PageProps) {
   const { jobId } = await params;
 
-  // Get the completed job
+  // Get the completed job with FILES from database
   const job = await prisma.generationJob.findUnique({
     where: { id: jobId },
     include: {
-      files: true,
+      files: true,  // ✅ This contains the actual generated files!
       modules: {
         include: { module: true }
       }
@@ -39,15 +63,25 @@ export default async function GenerationResultPage({ params }: PageProps) {
     );
   }
 
-  // Convert to PlanStep format with proper status typing
-  const plan: PlanStep[] = job.modules.map((m) => ({
+  // Convert modules to PlanStep format for display
+  const plan: PlanStep[] = (job.modules as ModuleWithRelation[]).map((m) => ({
     id: m.module.id,
     title: m.module.name,
     description: m.module.description || '',
     code: m.generatedCode || '',
-    status: 'completed', // Explicitly typed as the literal "completed"
+    status: 'completed' as const,
     dependencies: []
   }));
+
+  // ✅ FIX: Extract the actual files from the database with proper typing
+  const initialFiles: GeneratedFileData[] = (job.files as GeneratedFile[]).map((f) => ({
+    path: f.path,
+    content: f.content,
+    language: f.language,
+  }));
+
+  console.log(`📁 Passing ${initialFiles.length} files to AIWorkspace`);
+  console.log('Files:', initialFiles.map(f => f.path).join(', '));
 
   return (
     <div className="min-h-screen bg-white dark:bg-gray-950">
@@ -55,6 +89,7 @@ export default async function GenerationResultPage({ params }: PageProps) {
         plan={plan}
         projectName={job.prompt.slice(0, 50)}
         jobId={jobId}
+        initialFiles={initialFiles}  // ✅ Pass the database files!
       />
     </div>
   );
