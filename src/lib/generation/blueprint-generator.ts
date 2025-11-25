@@ -22,7 +22,7 @@ export interface Blueprint {
     frontend: string;
     backend: string;
     database: string;
-    authentication?: string; // MADE OPTIONAL
+    authentication?: string;
     payments?: string;
     hosting: string;
   };
@@ -62,28 +62,34 @@ Available module library statistics:
 - Total modules: ${moduleStats.totalModules}
 - Categories: ${Object.entries(moduleStats.byCategory).map(([category, count]) => `${category} (${count})`).join(', ')}
 
+CRITICAL REQUIREMENTS:
+1. ALWAYS include a "main-page" module as the FIRST module
+2. The "main-page" module MUST contain the complete, working application UI
+3. The "main-page" module category MUST be "UI"
+4. Additional supporting components are optional but should be separate modules
+
 Generate a JSON blueprint with this exact structure:
 
 {
   "architecture": {
-    "frontend": ["Next.js 16 with App Router", "React 19", "TypeScript", "Tailwind CSS", "Shadcn/ui components"],
+    "frontend": ["Next.js 16 with App Router", "React 19", "TypeScript", "Tailwind CSS"],
     "backend": ["Next.js API Routes", "TypeScript"],
     "database": ["PostgreSQL", "Prisma Client"],
     "infrastructure": ["Vercel deployment", "Environment variables"]
   },
   "modules": [
     {
-      "name": "counter-component",
+      "name": "main-page",
       "category": "UI",
-      "purpose": "Main counter UI with increment button",
+      "purpose": "Complete working todo list application with add, delete, and complete functionality in app/page.tsx",
       "dependencies": [],
       "estimatedComplexity": "simple"
     },
     {
-      "name": "state-management",
+      "name": "todo-types",
       "category": "UTILITY",
-      "purpose": "Handle counter state with React hooks",
-      "dependencies": ["counter-component"],
+      "purpose": "TypeScript interfaces for todo items",
+      "dependencies": ["main-page"],
       "estimatedComplexity": "simple"
     }
   ],
@@ -91,7 +97,7 @@ Generate a JSON blueprint with this exact structure:
     {
       "phase": "Core Features",
       "duration": "5 minutes",
-      "deliverables": ["Counter component", "State management"]
+      "deliverables": ["Main page with full functionality", "Type definitions"]
     },
     {
       "phase": "Polish",
@@ -102,7 +108,7 @@ Generate a JSON blueprint with this exact structure:
   "estimatedComplexity": "simple",
   "estimatedModules": 5,
   "estimatedTime": "15 minutes",
-  "features": ["Counter display", "Increment button", "Responsive design"],
+  "features": ["Add todos", "Delete todos", "Mark complete", "Responsive design"],
   "techStack": {
     "frontend": "Next.js 16 with React 19",
     "backend": "Next.js API Routes with TypeScript",
@@ -114,24 +120,70 @@ Generate a JSON blueprint with this exact structure:
 }
 
 Important guidelines:
-1. Include 5-30 modules depending on complexity
-2. Use these categories: AUTH, PAYMENT, DATABASE, UI, API, WORKFLOW, AGENT, INFRASTRUCTURE, UTILITY
-3. List dependencies between modules (use module names)
-4. Be specific about what each module does
-5. Estimate complexity realistically (simple/moderate/complex)
-6. Include a realistic timeline with phases
-7. List all key features the app will have
-8. For simple apps (counter, calculator, todo): Keep modules minimal (5-10)
+1. FIRST module MUST be "main-page" with category "UI"
+2. "main-page" purpose should describe the COMPLETE working application
+3. Include 3-15 modules total depending on complexity
+4. Use these categories: AUTH, PAYMENT, DATABASE, UI, API, WORKFLOW, AGENT, INFRASTRUCTURE, UTILITY
+5. List dependencies between modules (use module names)
+6. For simple apps (todo, calculator, counter): Keep to 3-8 modules
+7. For moderate apps (blog, dashboard): 10-15 modules
+8. For complex apps (SaaS, marketplace): 15-30 modules
 9. Only include authentication if the app needs user accounts
 10. Only include payments if the app needs to process money
 11. Return ONLY valid JSON, no markdown, no explanations, no code blocks
+
+Example for a calculator:
+{
+  "modules": [
+    {
+      "name": "main-page",
+      "category": "UI",
+      "purpose": "Complete calculator interface with all operations (add, subtract, multiply, divide) and display",
+      "dependencies": [],
+      "estimatedComplexity": "simple"
+    },
+    {
+      "name": "calculator-logic",
+      "category": "UTILITY",
+      "purpose": "Mathematical operation functions",
+      "dependencies": ["main-page"],
+      "estimatedComplexity": "simple"
+    }
+  ]
+}
+
+Example for a blog:
+{
+  "modules": [
+    {
+      "name": "main-page",
+      "category": "UI",
+      "purpose": "Blog homepage with post list and featured articles",
+      "dependencies": [],
+      "estimatedComplexity": "moderate"
+    },
+    {
+      "name": "post-detail-page",
+      "category": "UI",
+      "purpose": "Individual blog post page with comments",
+      "dependencies": ["main-page"],
+      "estimatedComplexity": "moderate"
+    },
+    {
+      "name": "blog-api",
+      "category": "API",
+      "purpose": "REST API for blog posts CRUD operations",
+      "dependencies": [],
+      "estimatedComplexity": "moderate"
+    }
+  ]
+}
 
 Generate the blueprint now:`;
 
     let blueprintText: string;
 
     // ALWAYS use Claude for blueprint generation (fast and reliable)
-    // LocalAI is too slow for blueprint generation
     console.log('☁️  Using Claude for blueprint generation');
     
     const response = await this.client.messages.create({
@@ -169,6 +221,9 @@ Generate the blueprint now:`;
     // Validate blueprint structure
     this.validateBlueprint(blueprint);
 
+    // Ensure main-page module exists
+    this.ensureMainPageModule(blueprint);
+
     console.log('✅ Blueprint generated successfully');
     console.log(`📊 Estimated: ${blueprint.estimatedModules} modules in ${blueprint.estimatedTime}`);
 
@@ -176,10 +231,34 @@ Generate the blueprint now:`;
   }
 
   /**
+   * Ensure blueprint has a main-page module
+   */
+  private ensureMainPageModule(blueprint: Blueprint): void {
+    const hasMainPage = blueprint.modules.some(m => 
+      m.name.toLowerCase().includes('main-page') || 
+      m.name.toLowerCase() === 'main-page'
+    );
+
+    if (!hasMainPage) {
+      console.warn('⚠️  Blueprint missing main-page module, adding it...');
+      
+      // Insert main-page as first module
+      blueprint.modules.unshift({
+        name: 'main-page',
+        category: 'UI',
+        purpose: 'Main application page with core functionality',
+        dependencies: [],
+        estimatedComplexity: 'simple'
+      });
+      
+      blueprint.estimatedModules = blueprint.modules.length;
+    }
+  }
+
+  /**
    * Validate blueprint has all required fields
    */
   private validateBlueprint(blueprint: unknown): asserts blueprint is Blueprint {
-    // Type guard to check if blueprint is an object
     if (typeof blueprint !== 'object' || blueprint === null) {
       throw new Error('Blueprint must be an object');
     }
@@ -231,9 +310,6 @@ Generate the blueprint now:`;
         throw new Error(`Tech stack missing required field: ${field}`);
       }
     }
-    
-    // Authentication and payments are optional - only needed for certain apps
-    // Allow Claude to decide based on app requirements
   }
 
   /**
@@ -258,7 +334,7 @@ Generate the blueprint now:`;
     if (keywords.moderate.some(k => lowerPrompt.includes(k))) {
       return 15;
     }
-    return 8; // Reduced from 10 for simple apps
+    return 8;
   }
 }
 

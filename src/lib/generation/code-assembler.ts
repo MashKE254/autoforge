@@ -257,9 +257,23 @@ module.exports = {
 
   /**
    * Determine appropriate file path for a module
+   * CRITICAL: Routes main-page to app/page.tsx so users see their actual app!
    */
   private determineFilePath(moduleName: string, category: string): string {
     const cleanName = moduleName.toLowerCase().replace(/\s+/g, '-');
+
+    // SPECIAL CASE: Main page goes to app/page.tsx (the actual app!)
+    if (cleanName === 'main-page' || cleanName.includes('main-page')) {
+      console.log('✨ Routing main-page module to app/page.tsx');
+      return 'app/page.tsx';
+    }
+
+    // SPECIAL CASE: Additional pages go to app/[name]/page.tsx
+    if (cleanName.endsWith('-page') && category === 'UI') {
+      const pageName = cleanName.replace('-page', '');
+      console.log(`✨ Routing ${cleanName} to app/${pageName}/page.tsx`);
+      return `app/${pageName}/page.tsx`;
+    }
 
     switch (category) {
       case 'AUTH':
@@ -271,6 +285,7 @@ module.exports = {
       case 'API':
         return `src/app/api/${cleanName}/route.ts`;
       case 'UI':
+        // Other UI components go to components folder
         return `src/components/${cleanName}.tsx`;
       case 'WORKFLOW':
         return `src/lib/workflows/${cleanName}.ts`;

@@ -1,16 +1,12 @@
 /**
- * Project Templates - Bolt.new Style
+ * Project Templates - WebContainer Stable Version
  * 
  * File: src/lib/templates/index.ts
  * 
- * Templates ensure all essential project files exist before the dev server starts.
- * This solves the "missing files" problem where AI-generated code doesn't include
- * all required config files.
+ * STABLE: Uses Tailwind CSS v3 for maximum WebContainer compatibility
  * 
- * How it works:
- * 1. Start with a complete template (all files needed for Next.js to run)
- * 2. Merge in AI-generated files (they override template files)
- * 3. Result: Complete project that always works
+ * Tailwind v4 has installation issues in WebContainer environments.
+ * This version uses v3 which is proven to work reliably.
  */
 
 // ============================================================================
@@ -33,32 +29,41 @@ export interface ProjectTemplate {
 }
 
 // ============================================================================
-// NEXT.JS TEMPLATE
+// NEXT.JS TEMPLATE (Tailwind v3 - WebContainer Stable)
 // ============================================================================
 
 /**
- * Get a complete Next.js 14 template with TypeScript and Tailwind CSS
+ * Get a complete Next.js 14 template with TypeScript and Tailwind CSS v3
  * All files needed for `npm run dev` to work
  */
 export function getNextJsTemplate(projectName: string = 'my-app'): ProjectTemplate {
-  // Sanitize project name for package.json
+  // Sanitize project name - handle multi-line prompts and special characters
   const safeName = projectName
+    .split('\n')[0]  // Take only first line
+    .slice(0, 50)    // Limit length
     .toLowerCase()
     .replace(/[^a-z0-9-]/gi, '-')
     .replace(/-+/g, '-')
     .replace(/^-|-$/g, '') || 'my-app';
   
+  // Create a safe title (single line, escaped)
+  const safeTitle = projectName
+    .split('\n')[0]  // Take only first line
+    .slice(0, 60)    // Limit length
+    .replace(/'/g, "\\'")  // Escape single quotes
+    .trim() || 'My App';
+  
   return {
     name: 'nextjs',
-    description: 'Next.js 14 with TypeScript and Tailwind CSS',
+    description: 'Next.js 14 with TypeScript and Tailwind CSS v3',
     framework: 'nextjs',
-    installCommand: 'npm install --silent --no-fund --no-audit',
+    installCommand: 'npm install',
     devCommand: 'npm run dev -- --port 3000 --hostname 0.0.0.0',
     buildCommand: 'npm run build',
     
     files: [
       // ========================================
-      // package.json - REQUIRED
+      // package.json - REQUIRED (Tailwind v3)
       // ========================================
       {
         path: 'package.json',
@@ -74,17 +79,17 @@ export function getNextJsTemplate(projectName: string = 'my-app'): ProjectTempla
           },
           dependencies: {
             'next': '14.2.5',
-            'react': '^18.3.1',
-            'react-dom': '^18.3.1'
+            'react': '18.3.1',
+            'react-dom': '18.3.1'
           },
           devDependencies: {
-            '@types/node': '^20',
-            '@types/react': '^18',
-            '@types/react-dom': '^18',
-            'typescript': '^5',
-            'tailwindcss': '^3.4.0',
-            'autoprefixer': '^10.4.0',
-            'postcss': '^8.4.0'
+            '@types/node': '20.14.0',
+            '@types/react': '18.3.3',
+            '@types/react-dom': '18.3.0',
+            'typescript': '5.5.2',
+            'tailwindcss': '3.4.4',
+            'autoprefixer': '10.4.19',
+            'postcss': '8.4.38'
           }
         }, null, 2)
       },
@@ -121,7 +126,6 @@ export function getNextJsTemplate(projectName: string = 'my-app'): ProjectTempla
       
       // ========================================
       // next.config.mjs - REQUIRED
-      // Using .mjs for better WebContainer compatibility
       // ========================================
       {
         path: 'next.config.mjs',
@@ -135,13 +139,12 @@ export default nextConfig;
       },
       
       // ========================================
-      // tailwind.config.ts - REQUIRED for Tailwind
+      // tailwind.config.js - REQUIRED for Tailwind v3
       // ========================================
       {
-        path: 'tailwind.config.ts',
-        content: `import type { Config } from 'tailwindcss';
-
-const config: Config = {
+        path: 'tailwind.config.js',
+        content: `/** @type {import('tailwindcss').Config} */
+module.exports = {
   content: [
     './pages/**/*.{js,ts,jsx,tsx,mdx}',
     './components/**/*.{js,ts,jsx,tsx,mdx}',
@@ -157,30 +160,25 @@ const config: Config = {
   },
   plugins: [],
 };
-
-export default config;
 `
       },
       
       // ========================================
-      // postcss.config.mjs - REQUIRED for Tailwind
+      // postcss.config.js - REQUIRED for Tailwind v3
       // ========================================
       {
-        path: 'postcss.config.mjs',
-        content: `/** @type {import('postcss-load-config').Config} */
-const config = {
+        path: 'postcss.config.js',
+        content: `module.exports = {
   plugins: {
     tailwindcss: {},
     autoprefixer: {},
   },
 };
-
-export default config;
 `
       },
       
       // ========================================
-      // app/globals.css - REQUIRED for styles
+      // app/globals.css - REQUIRED (Tailwind v3 syntax)
       // ========================================
       {
         path: 'app/globals.css',
@@ -230,7 +228,6 @@ a {
       
       // ========================================
       // app/layout.tsx - REQUIRED for App Router
-      // This file MUST exist or Next.js won't start
       // ========================================
       {
         path: 'app/layout.tsx',
@@ -238,8 +235,8 @@ a {
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: '${projectName}',
-  description: 'Generated by AutoForge',
+  title: '${safeTitle}',
+  description: 'Generated by BuildNow',
 };
 
 export default function RootLayout({
@@ -266,7 +263,7 @@ export default function RootLayout({
     <main className="flex min-h-screen flex-col items-center justify-center p-24 bg-gradient-to-b from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
       <div className="text-center max-w-2xl">
         <h1 className="text-5xl font-bold mb-6 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-          ${projectName}
+          ${safeTitle}
         </h1>
         <p className="text-xl text-gray-600 dark:text-gray-400 mb-8">
           Your application is running successfully!
@@ -290,7 +287,7 @@ export default function RootLayout({
           </a>
         </div>
         <p className="text-sm text-gray-500 mt-12">
-          Built with AutoForge ⚡
+          Built with BuildNow ⚡
         </p>
       </div>
     </main>
@@ -300,7 +297,7 @@ export default function RootLayout({
       },
       
       // ========================================
-      // .gitignore - Good to have
+      // .gitignore
       // ========================================
       {
         path: '.gitignore',
@@ -344,20 +341,33 @@ next-env.d.ts
 }
 
 // ============================================================================
-// VITE + REACT TEMPLATE (Optional - for future use)
+// VITE + REACT TEMPLATE
 // ============================================================================
 
 export function getViteReactTemplate(projectName: string = 'my-app'): ProjectTemplate {
-  const safeName = projectName.toLowerCase().replace(/[^a-z0-9-]/gi, '-') || 'my-app';
+  // Sanitize project name - handle multi-line prompts
+  const safeName = projectName
+    .split('\n')[0]  // Take only first line
+    .slice(0, 50)    // Limit length
+    .toLowerCase()
+    .replace(/[^a-z0-9-]/gi, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '') || 'my-app';
+  
+  // Create a safe title (single line, escaped)
+  const safeTitle = projectName
+    .split('\n')[0]  // Take only first line
+    .slice(0, 60)    // Limit length
+    .replace(/'/g, "\\'")  // Escape single quotes
+    .trim() || 'My App';
   
   return {
     name: 'vite-react',
-    description: 'Vite with React and TypeScript',
+    description: 'Vite + React with TypeScript',
     framework: 'vite',
-    installCommand: 'npm install --silent --no-fund --no-audit',
-    devCommand: 'npm run dev -- --port 3000 --host',
+    installCommand: 'npm install',
+    devCommand: 'npm run dev -- --host 0.0.0.0 --port 3000',
     buildCommand: 'npm run build',
-    
     files: [
       {
         path: 'package.json',
@@ -372,15 +382,15 @@ export function getViteReactTemplate(projectName: string = 'my-app'): ProjectTem
             preview: 'vite preview'
           },
           dependencies: {
-            'react': '^18.3.1',
-            'react-dom': '^18.3.1'
+            'react': '18.2.0',
+            'react-dom': '18.2.0'
           },
           devDependencies: {
-            '@types/react': '^18.3.0',
-            '@types/react-dom': '^18.3.0',
-            '@vitejs/plugin-react': '^4.3.0',
-            'typescript': '^5.4.0',
-            'vite': '^5.4.0'
+            '@types/react': '18.2.0',
+            '@types/react-dom': '18.2.0',
+            '@vitejs/plugin-react': '4.0.0',
+            'typescript': '5.0.0',
+            'vite': '5.0.0'
           }
         }, null, 2)
       },
@@ -411,21 +421,7 @@ export default defineConfig({
             jsx: 'react-jsx',
             strict: true
           },
-          include: ['src'],
-          references: [{ path: './tsconfig.node.json' }]
-        }, null, 2)
-      },
-      {
-        path: 'tsconfig.node.json',
-        content: JSON.stringify({
-          compilerOptions: {
-            composite: true,
-            skipLibCheck: true,
-            module: 'ESNext',
-            moduleResolution: 'bundler',
-            allowSyntheticDefaultImports: true
-          },
-          include: ['vite.config.ts']
+          include: ['src']
         }, null, 2)
       },
       {
@@ -435,7 +431,7 @@ export default defineConfig({
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>${projectName}</title>
+    <title>${safeTitle}</title>
   </head>
   <body>
     <div id="root"></div>
@@ -471,7 +467,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       fontFamily: 'system-ui, sans-serif'
     }}>
       <h1 style={{ fontSize: '3rem', marginBottom: '1rem' }}>
-        ${projectName}
+        ${safeTitle}
       </h1>
       <p style={{ color: '#666' }}>
         Your Vite + React app is running!
@@ -506,7 +502,7 @@ body {
 
 /**
  * Merge generated files with a template
- * Generated files take priority over template files
+ * Template files take priority to ensure stability
  * 
  * @param template - The base template to use
  * @param generatedFiles - Files from AI generation
@@ -516,17 +512,38 @@ export function mergeWithTemplate(
   template: ProjectTemplate,
   generatedFiles: Array<{ path: string; content: string }>
 ): TemplateFile[] {
-  // Create a map for efficient lookup
   const fileMap = new Map<string, string>();
   
-  // 1. Add all template files first
-  template.files.forEach(f => {
-    fileMap.set(f.path, f.content);
+  // 1. Add generated files first
+  generatedFiles.forEach(f => {
+    let content = f.content;
+    
+    // Force Tailwind v3 syntax for CSS files
+    if (f.path.endsWith('.css')) {
+      content = enforceTailwindV3Syntax(content);
+    }
+    
+    fileMap.set(f.path, content);
   });
   
-  // 2. Override with generated files (they take priority)
-  generatedFiles.forEach(f => {
-    fileMap.set(f.path, f.content);
+  // 2. Override with template files for critical config files
+  // This ensures config files are always correct
+  const criticalFiles = [
+    'package.json',
+    'tsconfig.json',
+    'next.config.mjs',
+    'tailwind.config.js',
+    'postcss.config.js',
+    'app/globals.css'
+  ];
+  
+  template.files.forEach(f => {
+    if (criticalFiles.includes(f.path)) {
+      fileMap.set(f.path, f.content);
+    } else if (!fileMap.has(f.path)) {
+      // Add template file if not already present
+      fileMap.set(f.path, f.content);
+    }
   });
   
   // 3. Convert back to array
@@ -537,6 +554,34 @@ export function mergeWithTemplate(
 }
 
 /**
+ * Force Tailwind v3 syntax in CSS files
+ * Converts any v4 syntax to v3
+ */
+function enforceTailwindV3Syntax(content: string): string {
+  // Remove v4 imports
+  let newContent = content
+    .replace(/@import\s+["']tailwindcss["'];?\s*/g, '')
+    .replace(/@import\s+["']tw-animate-css["'];?\s*/g, '');
+  
+  // Check if v3 directives already exist
+  const hasV3Directives = 
+    newContent.includes('@tailwind base') ||
+    newContent.includes('@tailwind components') ||
+    newContent.includes('@tailwind utilities');
+  
+  // Add v3 directives at the beginning if not present
+  if (!hasV3Directives) {
+    newContent = `@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+` + newContent.trim();
+  }
+  
+  return newContent;
+}
+
+/**
  * Get the appropriate template based on detected framework
  */
 export function getTemplateForFramework(
@@ -544,7 +589,6 @@ export function getTemplateForFramework(
   projectName: string,
   files?: Array<{ path: string; content: string }>
 ): ProjectTemplate {
-  // Auto-detect if needed
   if (framework === 'auto' && files) {
     const hasNextIndicator = files.some(f => 
       f.path.includes('next.config') || 
@@ -563,7 +607,6 @@ export function getTemplateForFramework(
     }
   }
   
-  // Default to Next.js
   if (framework === 'vite') {
     return getViteReactTemplate(projectName);
   }
@@ -573,7 +616,6 @@ export function getTemplateForFramework(
 
 /**
  * Validate that all essential files exist
- * Returns list of missing files
  */
 export function validateProjectFiles(
   files: TemplateFile[],
@@ -584,8 +626,8 @@ export function validateProjectFiles(
         'package.json',
         'tsconfig.json',
         'next.config.mjs',
-        'tailwind.config.ts',
-        'postcss.config.mjs',
+        'tailwind.config.js',
+        'postcss.config.js',
         'app/globals.css',
         'app/layout.tsx',
         'app/page.tsx'
