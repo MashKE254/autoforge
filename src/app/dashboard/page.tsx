@@ -1,5 +1,14 @@
 'use client';
 
+/**
+ * Dashboard Page - Updated for Bolt-Style Generation
+ * 
+ * File: src/app/dashboard/page.tsx
+ * 
+ * This now uses /api/generate/start (bolt-style) instead of
+ * /api/generation/blueprint (old modular approach)
+ */
+
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
@@ -55,6 +64,10 @@ export default function DashboardPage() {
     }
   };
 
+  /**
+   * Handle generation using Bolt-style API
+   * No more blueprint step - goes straight to generation
+   */
   const handleGenerate = async () => {
     if (!prompt.trim() || prompt.trim().length < 10) {
       setError('Please provide a detailed description (at least 10 characters)');
@@ -65,7 +78,8 @@ export default function DashboardPage() {
     setError(null);
 
     try {
-      const response = await fetch('/api/generation/blueprint', {
+      // Use the new bolt-style endpoint
+      const response = await fetch('/api/generate/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt: prompt.trim() })
@@ -74,10 +88,10 @@ export default function DashboardPage() {
       const data = await response.json();
 
       if (response.ok) {
-        // Redirect to blueprint approval page
-        router.push(`/generate/blueprint/${data.jobId}`);
+        // Redirect directly to job page (no blueprint approval needed)
+        router.push(`/job/${data.jobId}`);
       } else {
-        setError(data.error || 'Failed to generate blueprint');
+        setError(data.error || 'Failed to start generation');
         setLoading(false);
       }
     } catch (err) {
@@ -87,40 +101,25 @@ export default function DashboardPage() {
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
+  const getStatusBadge = (jobStatus: string) => {
+    switch (jobStatus) {
       case 'COMPLETED':
-        return 'bg-green-500';
-      case 'FAILED':
-        return 'bg-red-500';
+        return <Badge className="bg-green-500"><CheckCircle className="w-3 h-3 mr-1" /> Completed</Badge>;
       case 'RUNNING':
-      case 'COMPOSING':
-      case 'TESTING':
-        return 'bg-blue-500';
-      case 'BLUEPRINT_GENERATED':
-        return 'bg-yellow-500';
-      default:
-        return 'bg-gray-500';
-    }
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'COMPLETED':
-        return <CheckCircle className="w-4 h-4" />;
+        return <Badge className="bg-blue-500"><Loader2 className="w-3 h-3 mr-1 animate-spin" /> Running</Badge>;
       case 'FAILED':
-        return <AlertCircle className="w-4 h-4" />;
-      case 'RUNNING':
-        return <Loader2 className="w-4 h-4 animate-spin" />;
+        return <Badge className="bg-red-500"><AlertCircle className="w-3 h-3 mr-1" /> Failed</Badge>;
+      case 'PENDING':
+        return <Badge className="bg-yellow-500"><Clock className="w-3 h-3 mr-1" /> Pending</Badge>;
       default:
-        return <Clock className="w-4 h-4" />;
+        return <Badge variant="outline">{jobStatus}</Badge>;
     }
   };
 
   if (status === 'loading') {
     return (
-      <div className="container mx-auto p-8 flex items-center justify-center h-[60vh]">
-        <Loader2 className="w-12 h-12 animate-spin" />
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin" />
       </div>
     );
   }
@@ -131,149 +130,131 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="container mx-auto p-8 max-w-6xl">
+    <div className="container mx-auto px-4 py-8 max-w-6xl">
+      {/* Header */}
       <div className="mb-8">
-        <h1 className="text-4xl font-bold mb-2 flex items-center gap-3">
-          <Zap className="w-10 h-10 text-primary" />
-          Build.now Dashboard
-        </h1>
-        <p className="text-muted-foreground text-lg">
-          Transform your ideas into production-ready applications in minutes
+        <h1 className="text-3xl font-bold mb-2">Welcome back, {session?.user?.name || 'Builder'}!</h1>
+        <p className="text-gray-600 dark:text-gray-400">
+          Describe your application and let AI build it for you.
         </p>
       </div>
 
-      {/* New Generation Card */}
-      <Card className="mb-8">
+      {/* Main Generation Card */}
+      <Card className="mb-8 border-2 border-blue-100 dark:border-blue-900">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-primary" />
-            Start New Generation
+            <Sparkles className="h-5 w-5 text-blue-500" />
+            Create New Application
           </CardTitle>
           <CardDescription>
-            Describe your application in plain English and we&#39;ll create a Living Blueprint
+            Describe what you want to build in plain English. Be specific about features!
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <Textarea
-              placeholder="Example: Build a SaaS platform for project management with teams, tasks, time tracking, and subscription billing. Include user authentication, real-time updates, and a mobile-responsive dashboard."
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              rows={6}
-              className="resize-none"
-              disabled={loading}
-            />
+        <CardContent className="space-y-4">
+          <Textarea
+            placeholder="e.g., A calculator app with add, subtract, multiply, and divide operations. Should have a nice modern UI with a display showing the current number and buttons for each operation."
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+            className="min-h-[150px] text-lg"
+            disabled={loading}
+          />
+          
+          {error && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+          
+          <div className="flex gap-4">
+            <Button 
+              onClick={handleGenerate} 
+              disabled={loading || !prompt.trim()}
+              className="flex-1 h-12 text-lg bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <Zap className="mr-2 h-5 w-5" />
+                  Generate Application
+                </>
+              )}
+            </Button>
+          </div>
 
-            {error && (
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
-
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-muted-foreground">
-                {prompt.length}/2000 characters
-              </p>
-              <Button
-                onClick={handleGenerate}
-                disabled={loading || prompt.trim().length < 10}
-                size="lg"
-                className="min-w-[200px]"
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                    Generating Blueprint...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="w-5 h-5 mr-2" />
-                    Generate Blueprint
-                  </>
-                )}
-              </Button>
-            </div>
-
-            <div className="pt-4 border-t">
-              <p className="text-xs text-muted-foreground">
-                ⚡ Blueprint generation takes ~2 minutes • You&#39;ll review the architecture before generation starts
-              </p>
+          {/* Example prompts */}
+          <div className="pt-4 border-t">
+            <p className="text-sm text-gray-500 mb-2">Try these examples:</p>
+            <div className="flex flex-wrap gap-2">
+              {[
+                'A calculator with basic operations',
+                'A todo list with add, delete, and complete',
+                'A simple timer with start, pause, reset',
+                'A note-taking app with markdown support',
+              ].map((example) => (
+                <button
+                  key={example}
+                  onClick={() => setPrompt(example)}
+                  className="text-sm px-3 py-1 bg-gray-100 dark:bg-gray-800 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                  disabled={loading}
+                >
+                  {example}
+                </button>
+              ))}
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Recent Generations */}
+      {/* Recent Jobs */}
       <Card>
         <CardHeader>
-          <CardTitle>Recent Generations</CardTitle>
-          <CardDescription>
-            Your generation history and current jobs
-          </CardDescription>
+          <CardTitle className="flex items-center gap-2">
+            <Clock className="h-5 w-5" />
+            Recent Generations
+          </CardTitle>
         </CardHeader>
         <CardContent>
           {loadingJobs ? (
             <div className="flex items-center justify-center py-8">
-              <Loader2 className="w-8 h-8 animate-spin" />
+              <Loader2 className="h-6 w-6 animate-spin" />
             </div>
           ) : recentJobs.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              <p>No generations yet. Start your first one above!</p>
-            </div>
+            <p className="text-center text-gray-500 py-8">
+              No generations yet. Create your first app above!
+            </p>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-4">
               {recentJobs.map((job) => (
                 <div
                   key={job.id}
-                  className="flex items-center justify-between p-4 border rounded-lg hover:bg-accent/50 transition-colors cursor-pointer"
-                  onClick={() => {
-                    if (job.status === 'BLUEPRINT_GENERATED') {
-                      router.push(`/generate/blueprint/${job.id}`);
-                    } else if (job.status === 'COMPLETED') {
-                      router.push(`/generate/result/${job.id}`);
-                    } else {
-                      router.push(`/generate/progress/${job.id}`);
-                    }
-                  }}
+                  className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer transition-colors"
+                  onClick={() => router.push(`/job/${job.id}`)}
                 >
-                  <div className="flex-1">
-                    <p className="font-medium line-clamp-1">{job.prompt}</p>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {new Date(job.createdAt).toLocaleString()}
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium truncate">{job.prompt}</p>
+                    <p className="text-sm text-gray-500">
+                      {new Date(job.createdAt).toLocaleDateString()} at{' '}
+                      {new Date(job.createdAt).toLocaleTimeString()}
                     </p>
                   </div>
-                  <div className="flex items-center gap-3 ml-4">
-                    {job.estimatedModules && (
-                      <Badge variant="secondary">
-                        {job.estimatedModules} modules
-                      </Badge>
-                    )}
-                    <Badge className={getStatusColor(job.status)}>
-                      <span className="flex items-center gap-1">
-                        {getStatusIcon(job.status)}
-                        {job.status.replace('_', ' ')}
-                      </span>
-                    </Badge>
+                  <div className="flex items-center gap-4 ml-4">
+                    {getStatusBadge(job.status)}
                     {job.status === 'COMPLETED' && (
                       <Button
-                        onClick={async () => {
-                          const response = await fetch(`/api/generation/${job.id}/download`);
-                          const blob = await response.blob();
-                          const url = window.URL.createObjectURL(blob);
-                          const a = document.createElement('a');
-                          a.href = url;
-                          a.download = `app-${job.id.slice(0, 8)}.zip`;
-                          document.body.appendChild(a);
-                          a.click();
-                          window.URL.revokeObjectURL(url);
-                          document.body.removeChild(a);
-                        }}
                         size="sm"
                         variant="outline"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          router.push(`/generate/result/${job.id}`);
+                        }}
                       >
-                        <Download className="w-4 h-4 mr-2" />
-                        Download
+                        <Download className="h-4 w-4 mr-1" />
+                        View
                       </Button>
                     )}
                   </div>
