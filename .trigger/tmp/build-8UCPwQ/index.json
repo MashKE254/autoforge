@@ -1,0 +1,75 @@
+{
+  "configPath": "C:\\Users\\Admin\\autoforge\\.trigger\\tmp\\build-8UCPwQ\\autoforge\\trigger.config.mjs",
+  "tasks": [
+    {
+      "id": "generate-application-job",
+      "retry": {
+        "maxAttempts": 3,
+        "factor": 2,
+        "minTimeoutInMs": 1000,
+        "maxTimeoutInMs": 10000
+      },
+      "maxDuration": 300,
+      "filePath": "src/trigger/index.ts",
+      "entryPoint": "C:\\Users\\Admin\\autoforge\\.trigger\\tmp\\build-8UCPwQ\\autoforge\\src\\trigger\\index.mjs"
+    },
+    {
+      "id": "code-generation-job",
+      "retry": {
+        "maxAttempts": 3,
+        "factor": 2,
+        "minTimeoutInMs": 1000,
+        "maxTimeoutInMs": 10000
+      },
+      "maxDuration": 300,
+      "filePath": "src/trigger/index.ts",
+      "entryPoint": "C:\\Users\\Admin\\autoforge\\.trigger\\tmp\\build-8UCPwQ\\autoforge\\src\\trigger\\index.mjs"
+    },
+    {
+      "id": "unified-generation-job",
+      "retry": {
+        "maxAttempts": 3,
+        "factor": 2,
+        "minTimeoutInMs": 1000,
+        "maxTimeoutInMs": 10000
+      },
+      "maxDuration": 600,
+      "filePath": "src/trigger/unified-generate.ts",
+      "entryPoint": "C:\\Users\\Admin\\autoforge\\.trigger\\tmp\\build-8UCPwQ\\autoforge\\src\\trigger\\unified-generate.mjs"
+    },
+    {
+      "id": "workflow-generation-job",
+      "retry": {
+        "maxAttempts": 3,
+        "factor": 2,
+        "minTimeoutInMs": 1000,
+        "maxTimeoutInMs": 10000
+      },
+      "maxDuration": 600,
+      "filePath": "src/trigger/unified-generate.ts",
+      "entryPoint": "C:\\Users\\Admin\\autoforge\\.trigger\\tmp\\build-8UCPwQ\\autoforge\\src\\trigger\\unified-generate.mjs"
+    },
+    {
+      "id": "agent-generation-job",
+      "retry": {
+        "maxAttempts": 3,
+        "factor": 2,
+        "minTimeoutInMs": 1000,
+        "maxTimeoutInMs": 10000
+      },
+      "maxDuration": 600,
+      "filePath": "src/trigger/unified-generate.ts",
+      "entryPoint": "C:\\Users\\Admin\\autoforge\\.trigger\\tmp\\build-8UCPwQ\\autoforge\\src\\trigger\\unified-generate.mjs"
+    }
+  ],
+  "queues": [],
+  "workerEntryPoint": "C:\\Users\\Admin\\autoforge\\.trigger\\tmp\\build-8UCPwQ\\AppData\\Local\\npm-cache\\_npx\\f51a09bd0abf5f10\\node_modules\\trigger.dev\\dist\\esm\\entryPoints\\dev-run-worker.mjs",
+  "runtime": "node",
+  "runtimeVersion": "22.19.0",
+  "customConditions": [],
+  "timings": {
+    "src/trigger/bolt-generate.ts": 68.30680000000007,
+    "src/trigger/index.ts": 16.77819999999997,
+    "src/trigger/unified-generate.ts": 3.3610000000001037
+  }
+}
