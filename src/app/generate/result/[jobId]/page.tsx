@@ -1,109 +1,72 @@
-// app/generate/result/[jobId]/page.tsx
-import { prisma } from '@/lib/prisma';
+/**
+ * Generation Result Page
+ * 
+ * File: src/app/generate/result/[jobId]/page.tsx
+ * 
+ * Shows the AI Workspace with generated files
+ */
+
 import { notFound } from 'next/navigation';
+import { prisma } from '@/lib/prisma';
 import AIWorkspace from '@/components/ai-workspace';
-import type { PlanStep } from '@/components/job-plan';
 
 interface PageProps {
   params: Promise<{ jobId: string }>;
 }
 
-// Define the file type for passing to AIWorkspace
-interface GeneratedFileData {
-  path: string;
-  content: string;
-  language: string;
+interface PlanStep {
+  title: string;
+  description: string;
+  [key: string]: unknown;
 }
 
-// Define the module type from Prisma query
-interface ModuleWithRelation {
-  module: {
-    id: string;
-    name: string;
-    description: string;
-  };
-  generatedCode: string | null;
-}
-
-// Define the file type from Prisma query
-interface GeneratedFile {
-  path: string;
-  content: string;
-  language: string;
-}
-
-export default async function GenerationResultPage({ params }: PageProps) {
+export default async function ResultPage({ params }: PageProps) {
   const { jobId } = await params;
 
-  // Get the completed job with FILES from database
+  // Fetch job and files
   const job = await prisma.generationJob.findUnique({
     where: { id: jobId },
     include: {
-      files: true,  // ✅ This contains the actual generated files!
-      modules: {
-        include: { module: true }
-      }
-    }
+      files: {
+        orderBy: { path: 'asc' },
+      },
+    },
   });
 
   if (!job) {
     notFound();
   }
 
-  if (job.status !== 'COMPLETED') {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold">Generation {job.status}</h1>
-          <p className="text-gray-600 mt-2">
-            Progress: {job.completedModules}/{job.totalModules} modules
-          </p>
-        </div>
-      </div>
-    );
+  // Transform files
+  const initialFiles = job.files.map((file) => ({
+    path: file.path,
+    content: file.content,
+    language: file.language || 'plaintext',
+  }));
+
+  // Parse plan if available
+  let plan: PlanStep[] = [];
+  if (job.blueprint) {
+    try {
+      const blueprint = JSON.parse(job.blueprint as string);
+      plan = blueprint.plan || [];
+    } catch {
+      plan = [];
+    }
   }
 
-  // Convert modules to PlanStep format for display
-  const plan: PlanStep[] = (job.modules as ModuleWithRelation[]).map((m) => ({
-    id: m.module.id,
-    title: m.module.name,
-    description: m.module.description || '',
-    code: m.generatedCode || '',
-    status: 'completed' as const,
-    dependencies: []
-  }));
-
-  // ✅ FIX: Extract the actual files from the database with proper typing
-  const initialFiles: GeneratedFileData[] = (job.files as GeneratedFile[]).map((f) => ({
-    path: f.path,
-    content: f.content,
-    language: f.language,
-  }));
-
-  console.log(`📁 Passing ${initialFiles.length} files to AIWorkspace`);
-  console.log('Files:', initialFiles.map(f => f.path).join(', '));
+  // Generate project name from prompt
+  const projectName = job.prompt
+    .slice(0, 50)
+    .replace(/[^a-zA-Z0-9\s]/g, '')
+    .trim() || 'Generated App';
 
   return (
-    <div className="min-h-screen bg-white dark:bg-gray-950">
-      <AIWorkspace 
-        plan={plan}
-        projectName={job.prompt.slice(0, 50)}
-        jobId={jobId}
-        initialFiles={initialFiles}  // ✅ Pass the database files!
-      />
-    </div>
+    <AIWorkspace
+      plan={plan}
+      projectName={projectName}
+      jobId={jobId}
+      initialFiles={initialFiles}
+    />
   );
-}
-
-// Generate metadata for SEO
-export async function generateMetadata({ params }: PageProps) {
-  const { jobId } = await params;
-  const job = await prisma.generationJob.findUnique({
-    where: { id: jobId },
-    select: { prompt: true }
-  });
-
-  return {
-    title: job?.prompt ? `Result: ${job.prompt.slice(0, 50)}` : 'Generation Result'
-  };
 }

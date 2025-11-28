@@ -1,5 +1,5 @@
 {
-  "configPath": "C:\\Users\\Admin\\autoforge\\.trigger\\tmp\\build-q2NPZG\\autoforge\\trigger.config.mjs",
+  "configPath": "C:\\Users\\Admin\\autoforge\\.trigger\\tmp\\build-401YUD\\autoforge\\trigger.config.mjs",
   "tasks": [
     {
       "id": "generate-application-job",
@@ -11,7 +11,7 @@
       },
       "maxDuration": 300,
       "filePath": "src/trigger/index.ts",
-      "entryPoint": "C:\\Users\\Admin\\autoforge\\.trigger\\tmp\\build-q2NPZG\\autoforge\\src\\trigger\\index.mjs"
+      "entryPoint": "C:\\Users\\Admin\\autoforge\\.trigger\\tmp\\build-401YUD\\autoforge\\src\\trigger\\index.mjs"
     },
     {
       "id": "code-generation-job",
@@ -23,7 +23,7 @@
       },
       "maxDuration": 300,
       "filePath": "src/trigger/index.ts",
-      "entryPoint": "C:\\Users\\Admin\\autoforge\\.trigger\\tmp\\build-q2NPZG\\autoforge\\src\\trigger\\index.mjs"
+      "entryPoint": "C:\\Users\\Admin\\autoforge\\.trigger\\tmp\\build-401YUD\\autoforge\\src\\trigger\\index.mjs"
     },
     {
       "id": "enhanced-unified-generation-job",
@@ -35,7 +35,7 @@
       },
       "maxDuration": 900,
       "filePath": "src/trigger/enhanced-unified-generate.ts",
-      "entryPoint": "C:\\Users\\Admin\\autoforge\\.trigger\\tmp\\build-q2NPZG\\autoforge\\src\\trigger\\enhanced-unified-generate.mjs"
+      "entryPoint": "C:\\Users\\Admin\\autoforge\\.trigger\\tmp\\build-401YUD\\autoforge\\src\\trigger\\enhanced-unified-generate.mjs"
     },
     {
       "id": "saas-generation-job",
@@ -47,7 +47,7 @@
       },
       "maxDuration": 600,
       "filePath": "src/trigger/enhanced-unified-generate.ts",
-      "entryPoint": "C:\\Users\\Admin\\autoforge\\.trigger\\tmp\\build-q2NPZG\\autoforge\\src\\trigger\\enhanced-unified-generate.mjs"
+      "entryPoint": "C:\\Users\\Admin\\autoforge\\.trigger\\tmp\\build-401YUD\\autoforge\\src\\trigger\\enhanced-unified-generate.mjs"
     },
     {
       "id": "api-backend-generation-job",
@@ -59,7 +59,7 @@
       },
       "maxDuration": 300,
       "filePath": "src/trigger/enhanced-unified-generate.ts",
-      "entryPoint": "C:\\Users\\Admin\\autoforge\\.trigger\\tmp\\build-q2NPZG\\autoforge\\src\\trigger\\enhanced-unified-generate.mjs"
+      "entryPoint": "C:\\Users\\Admin\\autoforge\\.trigger\\tmp\\build-401YUD\\autoforge\\src\\trigger\\enhanced-unified-generate.mjs"
     },
     {
       "id": "infrastructure-generation-job",
@@ -71,7 +71,7 @@
       },
       "maxDuration": 300,
       "filePath": "src/trigger/enhanced-unified-generate.ts",
-      "entryPoint": "C:\\Users\\Admin\\autoforge\\.trigger\\tmp\\build-q2NPZG\\autoforge\\src\\trigger\\enhanced-unified-generate.mjs"
+      "entryPoint": "C:\\Users\\Admin\\autoforge\\.trigger\\tmp\\build-401YUD\\autoforge\\src\\trigger\\enhanced-unified-generate.mjs"
     },
     {
       "id": "full-stack-saas-generation-job",
@@ -83,7 +83,7 @@
       },
       "maxDuration": 900,
       "filePath": "src/trigger/enhanced-unified-generate.ts",
-      "entryPoint": "C:\\Users\\Admin\\autoforge\\.trigger\\tmp\\build-q2NPZG\\autoforge\\src\\trigger\\enhanced-unified-generate.mjs"
+      "entryPoint": "C:\\Users\\Admin\\autoforge\\.trigger\\tmp\\build-401YUD\\autoforge\\src\\trigger\\enhanced-unified-generate.mjs"
     },
     {
       "id": "unified-generation-job",
@@ -95,7 +95,7 @@
       },
       "maxDuration": 600,
       "filePath": "src/trigger/unified-generate.ts",
-      "entryPoint": "C:\\Users\\Admin\\autoforge\\.trigger\\tmp\\build-q2NPZG\\autoforge\\src\\trigger\\unified-generate.mjs"
+      "entryPoint": "C:\\Users\\Admin\\autoforge\\.trigger\\tmp\\build-401YUD\\autoforge\\src\\trigger\\unified-generate.mjs"
     },
     {
       "id": "workflow-generation-job",
@@ -107,7 +107,7 @@
       },
       "maxDuration": 600,
       "filePath": "src/trigger/unified-generate.ts",
-      "entryPoint": "C:\\Users\\Admin\\autoforge\\.trigger\\tmp\\build-q2NPZG\\autoforge\\src\\trigger\\unified-generate.mjs"
+      "entryPoint": "C:\\Users\\Admin\\autoforge\\.trigger\\tmp\\build-401YUD\\autoforge\\src\\trigger\\unified-generate.mjs"
     },
     {
       "id": "agent-generation-job",
@@ -119,18 +119,18 @@
       },
       "maxDuration": 600,
       "filePath": "src/trigger/unified-generate.ts",
-      "entryPoint": "C:\\Users\\Admin\\autoforge\\.trigger\\tmp\\build-q2NPZG\\autoforge\\src\\trigger\\unified-generate.mjs"
+      "entryPoint": "C:\\Users\\Admin\\autoforge\\.trigger\\tmp\\build-401YUD\\autoforge\\src\\trigger\\unified-generate.mjs"
     }
   ],
   "queues": [],
-  "workerEntryPoint": "C:\\Users\\Admin\\autoforge\\.trigger\\tmp\\build-q2NPZG\\AppData\\Local\\npm-cache\\_npx\\f51a09bd0abf5f10\\node_modules\\trigger.dev\\dist\\esm\\entryPoints\\dev-run-worker.mjs",
+  "workerEntryPoint": "C:\\Users\\Admin\\autoforge\\.trigger\\tmp\\build-401YUD\\AppData\\Local\\npm-cache\\_npx\\f51a09bd0abf5f10\\node_modules\\trigger.dev\\dist\\esm\\entryPoints\\dev-run-worker.mjs",
   "runtime": "node",
   "runtimeVersion": "22.19.0",
   "customConditions": [],
   "timings": {
-    "src/trigger/bolt-generate.ts": 121.10660000000007,
-    "src/trigger/enhanced-unified-generate.ts": 97.76129999999989,
-    "src/trigger/index.ts": 11.092000000000098,
-    "src/trigger/unified-generate.ts": 5.593399999999974
+    "src/trigger/bolt-generate.ts": 114.66240000000016,
+    "src/trigger/enhanced-unified-generate.ts": 29.625,
+    "src/trigger/index.ts": 11.669599999999946,
+    "src/trigger/unified-generate.ts": 5.667899999999918
   }
 }
