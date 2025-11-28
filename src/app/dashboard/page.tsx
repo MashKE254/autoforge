@@ -1,17 +1,17 @@
 'use client';
 
 /**
- * Updated Dashboard Page with Workflow & Agent Support
+ * Fast Streaming Dashboard (like bolt.new)
  * 
  * File: src/app/dashboard/page.tsx
  * 
  * Features:
- * - Example prompts for UI, Workflow, and Agent generation
- * - Real-time classification preview
- * - Visual indicator of what will be generated
+ * - INSTANT streaming generation
+ * - Live file preview as they're generated
+ * - Background jobs only for complex SaaS
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -20,93 +20,60 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { 
-  Loader2, 
-  Sparkles, 
-  AlertCircle, 
-  Zap, 
-  Bot, 
-  Workflow,
-  ArrowRight,
-  CheckCircle,
-  Clock,
-  Code,
-  Cpu,
-  Globe,
-  Mail,
-  MessageSquare
+  Loader2, Sparkles, AlertCircle, Zap, Bot, Workflow,
+  CheckCircle, Clock, Code, Cpu, Globe, Mail, MessageSquare,
+  CreditCard, Server, Container, Building2, Database, FileCode, Eye
 } from 'lucide-react';
+
+interface StreamedFile {
+  path: string;
+  content: string;
+  index: number;
+}
 
 interface Classification {
   type: string;
   confidence: number;
-  confidencePercent: string;
-  description: string;
-  reasoning: string;
-  techStack: string[];
+  features?: Record<string, boolean>;
+  techStack?: string[];
 }
 
-interface RecentJob {
-  id: string;
-  createdAt: string;
-  status: string;
-  prompt: string;
-  progress: number;
-}
-
-// Example prompts for each category
 const examplePrompts = {
   ui: [
-    {
-      title: 'Calculator',
-      prompt: 'A calculator with add, subtract, multiply, divide operations. Include dark mode and calculation history.',
-      icon: Code,
-    },
-    {
-      title: 'Kanban Board',
-      prompt: 'A Trello-like kanban board with drag and drop, columns for todo/in-progress/done, and card editing.',
-      icon: Cpu,
-    },
-    {
-      title: 'Dashboard',
-      prompt: 'An analytics dashboard with line charts, bar charts, KPI cards, and date filters.',
-      icon: Globe,
-    },
+    { title: 'Calculator', prompt: 'A calculator with add, subtract, multiply, divide. Dark mode and history.', icon: Code },
+    { title: 'Kanban Board', prompt: 'A Trello-like kanban board with drag and drop columns.', icon: Cpu },
+    { title: 'Dashboard', prompt: 'An analytics dashboard with charts and KPI cards.', icon: Globe },
+  ],
+  saas: [
+    { title: 'Project Management', prompt: 'Build a project management SaaS with Stripe subscription billing, team workspaces, and admin dashboard.', icon: Building2 },
+    { title: 'Feedback Tool', prompt: 'A customer feedback SaaS with pricing tiers, Stripe checkout, and analytics.', icon: MessageSquare },
+  ],
+  api: [
+    { title: 'User API', prompt: 'Create a REST API for user management with JWT auth and rate limiting. No frontend.', icon: Database },
+    { title: 'Inventory API', prompt: 'Build a headless inventory API with CRUD, pagination, and OpenAPI docs.', icon: Server },
   ],
   workflow: [
-    {
-      title: 'Welcome Flow',
-      prompt: 'When a new user signs up, send them a welcome email, wait 2 days, then send a follow-up. Notify team on Slack.',
-      icon: Mail,
-    },
-    {
-      title: 'Daily Report',
-      prompt: 'Every day at 9 AM, gather metrics from our database, generate a summary report, and email it to the team.',
-      icon: Clock,
-    },
-    {
-      title: 'Data Sync',
-      prompt: 'Every hour, sync customer data between our database and Hubspot CRM. Handle conflicts by preferring recent updates.',
-      icon: Zap,
-    },
+    { title: 'Welcome Flow', prompt: 'When a user signs up, send welcome email, wait 2 days, send follow-up.', icon: Mail },
+    { title: 'Daily Report', prompt: 'Every day at 9 AM, gather metrics and email a summary report.', icon: Clock },
   ],
   agent: [
-    {
-      title: 'Research Agent',
-      prompt: 'An AI agent that can search the web, read articles, and summarize findings to answer research questions.',
-      icon: Bot,
-    },
-    {
-      title: 'Content Crew',
-      prompt: 'A team of AI agents: researcher, writer, and reviewer. They collaborate to produce high-quality blog posts.',
-      icon: MessageSquare,
-    },
-    {
-      title: 'Support Agent',
-      prompt: 'A customer support AI that answers from knowledge base, looks up orders, and escalates to humans when needed.',
-      icon: Cpu,
-    },
+    { title: 'Research Agent', prompt: 'An AI agent that searches the web and summarizes findings.', icon: Bot },
+    { title: 'Content Crew', prompt: 'Team of AI agents: researcher, writer, reviewer for blog posts.', icon: MessageSquare },
   ],
+};
+
+const typeConfig: Record<string, { label: string; color: string; useStreaming: boolean }> = {
+  'ui-application': { label: 'UI App', color: 'text-blue-400', useStreaming: true },
+  'full-saas': { label: 'Full SaaS', color: 'text-green-400', useStreaming: false },
+  'full-stack-saas': { label: 'Full-Stack SaaS', color: 'text-emerald-400', useStreaming: false },
+  'api-backend': { label: 'API Backend', color: 'text-cyan-400', useStreaming: true },
+  'workflow-automation': { label: 'Workflow', color: 'text-orange-400', useStreaming: false },
+  'ai-agent-network': { label: 'AI Agents', color: 'text-purple-400', useStreaming: false },
+  'infrastructure': { label: 'Infrastructure', color: 'text-slate-400', useStreaming: true },
 };
 
 export default function DashboardPage() {
@@ -114,21 +81,24 @@ export default function DashboardPage() {
   const router = useRouter();
   
   const [prompt, setPrompt] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [recentJobs, setRecentJobs] = useState<RecentJob[]>([]);
+  const [activeTab, setActiveTab] = useState('ui');
+  
+  const [streamedFiles, setStreamedFiles] = useState<StreamedFile[]>([]);
+  const [currentChunk, setCurrentChunk] = useState('');
+  const [jobId, setJobId] = useState<string | null>(null);
+  const [generationComplete, setGenerationComplete] = useState(false);
+  
   const [classification, setClassification] = useState<Classification | null>(null);
   const [classifying, setClassifying] = useState(false);
-  const [activeTab, setActiveTab] = useState('ui');
+  
+  const [includeInfrastructure, setIncludeInfrastructure] = useState(false);
+  const [useBackgroundJob, setUseBackgroundJob] = useState(false);
+  
+  const abortControllerRef = useRef<AbortController | null>(null);
 
-  // Load recent jobs
-  useEffect(() => {
-    if (status === 'authenticated') {
-      fetchRecentJobs();
-    }
-  }, [status]);
-
-  // Classify prompt as user types (debounced)
+  // Classify prompt as user types
   useEffect(() => {
     if (!prompt.trim() || prompt.length < 10) {
       setClassification(null);
@@ -138,99 +108,133 @@ export default function DashboardPage() {
     const timeout = setTimeout(async () => {
       setClassifying(true);
       try {
-        const res = await fetch('/api/generate/classify', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ prompt }),
-        });
+        const res = await fetch(`/api/generate/enhanced?prompt=${encodeURIComponent(prompt)}`);
         const data = await res.json();
-        if (data.success) {
-          setClassification(data.classification);
+        if (data.primaryType) {
+          setClassification({
+            type: data.primaryType,
+            confidence: data.confidence,
+            features: data.detectedFeatures,
+            techStack: data.suggestedTechStack,
+          });
+          const config = typeConfig[data.primaryType];
+          if (config && !config.useStreaming) {
+            setUseBackgroundJob(true);
+          } else {
+            setUseBackgroundJob(false);
+          }
         }
       } catch {
-        // Silent fail for classification
+        // Silent
       } finally {
         setClassifying(false);
       }
-    }, 500);
+    }, 400);
 
     return () => clearTimeout(timeout);
   }, [prompt]);
 
-  const fetchRecentJobs = async () => {
-    try {
-      const res = await fetch('/api/generation/recent?limit=5');
-      const data = await res.json();
-      if (data.success) {
-        setRecentJobs(data.jobs);
-      }
-    } catch {
-      // Silent fail
-    }
-  };
-
-  const handleGenerate = async () => {
-    if (!prompt.trim()) return;
-
-    setLoading(true);
+  // STREAMING GENERATION
+  const handleStreamingGenerate = async () => {
+    setIsGenerating(true);
     setError(null);
-
+    setStreamedFiles([]);
+    setCurrentChunk('');
+    setJobId(null);
+    setGenerationComplete(false);
+    
+    abortControllerRef.current = new AbortController();
+    
     try {
-      const res = await fetch('/api/generate/start', {
+      const response = await fetch('/api/generate/stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt: prompt.trim() }),
+        signal: abortControllerRef.current.signal,
+      });
+
+      if (!response.ok) throw new Error('Failed to start generation');
+
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error('No response stream');
+
+      const decoder = new TextDecoder();
+      
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        
+        const text = decoder.decode(value);
+        const lines = text.split('\n');
+        
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              
+              if (data.type === 'job') setJobId(data.jobId);
+              else if (data.type === 'chunk') setCurrentChunk(prev => prev + data.content);
+              else if (data.type === 'file') {
+                setStreamedFiles(prev => [...prev, { path: data.path, content: data.content, index: data.index }]);
+              }
+              else if (data.type === 'complete') {
+                setGenerationComplete(true);
+                setJobId(data.jobId);
+                // Auto-redirect to workspace after a brief moment
+                setTimeout(() => {
+                  router.push(`/generate/result/${data.jobId}`);
+                }, 1500);
+              }
+              else if (data.type === 'error') throw new Error(data.message);
+            } catch (e) {}
+          }
+        }
+      }
+    } catch (err) {
+      if (err instanceof Error && err.name !== 'AbortError') {
+        setError(err.message);
+      }
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  // BACKGROUND JOB GENERATION
+  const handleBackgroundGenerate = async () => {
+    setIsGenerating(true);
+    setError(null);
+    
+    try {
+      const res = await fetch('/api/generate/enhanced', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: prompt.trim(), includeInfrastructure }),
       });
 
       const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || 'Generation failed');
-      }
-
-      // Redirect to job page
+      if (!res.ok) throw new Error(data.error);
+      
       router.push(`/job/${data.jobId}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong');
-      setLoading(false);
+      setError(err instanceof Error ? err.message : 'Failed');
+      setIsGenerating(false);
     }
   };
 
-  const handleExampleClick = (examplePrompt: string) => {
-    setPrompt(examplePrompt);
+  const handleGenerate = () => {
+    if (!prompt.trim()) return;
+    useBackgroundJob ? handleBackgroundGenerate() : handleStreamingGenerate();
   };
 
-  const getStatusBadge = (jobStatus: string) => {
-    switch (jobStatus) {
-      case 'COMPLETED':
-        return <Badge className="bg-green-500"><CheckCircle className="w-3 h-3 mr-1" /> Completed</Badge>;
-      case 'RUNNING':
-        return <Badge className="bg-blue-500"><Loader2 className="w-3 h-3 mr-1 animate-spin" /> Running</Badge>;
-      case 'FAILED':
-        return <Badge className="bg-red-500"><AlertCircle className="w-3 h-3 mr-1" /> Failed</Badge>;
-      default:
-        return <Badge variant="outline">{jobStatus}</Badge>;
-    }
+  const handleCancel = () => {
+    abortControllerRef.current?.abort();
+    setIsGenerating(false);
   };
 
-  const getTypeIcon = (type: string) => {
-    if (type.includes('workflow')) return <Workflow className="w-5 h-5" />;
-    if (type.includes('agent')) return <Bot className="w-5 h-5" />;
-    return <Code className="w-5 h-5" />;
-  };
-
-  const getTypeColor = (type: string) => {
-    if (type.includes('workflow')) return 'bg-orange-500/20 text-orange-500 border-orange-500/50';
-    if (type.includes('agent')) return 'bg-purple-500/20 text-purple-500 border-purple-500/50';
-    return 'bg-blue-500/20 text-blue-500 border-blue-500/50';
-  };
+  const getTypeConfig = (type: string) => typeConfig[type] || typeConfig['ui-application'];
 
   if (status === 'loading') {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin" />
-      </div>
-    );
+    return <div className="flex items-center justify-center min-h-screen"><Loader2 className="h-8 w-8 animate-spin" /></div>;
   }
 
   if (status === 'unauthenticated') {
@@ -239,165 +243,173 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-6xl">
-      {/* Header */}
+    <div className="container mx-auto px-4 py-8 max-w-7xl">
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-2">Welcome back, {session?.user?.name || 'Builder'}!</h1>
-        <p className="text-gray-600 dark:text-gray-400">
-          Create UI apps, workflow automations, or AI agent networks from a single prompt.
+        <p className="text-gray-400">
+          Create apps instantly with <span className="text-blue-400">streaming generation</span> — see code appear in real-time.
         </p>
       </div>
 
-      {/* Main Generation Card */}
-      <Card className="mb-8 border-2 border-blue-100 dark:border-blue-900">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-blue-500" />
-            Create New Application
-          </CardTitle>
-          <CardDescription>
-            Describe what you want to build. We&apos;ll automatically detect if it&apos;s a UI app, workflow, or AI agent system.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <Textarea
-            placeholder="e.g., 'A calculator app' or 'When a user signs up, send welcome email' or 'An AI agent that researches topics'"
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            className="min-h-[120px] text-lg"
-            disabled={loading}
-          />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Left: Form */}
+        <div className="space-y-6">
+          <Card className="border-2 border-blue-500/30 bg-gradient-to-br from-blue-500/5 to-purple-500/5">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-blue-500" />
+                Create New Application
+              </CardTitle>
+              <CardDescription>Describe what you want — generation starts instantly</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Textarea
+                placeholder="e.g., 'A todo app with categories and dark mode'"
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                className="min-h-[100px] text-lg"
+                disabled={isGenerating}
+              />
 
-          {/* Classification Preview */}
-          {(classification || classifying) && (
-            <div className={`p-4 rounded-lg border ${classification ? getTypeColor(classification.type) : 'bg-gray-100'}`}>
-              {classifying ? (
-                <div className="flex items-center gap-2 text-gray-500">
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Analyzing your prompt...</span>
-                </div>
-              ) : classification && (
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    {getTypeIcon(classification.type)}
-                    <span className="font-semibold">{classification.description}</span>
-                    <Badge variant="outline" className="ml-auto">
-                      {classification.confidencePercent} confident
-                    </Badge>
-                  </div>
-                  <p className="text-sm opacity-80">{classification.reasoning}</p>
-                  <div className="flex flex-wrap gap-1 mt-2">
-                    {classification.techStack.map((tech, i) => (
-                      <Badge key={i} variant="secondary" className="text-xs">
-                        {tech}
-                      </Badge>
-                    ))}
-                  </div>
+              {classification && (
+                <div className="flex items-center gap-2 p-3 rounded-lg bg-gray-900/50 border border-gray-700">
+                  <span className={`font-medium ${getTypeConfig(classification.type).color}`}>
+                    {getTypeConfig(classification.type).label}
+                  </span>
+                  <Badge variant="outline">{Math.round(classification.confidence * 100)}%</Badge>
+                  {classification.features?.hasBilling && (
+                    <Badge className="bg-green-500/20 text-green-400"><CreditCard className="w-3 h-3 mr-1" /> Billing</Badge>
+                  )}
+                  {!typeConfig[classification.type]?.useStreaming && (
+                    <Badge className="bg-orange-500/20 text-orange-400">Background Job</Badge>
+                  )}
                 </div>
               )}
-            </div>
-          )}
 
-          {error && (
-            <Alert variant="destructive">
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
-
-          <Button
-            onClick={handleGenerate}
-            disabled={loading || !prompt.trim()}
-            className="w-full h-12 text-lg bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
-          >
-            {loading ? (
-              <>
-                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                Generating...
-              </>
-            ) : (
-              <>
-                <Sparkles className="mr-2 h-5 w-5" />
-                Generate Application
-                <ArrowRight className="ml-2 h-5 w-5" />
-              </>
-            )}
-          </Button>
-        </CardContent>
-      </Card>
-
-      {/* Example Prompts */}
-      <Card className="mb-8">
-        <CardHeader>
-          <CardTitle>Example Prompts</CardTitle>
-          <CardDescription>Click any example to use it as a starting point</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="ui" className="flex items-center gap-2">
-                <Code className="w-4 h-4" />
-                UI Apps
-              </TabsTrigger>
-              <TabsTrigger value="workflow" className="flex items-center gap-2">
-                <Workflow className="w-4 h-4" />
-                Workflows
-              </TabsTrigger>
-              <TabsTrigger value="agent" className="flex items-center gap-2">
-                <Bot className="w-4 h-4" />
-                AI Agents
-              </TabsTrigger>
-            </TabsList>
-
-            {(['ui', 'workflow', 'agent'] as const).map((category) => (
-              <TabsContent key={category} value={category} className="mt-4">
-                <div className="grid gap-3">
-                  {examplePrompts[category].map((example, i) => (
-                    <button
-                      key={i}
-                      onClick={() => handleExampleClick(example.prompt)}
-                      className="flex items-start gap-3 p-4 rounded-lg border hover:bg-gray-50 dark:hover:bg-gray-900 text-left transition-colors"
-                    >
-                      <example.icon className="w-5 h-5 mt-0.5 text-blue-500 flex-shrink-0" />
-                      <div>
-                        <p className="font-medium">{example.title}</p>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">{example.prompt}</p>
-                      </div>
-                    </button>
-                  ))}
+              <div className="flex flex-wrap gap-4 p-3 rounded-lg bg-gray-900/30 border border-gray-800">
+                <div className="flex items-center space-x-2">
+                  <Checkbox id="bg" checked={useBackgroundJob} onCheckedChange={(c) => setUseBackgroundJob(c === true)} />
+                  <Label htmlFor="bg" className="text-sm cursor-pointer">Use background job</Label>
                 </div>
-              </TabsContent>
-            ))}
-          </Tabs>
-        </CardContent>
-      </Card>
+                <div className="flex items-center space-x-2">
+                  <Checkbox id="infra" checked={includeInfrastructure} onCheckedChange={(c) => setIncludeInfrastructure(c === true)} />
+                  <Label htmlFor="infra" className="text-sm cursor-pointer flex items-center gap-1">
+                    <Container className="w-3 h-3" /> Add Docker/CI
+                  </Label>
+                </div>
+              </div>
 
-      {/* Recent Jobs */}
-      {recentJobs.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Recent Generations</CardTitle>
+              {error && <Alert variant="destructive"><AlertCircle className="h-4 w-4" /><AlertDescription>{error}</AlertDescription></Alert>}
+
+              <div className="flex gap-2">
+                <Button onClick={handleGenerate} disabled={!prompt.trim() || isGenerating}
+                  className="flex-1 h-12 text-lg bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
+                  {isGenerating ? <><Loader2 className="mr-2 h-5 w-5 animate-spin" />Generating...</> : <><Zap className="mr-2 h-5 w-5" />Generate Instantly</>}
+                </Button>
+                {isGenerating && !useBackgroundJob && <Button variant="outline" onClick={handleCancel}>Cancel</Button>}
+                {generationComplete && jobId && (
+                  <Button onClick={() => router.push(`/generate/result/${jobId}`)} className="bg-green-600 hover:bg-green-700">
+                    <Eye className="mr-2 h-4 w-4" />View
+                  </Button>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Examples */}
+          <Card>
+            <CardHeader className="pb-3"><CardTitle className="text-lg">Examples</CardTitle></CardHeader>
+            <CardContent>
+              <Tabs value={activeTab} onValueChange={setActiveTab}>
+                <TabsList className="grid grid-cols-5 mb-3">
+                  <TabsTrigger value="ui" className="text-xs">UI</TabsTrigger>
+                  <TabsTrigger value="saas" className="text-xs">SaaS</TabsTrigger>
+                  <TabsTrigger value="api" className="text-xs">API</TabsTrigger>
+                  <TabsTrigger value="workflow" className="text-xs">Flow</TabsTrigger>
+                  <TabsTrigger value="agent" className="text-xs">Agent</TabsTrigger>
+                </TabsList>
+                {Object.entries(examplePrompts).map(([cat, examples]) => (
+                  <TabsContent key={cat} value={cat} className="mt-2 space-y-2">
+                    {examples.map((ex, i) => (
+                      <button key={i} onClick={() => setPrompt(ex.prompt)}
+                        className="w-full flex items-center gap-2 p-2 rounded-lg border border-gray-800 hover:bg-gray-900 text-left text-sm">
+                        <ex.icon className="w-4 h-4 text-blue-500" /><span className="font-medium">{ex.title}</span>
+                      </button>
+                    ))}
+                  </TabsContent>
+                ))}
+              </Tabs>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Right: Live Preview */}
+        <Card className="h-[600px] flex flex-col">
+          <CardHeader className="pb-3 border-b border-gray-800">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <FileCode className="h-5 w-5" />
+              Live Generation
+              {isGenerating && <Badge className="bg-blue-500/20 text-blue-400 animate-pulse"><Loader2 className="w-3 h-3 mr-1 animate-spin" />Streaming</Badge>}
+              {generationComplete && <Badge className="bg-green-500/20 text-green-400"><CheckCircle className="w-3 h-3 mr-1" />Complete</Badge>}
+            </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {recentJobs.map((job) => (
-                <div
-                  key={job.id}
-                  className="flex items-center justify-between p-3 rounded-lg border hover:bg-gray-50 dark:hover:bg-gray-900 cursor-pointer"
-                  onClick={() => router.push(`/job/${job.id}`)}
-                >
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate">{job.prompt}</p>
-                    <p className="text-sm text-gray-500">
-                      {new Date(job.createdAt).toLocaleDateString()}
-                    </p>
-                  </div>
-                  {getStatusBadge(job.status)}
+          <CardContent className="flex-1 p-0 overflow-hidden">
+            {streamedFiles.length === 0 && !isGenerating ? (
+              <div className="h-full flex items-center justify-center text-gray-500">
+                <div className="text-center">
+                  <Code className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                  <p>Files will appear here in real-time</p>
                 </div>
-              ))}
-            </div>
+              </div>
+            ) : (
+              <ScrollArea className="h-full">
+                <div className="p-4 space-y-3">
+                  {streamedFiles.map((file, i) => (
+                    <div key={i} className="rounded-lg border border-gray-800 overflow-hidden">
+                      <div className="flex items-center gap-2 px-3 py-2 bg-gray-900 border-b border-gray-800">
+                        <FileCode className="w-4 h-4 text-blue-400" />
+                        <span className="text-sm font-mono text-gray-300">{file.path}</span>
+                        <CheckCircle className="w-4 h-4 text-green-500 ml-auto" />
+                      </div>
+                      <pre className="p-3 text-xs overflow-x-auto bg-gray-950 max-h-[150px] overflow-y-auto">
+                        <code className="text-gray-400">{file.content.slice(0, 400)}{file.content.length > 400 && '...'}</code>
+                      </pre>
+                    </div>
+                  ))}
+                  {isGenerating && currentChunk && (
+                    <div className="rounded-lg border border-blue-500/50 overflow-hidden animate-pulse">
+                      <div className="flex items-center gap-2 px-3 py-2 bg-blue-900/30">
+                        <Loader2 className="w-4 h-4 text-blue-400 animate-spin" />
+                        <span className="text-sm text-blue-300">Generating...</span>
+                      </div>
+                      <pre className="p-3 text-xs bg-gray-950 max-h-[80px] overflow-hidden">
+                        <code className="text-gray-500">{currentChunk.slice(-200)}</code>
+                      </pre>
+                    </div>
+                  )}
+                </div>
+              </ScrollArea>
+            )}
           </CardContent>
         </Card>
+      </div>
+
+      {/* Stats */}
+      {streamedFiles.length > 0 && (
+        <div className="grid grid-cols-3 gap-3 mt-6">
+          <Card className="p-3 text-center">
+            <div className="text-2xl font-bold text-blue-400">{streamedFiles.length}</div>
+            <div className="text-xs text-gray-500">Files</div>
+          </Card>
+          <Card className="p-3 text-center">
+            <div className="text-2xl font-bold text-green-400">{streamedFiles.reduce((a, f) => a + f.content.length, 0).toLocaleString()}</div>
+            <div className="text-xs text-gray-500">Characters</div>
+          </Card>
+          <Card className="p-3 text-center">
+            <div className="text-2xl font-bold text-purple-400">{streamedFiles.reduce((a, f) => a + f.content.split('\n').length, 0)}</div>
+            <div className="text-xs text-gray-500">Lines</div>
+          </Card>
+        </div>
       )}
     </div>
   );

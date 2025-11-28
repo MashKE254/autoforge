@@ -5,10 +5,13 @@
  * 
  * This replaces the complex blueprint → modules → assembly pipeline
  * with a single LLM call that generates the complete application.
+ * 
+ * Uses PREMIUM UI PROMPT for industry-grade designs.
  */
 
 import Anthropic from '@anthropic-ai/sdk';
 import { prisma } from '../prisma';
+import { PREMIUM_UI_SYSTEM_PROMPT, buildPremiumUserPrompt } from './premium-ui-prompt';
 
 // ============================================================================
 // TYPES
@@ -32,70 +35,6 @@ export interface StreamCallbacks {
   onFileComplete?: (path: string, content: string) => void;
   onProgress?: (message: string) => void;
   onError?: (error: string) => void;
-}
-
-// ============================================================================
-// PROMPTS
-// ============================================================================
-
-const SYSTEM_PROMPT = `You are an expert full-stack developer. You generate complete, working Next.js applications.
-
-OUTPUT FORMAT:
-You MUST output files in this exact format - one file at a time:
-
-<file path="package.json">
-{
-  "name": "app",
-  "version": "0.1.0",
-  ...
-}
-</file>
-
-<file path="app/page.tsx">
-'use client';
-// Complete working code here
-</file>
-
-CRITICAL RULES:
-1. ALWAYS include these files:
-   - package.json (with all dependencies)
-   - app/page.tsx (the MAIN application - fully functional)
-   - app/layout.tsx (root layout)
-   - app/globals.css (Tailwind directives)
-   - tailwind.config.js
-   - tsconfig.json
-   - next.config.mjs
-   - postcss.config.js
-
-2. app/page.tsx MUST:
-   - Start with 'use client' for interactivity
-   - Include ALL functionality described by the user
-   - Be a COMPLETE working application, not a placeholder
-   - Use Tailwind CSS for styling
-   - Include proper TypeScript types
-   - Handle all user interactions
-
-3. Use these exact versions in package.json:
-   - "next": "14.2.5"
-   - "react": "18.3.1"
-   - "react-dom": "18.3.1"
-   - "tailwindcss": "3.4.4"
-   - "typescript": "5.5.2"
-
-4. DO NOT:
-   - Output explanations or markdown outside of file tags
-   - Use placeholder comments like "// TODO" or "// Add logic here"
-   - Leave any functionality incomplete
-   - Use external APIs unless specifically requested`;
-
-function buildUserPrompt(userRequest: string): string {
-  return `Create a complete, working Next.js application for:
-
-"${userRequest}"
-
-Generate ALL necessary files. The app/page.tsx MUST contain the complete, fully functional application with all UI and logic implemented.
-
-Start generating files now:`;
 }
 
 // ============================================================================
@@ -171,37 +110,39 @@ export function addMissingEssentialFiles(
     files.map((f: GeneratedFile) => [f.path, f])
   );
   
-  const safeName = projectName.toLowerCase().replace(/[^a-z0-9]/g, '-').slice(0, 50) || 'my-app';
-  const safeTitle = projectName.slice(0, 50).replace(/'/g, "\\'");
+  const safeTitle = projectName.replace(/[<>"'&]/g, '');
   
   if (!fileMap.has('package.json')) {
     fileMap.set('package.json', {
       path: 'package.json',
-      content: JSON.stringify({
-        name: safeName,
-        version: '0.1.0',
-        private: true,
-        scripts: {
-          dev: 'next dev',
-          build: 'next build',
-          start: 'next start',
-          lint: 'next lint'
-        },
-        dependencies: {
-          'next': '14.2.5',
-          'react': '18.3.1',
-          'react-dom': '18.3.1'
-        },
-        devDependencies: {
-          '@types/node': '20.14.0',
-          '@types/react': '18.3.3',
-          '@types/react-dom': '18.3.0',
-          'typescript': '5.5.2',
-          'tailwindcss': '3.4.4',
-          'autoprefixer': '10.4.19',
-          'postcss': '8.4.38'
-        }
-      }, null, 2),
+      content: `{
+  "name": "${safeTitle.toLowerCase().replace(/[^a-z0-9]/g, '-')}",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "next": "14.2.5",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "lucide-react": "^0.400.0",
+    "clsx": "^2.1.1",
+    "tailwind-merge": "^2.3.0"
+  },
+  "devDependencies": {
+    "typescript": "5.5.2",
+    "@types/node": "20.14.2",
+    "@types/react": "18.3.3",
+    "@types/react-dom": "18.3.0",
+    "tailwindcss": "3.4.4",
+    "postcss": "8.4.38",
+    "autoprefixer": "10.4.19"
+  }
+}`,
       language: 'json'
     });
   }
@@ -209,27 +150,26 @@ export function addMissingEssentialFiles(
   if (!fileMap.has('tsconfig.json')) {
     fileMap.set('tsconfig.json', {
       path: 'tsconfig.json',
-      content: JSON.stringify({
-        compilerOptions: {
-          target: 'ES2017',
-          lib: ['dom', 'dom.iterable', 'esnext'],
-          allowJs: true,
-          skipLibCheck: true,
-          strict: true,
-          noEmit: true,
-          esModuleInterop: true,
-          module: 'esnext',
-          moduleResolution: 'bundler',
-          resolveJsonModule: true,
-          isolatedModules: true,
-          jsx: 'preserve',
-          incremental: true,
-          plugins: [{ name: 'next' }],
-          paths: { '@/*': ['./*'] }
-        },
-        include: ['next-env.d.ts', '**/*.ts', '**/*.tsx', '.next/types/**/*.ts'],
-        exclude: ['node_modules']
-      }, null, 2),
+      content: `{
+  "compilerOptions": {
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "preserve",
+    "incremental": true,
+    "plugins": [{ "name": "next" }],
+    "paths": { "@/*": ["./*"] }
+  },
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+  "exclude": ["node_modules"]
+}`,
       language: 'json'
     });
   }
@@ -259,7 +199,13 @@ module.exports = {
     './app/**/*.{js,ts,jsx,tsx,mdx}',
   ],
   theme: {
-    extend: {},
+    extend: {
+      animation: {
+        'fade-in': 'fadeIn 0.6s ease-out forwards',
+        'slide-up': 'slideUp 0.6s ease-out forwards',
+        'scale-in': 'scaleIn 0.4s ease-out forwards',
+      },
+    },
   },
   plugins: [],
 };
@@ -288,6 +234,63 @@ module.exports = {
       content: `@tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-gray-50 text-gray-900 antialiased;
+  }
+}
+
+@layer utilities {
+  .animate-fade-in {
+    animation: fadeIn 0.6s ease-out forwards;
+  }
+  
+  .animate-slide-up {
+    animation: slideUp 0.6s ease-out forwards;
+  }
+  
+  .animate-scale-in {
+    animation: scaleIn 0.4s ease-out forwards;
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(30px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.9); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(to bottom, #6366f1, #a855f7);
+  border-radius: 5px;
+}
+
+::selection {
+  background: #c4b5fd;
+  color: #1e1b4b;
+}
 `,
       language: 'css'
     });
@@ -297,11 +300,14 @@ module.exports = {
     fileMap.set('app/layout.tsx', {
       path: 'app/layout.tsx',
       content: `import type { Metadata } from 'next';
+import { Inter } from 'next/font/google';
 import './globals.css';
+
+const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
   title: '${safeTitle}',
-  description: 'Generated application',
+  description: 'Built with AutoForge - AI-Powered Code Generation',
 };
 
 export default function RootLayout({
@@ -311,7 +317,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body className={inter.className}>{children}</body>
     </html>
   );
 }
@@ -358,16 +364,16 @@ export class BoltGenerator {
         });
       }
       
-      callbacks?.onProgress?.('Starting AI generation...');
+      callbacks?.onProgress?.('Starting AI generation (Premium UI)...');
       
       const response = await this.client.messages.create({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 16000,
         temperature: 0.7,
-        system: SYSTEM_PROMPT,
+        system: PREMIUM_UI_SYSTEM_PROMPT,
         messages: [{
           role: 'user',
-          content: buildUserPrompt(prompt)
+          content: buildPremiumUserPrompt(prompt)
         }]
       });
       
@@ -382,11 +388,8 @@ export class BoltGenerator {
       
       console.log(`   Parsed ${files.length} files from response`);
       
-      const missing = validateGeneratedFiles(files);
-      if (missing.length > 0) {
-        console.log(`   Adding ${missing.length} missing essential files: ${missing.join(', ')}`);
-        files = addMissingEssentialFiles(files, prompt);
-      }
+      // Add any missing essential files
+      files = addMissingEssentialFiles(files, prompt);
       
       console.log('   Generated files:');
       files.forEach((f: GeneratedFile) => {
@@ -394,74 +397,77 @@ export class BoltGenerator {
         callbacks?.onFileComplete?.(f.path, f.content);
       });
       
-      const pageTsx = files.find((f: GeneratedFile) => f.path === 'app/page.tsx');
-      if (!pageTsx) {
-        throw new Error('AI failed to generate app/page.tsx');
-      }
-      
+      // Save files to database if jobId provided
       if (jobId) {
         callbacks?.onProgress?.('Saving files to database...');
         
-        await prisma.generatedFile.deleteMany({
-          where: { generationJobId: jobId }
-        });
-        
-        for (const file of files) {
-          await prisma.generatedFile.create({
-            data: {
-              generationJobId: jobId,
-              path: file.path,
-              content: file.content,
-              language: file.language
-            }
-          });
-        }
+        await prisma.$transaction(
+          files.map((file: GeneratedFile) =>
+            prisma.generatedFile.upsert({
+              where: {
+                generationJobId_path: {
+                  generationJobId: jobId,
+                  path: file.path,
+                },
+              },
+              update: {
+                content: file.content,
+                language: file.language,
+                size: file.content.length,
+              },
+              create: {
+                generationJobId: jobId,
+                path: file.path,
+                content: file.content,
+                language: file.language,
+                size: file.content.length,
+              },
+            })
+          )
+        );
         
         await prisma.generationJob.update({
           where: { id: jobId },
           data: {
             status: 'COMPLETED',
-            completedModules: files.length,
+            generationCompletedAt: new Date(),
             totalModules: files.length,
-            generationCompletedAt: new Date()
-          }
+            completedModules: files.length,
+          },
         });
-        
-        console.log(`✅ Saved ${files.length} files to database for job ${jobId}`);
       }
-      
-      callbacks?.onProgress?.('Generation complete!');
       
       return {
         success: true,
         files,
-        tokensUsed: response.usage?.output_tokens
+        tokensUsed: response.usage?.input_tokens + response.usage?.output_tokens,
       };
       
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      console.error('❌ Generation error:', errorMessage);
+      console.error('❌ Generation error:', error);
       
-      callbacks?.onError?.(errorMessage);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       
       if (jobId) {
         await prisma.generationJob.update({
           where: { id: jobId },
           data: {
             status: 'FAILED',
-            errorLog: errorMessage
-          }
+            errorLog: errorMessage,
+          },
         });
       }
+      
+      callbacks?.onError?.(errorMessage);
       
       return {
         success: false,
         files: [],
-        error: errorMessage
+        error: errorMessage,
       };
     }
   }
 }
 
-// Export singleton instance
+// Create singleton instance
 export const boltGenerator = new BoltGenerator();
