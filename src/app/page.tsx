@@ -147,7 +147,7 @@ export default function LandingPage() {
     if (session) {
       router.push(`/dashboard?prompt=${encodeURIComponent(prompt)}`);
     } else {
-      router.push('/auth/signin');
+      router.push('/login');
     }
   };
 
@@ -195,13 +195,13 @@ export default function LandingPage() {
               ) : (
                 <>
                   <Link 
-                    href="/auth/signin"
+                    href="/login"
                     className="px-4 py-2 text-sm text-gray-400 hover:text-white transition-colors"
                   >
                     Sign In
                   </Link>
                   <Link 
-                    href="/auth/signin"
+                    href="/login"
                     className="px-4 py-2 text-sm font-medium bg-white text-black rounded-lg hover:bg-gray-100 transition-colors"
                   >
                     Get Started
@@ -438,7 +438,7 @@ export default function LandingPage() {
               </p>
               <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
                 <Link
-                  href={session ? "/dashboard" : "/auth/signin"}
+                  href={session ? "/dashboard" : "/login"}
                   className="inline-flex items-center gap-2 px-8 py-4 bg-white text-black font-semibold rounded-xl hover:bg-gray-100 transition-colors"
                 >
                   Start Building Free

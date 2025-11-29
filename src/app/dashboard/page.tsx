@@ -1,39 +1,30 @@
 'use client';
 
 /**
- * AutoForge Dashboard - v0.dev/bolt.new Style
- * 
- * File: src/app/dashboard/page.tsx
- * 
- * Clean, minimal dashboard focused on the prompt input
- * with recent generations and quick examples
+ * AutoForge Dashboard
+ * * File: src/app/dashboard/page.tsx
+ * * Clean, minimal dashboard focused on the prompt input
+ * with recent generations and quick examples.
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type ElementType } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import {
   Sparkles,
-  ArrowRight,
   Loader2,
   Clock,
   Code2,
   Layers,
   Bot,
-  Workflow,
-  Zap,
   FileCode,
   ChevronRight,
-  Plus,
-  Search,
-  MoreHorizontal,
-  Trash2,
-  ExternalLink,
   CheckCircle,
   XCircle,
-  AlertCircle,
 } from 'lucide-react';
+
+// --- Types ---
 
 interface RecentGeneration {
   id: string;
@@ -43,8 +34,6 @@ interface RecentGeneration {
   fileCount?: number;
 }
 
-import type { ElementType } from 'react';
-
 interface QuickTemplate {
   id: string;
   title: string;
@@ -52,6 +41,8 @@ interface QuickTemplate {
   icon: ElementType;
   color: string;
 }
+
+// --- Configuration ---
 
 const quickTemplates: QuickTemplate[] = [
   {
@@ -84,6 +75,8 @@ const quickTemplates: QuickTemplate[] = [
   },
 ];
 
+// --- Sub-components ---
+
 function StatusBadge({ status }: { status: string }) {
   const config: Record<string, { color: string; icon: ElementType; label: string }> = {
     COMPLETED: { color: 'text-green-400 bg-green-400/10', icon: CheckCircle, label: 'Completed' },
@@ -102,6 +95,8 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
+// --- Main Component ---
+
 export default function Dashboard() {
   const { data: session, status: authStatus } = useSession();
   const router = useRouter();
@@ -111,10 +106,9 @@ export default function Dashboard() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [recentGenerations, setRecentGenerations] = useState<RecentGeneration[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [streamOutput, setStreamOutput] = useState('');
   const [generatedFiles, setGeneratedFiles] = useState<string[]>([]);
 
-  // Fetch recent generations
+  // Fetch recent generations when session is available
   useEffect(() => {
     if (session?.user?.id) {
       fetchRecentGenerations();
@@ -139,7 +133,6 @@ export default function Dashboard() {
     if (!prompt.trim() || isGenerating) return;
 
     setIsGenerating(true);
-    setStreamOutput('');
     setGeneratedFiles([]);
 
     try {
@@ -174,7 +167,8 @@ export default function Dashboard() {
               } else if (data.type === 'file') {
                 setGeneratedFiles(prev => [...prev, data.path]);
               } else if (data.type === 'complete') {
-                // Redirect to workspace
+                // Redirect to workspace result page
+                // Uses a small timeout to ensure UI updates before navigation
                 setTimeout(() => {
                   router.push(`/generate/result/${jobId}`);
                 }, 500);
@@ -182,7 +176,8 @@ export default function Dashboard() {
                 throw new Error(data.message);
               }
             } catch (e) {
-              // Skip invalid JSON
+              // Ignore incomplete JSON chunks
+              console.warn('Error parsing stream chunk', e);
             }
           }
         }
@@ -195,7 +190,10 @@ export default function Dashboard() {
 
   const handleTemplateClick = (template: QuickTemplate) => {
     setPrompt(template.prompt);
+    // Optional: Auto-focus the textarea here if desired
   };
+
+  // --- Auth & Loading States ---
 
   if (authStatus === 'loading') {
     return (
@@ -205,23 +203,26 @@ export default function Dashboard() {
     );
   }
 
+  // Redirect to the custom login page if unauthenticated
   if (!session) {
-    router.push('/auth/signin');
+    router.push('/login'); 
     return null;
   }
+
+  // --- Render ---
 
   return (
     <div className="min-h-screen bg-[#0A0A0B] text-white">
 
       {/* Main Content */}
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        {/* Hero Prompt Input */}
+        {/* Hero Section */}
         <div className="text-center mb-12">
           <h1 className="text-3xl font-bold mb-2">What do you want to build?</h1>
           <p className="text-gray-400">Describe your app and watch it come to life</p>
         </div>
 
-        {/* Main Input */}
+        {/* Main Prompt Input */}
         <div className="mb-12">
           <div className="relative group">
             <div className="absolute -inset-1 bg-gradient-to-r from-violet-600/50 via-indigo-600/50 to-cyan-600/50 rounded-2xl blur opacity-25 group-focus-within:opacity-50 transition-opacity" />
@@ -238,7 +239,7 @@ export default function Dashboard() {
                 placeholder="Describe your application..."
                 rows={4}
                 disabled={isGenerating}
-                className="w-full bg-transparent text-white placeholder:text-gray-500 p-4 text-lg focus:outline-none resize-none disabled:opacity-50"
+                className="w-full bg-transparent text-white placeholder:text-gray-500 p-4 text-lg focus:outline-none resize-none disabled:opacity-50 font-sans"
               />
               <div className="flex items-center justify-between px-4 py-3 border-t border-white/5 bg-white/[0.02]">
                 <div className="flex items-center gap-2 text-xs text-gray-500">
@@ -266,9 +267,9 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Generation Progress */}
+          {/* Live Generation Progress */}
           {isGenerating && generatedFiles.length > 0 && (
-            <div className="mt-4 p-4 bg-[#1A1A1C] border border-white/10 rounded-xl">
+            <div className="mt-4 p-4 bg-[#1A1A1C] border border-white/10 rounded-xl animate-in fade-in slide-in-from-top-2">
               <div className="flex items-center gap-2 text-sm text-gray-400 mb-3">
                 <Loader2 className="w-4 h-4 animate-spin text-violet-400" />
                 <span>Generating files...</span>
@@ -277,10 +278,10 @@ export default function Dashboard() {
                 {generatedFiles.map((file, i) => (
                   <div
                     key={i}
-                    className="flex items-center gap-1.5 px-2 py-1 bg-violet-500/10 text-violet-300 rounded text-xs"
+                    className="flex items-center gap-1.5 px-2 py-1 bg-violet-500/10 text-violet-300 rounded text-xs animate-in zoom-in duration-300"
                   >
                     <FileCode className="w-3 h-3" />
-                    {file}
+                    <span className="truncate max-w-[200px]">{file}</span>
                   </div>
                 ))}
               </div>
@@ -288,7 +289,7 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* Quick Templates */}
+        {/* Quick Start Templates */}
         <div className="mb-12">
           <h2 className="text-sm font-medium text-gray-400 mb-4">Quick Start Templates</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -297,19 +298,21 @@ export default function Dashboard() {
                 key={template.id}
                 onClick={() => handleTemplateClick(template)}
                 disabled={isGenerating}
-                className="group relative bg-[#1A1A1C] border border-white/10 rounded-xl p-4 text-left hover:border-white/20 hover:bg-white/5 transition-all disabled:opacity-50"
+                className="group relative bg-[#1A1A1C] border border-white/10 rounded-xl p-4 text-left hover:border-white/20 hover:bg-white/5 transition-all disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
               >
                 <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${template.color} flex items-center justify-center mb-3`}>
                   <template.icon className="w-5 h-5 text-white" />
                 </div>
-                <h3 className="font-medium text-sm mb-1">{template.title}</h3>
+                <h3 className="font-medium text-sm mb-1 text-white group-hover:text-violet-200 transition-colors">
+                  {template.title}
+                </h3>
                 <p className="text-xs text-gray-500 line-clamp-2">{template.prompt}</p>
               </button>
             ))}
           </div>
         </div>
 
-        {/* Recent Generations */}
+        {/* Recent Generations List */}
         <div>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-medium text-gray-400">Recent Generations</h2>
@@ -321,7 +324,7 @@ export default function Dashboard() {
           </div>
 
           {isLoading ? (
-            <div className="flex items-center justify-center py-12">
+            <div className="flex items-center justify-center py-12 border border-white/5 rounded-xl bg-[#1A1A1C]/50">
               <Loader2 className="w-6 h-6 text-gray-400 animate-spin" />
             </div>
           ) : recentGenerations.length === 0 ? (
@@ -340,24 +343,25 @@ export default function Dashboard() {
                   href={`/generate/result/${gen.id}`}
                   className="flex items-center gap-4 p-4 bg-[#1A1A1C] border border-white/10 rounded-xl hover:border-white/20 hover:bg-white/5 transition-all group"
                 >
-                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-violet-500/20 to-indigo-500/20 flex items-center justify-center">
+                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-violet-500/20 to-indigo-500/20 flex items-center justify-center shrink-0">
                     <Code2 className="w-5 h-5 text-violet-400" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{gen.prompt}</p>
+                    <p className="text-sm font-medium text-white truncate pr-4">{gen.prompt}</p>
                     <div className="flex items-center gap-3 mt-1">
                       <StatusBadge status={gen.status} />
                       <span className="text-xs text-gray-500">
                         {new Date(gen.createdAt).toLocaleDateString()}
                       </span>
-                      {gen.fileCount && (
-                        <span className="text-xs text-gray-500">
-                          {gen.fileCount} files
+                      {gen.fileCount !== undefined && (
+                        <span className="text-xs text-gray-500 flex items-center gap-1">
+                           <span className="w-1 h-1 rounded-full bg-gray-600"/>
+                           {gen.fileCount} files
                         </span>
                       )}
                     </div>
                   </div>
-                  <ChevronRight className="w-5 h-5 text-gray-500 group-hover:text-white transition-colors" />
+                  <ChevronRight className="w-5 h-5 text-gray-600 group-hover:text-white transition-colors shrink-0" />
                 </Link>
               ))}
             </div>
