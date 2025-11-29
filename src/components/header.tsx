@@ -2,18 +2,16 @@
 
 /**
  * AutoForge Header - v0.dev/bolt.new Style
- * 
- * File: src/components/header.tsx
- * 
- * Sleek, minimal header with glass effect
+ * * File: src/components/header.tsx
+ * * Sleek, minimal header with glass effect
  */
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { useSession, signOut } from 'next-auth/react';
 import { useState } from 'react';
 import {
-  Sparkles,
   Menu,
   X,
   ChevronDown,
@@ -47,9 +45,13 @@ export default function Header() {
           {/* Logo */}
           <div className="flex items-center gap-6">
             <Link href="/" className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-violet-500 to-indigo-500 flex items-center justify-center">
-                <Sparkles className="w-4 h-4 text-white" />
-              </div>
+              <Image 
+                src="/BASED IN.png" 
+                alt="AutoForge Logo" 
+                width={50} 
+                height={50} 
+                className="rounded-lg" 
+              />
               <span className="font-bold text-white">AutoForge</span>
             </Link>
 

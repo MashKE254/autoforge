@@ -2,15 +2,14 @@
 
 /**
  * AutoForge Landing Page - v0.dev/bolt.new Style
- * 
- * File: src/app/page.tsx
- * 
- * A stunning, modern landing page that matches the aesthetic
+ * * File: src/app/page.tsx
+ * * A stunning, modern landing page that matches the aesthetic
  * of v0.dev and bolt.new
  */
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { 
@@ -164,9 +163,13 @@ export default function LandingPage() {
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-8">
               <Link href="/" className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-indigo-500 flex items-center justify-center">
-                  <Sparkles className="w-5 h-5 text-white" />
-                </div>
+                <Image 
+                  src="/BASED IN.png" 
+                  alt="AutoForge Logo" 
+                  width={50} 
+                  height={50} 
+                  className="rounded-lg"
+                />
                 <span className="font-bold text-xl">AutoForge</span>
               </Link>
               <div className="hidden md:flex items-center gap-1">
@@ -459,9 +462,13 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-violet-500 to-indigo-500 flex items-center justify-center">
-                <Sparkles className="w-4 h-4 text-white" />
-              </div>
+              <Image 
+                src="/BASED IN.png" 
+                alt="AutoForge Logo" 
+                width={40} 
+                height={40} 
+                className="rounded-lg"
+              />
               <span className="font-semibold">AutoForge</span>
             </div>
             <div className="flex items-center gap-6 text-sm text-gray-400">

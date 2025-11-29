@@ -1,15 +1,12 @@
 /**
  * Unified Generator - Routes to Appropriate Generator
- * 
- * File: src/lib/generation/unified-generator.ts
- * 
- * This is the main entry point for generation. It:
+ * * File: src/lib/generation/unified-generator.ts
+ * * This is the main entry point for generation. It:
  * 1. Classifies the user's prompt
- * 2. Routes to the appropriate generator (UI, Workflow, Agent)
+ * 2. Routes to the appropriate generator (SaaS, UI, Workflow, Agent)
  * 3. Returns the generated files
- * 
- * Usage:
- *   const result = await unifiedGenerator.generate(prompt, jobId);
+ * * Usage:
+ * const result = await unifiedGenerator.generate(prompt, jobId);
  */
 
 import { prisma } from '../prisma';
@@ -17,20 +14,21 @@ import { classifyPrompt, GenerationType, ClassificationResult } from './prompt-c
 import { BoltGenerator, GeneratedFile, GenerationResult, StreamCallbacks } from './bolt-generator';
 import { WorkflowGenerator } from './workflow-generator';
 import { AgentGenerator } from './agent-generator';
+import { SaaSGenerator } from './saas-generator';
 
 // ============================================================================
 // TYPES
 // ============================================================================
 
 export interface UnifiedGenerationResult extends GenerationResult {
-  classificationType: GenerationType;
+  classificationType: GenerationType | 'saas-application';
   classification: ClassificationResult;
 }
 
 export interface GenerationContext {
   jobId?: string;
   callbacks?: StreamCallbacks;
-  forceType?: GenerationType; // Override auto-classification
+  forceType?: GenerationType | 'saas-application'; // Override auto-classification
 }
 
 // ============================================================================
@@ -41,11 +39,13 @@ export class UnifiedGenerator {
   private boltGenerator: BoltGenerator;
   private workflowGenerator: WorkflowGenerator;
   private agentGenerator: AgentGenerator;
+  private saasGenerator: SaaSGenerator;
   
   constructor() {
     this.boltGenerator = new BoltGenerator();
     this.workflowGenerator = new WorkflowGenerator();
     this.agentGenerator = new AgentGenerator();
+    this.saasGenerator = new SaaSGenerator();
   }
   
   /**
@@ -67,8 +67,24 @@ export class UnifiedGenerator {
     console.log(`   Confidence: ${(classification.confidence * 100).toFixed(1)}%`);
     console.log(`   Reasoning: ${classification.reasoning}`);
     
-    // Allow override
-    const generationType = forceType || classification.primaryType;
+    // Check for SaaS/Monetization intent (Keyword Override)
+    // This ensures that any mention of business/money gets the full SaaS Engine
+    const isSaaSIntent = 
+      prompt.toLowerCase().includes('saas') || 
+      prompt.toLowerCase().includes('subscription') || 
+      prompt.toLowerCase().includes('stripe') || 
+      prompt.toLowerCase().includes('payment') || 
+      prompt.toLowerCase().includes('billing') ||
+      prompt.toLowerCase().includes('business') ||
+      prompt.toLowerCase().includes('monetize');
+
+    // Determine final generation type
+    let generationType = forceType || classification.primaryType;
+
+    if (isSaaSIntent && !forceType) {
+      console.log('   → Detected SaaS/Monetization intent. Overriding to SaaS Generator.');
+      generationType = 'saas-application' as GenerationType | 'saas-application';
+    }
     
     // Update job with classification info
     if (jobId) {
@@ -82,6 +98,7 @@ export class UnifiedGenerator {
             detectedFeatures: classification.detectedFeatures,
             suggestedTechStack: classification.suggestedTechStack,
             reasoning: classification.reasoning,
+            isSaaS: isSaaSIntent
           }),
         },
       });
@@ -90,32 +107,42 @@ export class UnifiedGenerator {
     // Step 2: Route to appropriate generator
     let result: GenerationResult;
     
-    switch (generationType) {
-      case 'workflow-automation':
-      case 'hybrid-workflow-ui':
-        callbacks?.onProgress?.('🔄 Generating workflow automation system...');
-        console.log('   → Routing to Workflow Generator');
-        result = await this.workflowGenerator.generate(prompt, jobId, callbacks);
-        break;
-        
-      case 'ai-agent-network':
-      case 'hybrid-agent-ui':
-        callbacks?.onProgress?.('🤖 Generating AI agent network...');
-        console.log('   → Routing to Agent Generator');
-        result = await this.agentGenerator.generate(prompt, jobId, callbacks);
-        break;
-        
-      case 'ui-application':
-      default:
-        callbacks?.onProgress?.('🎨 Generating UI application...');
-        console.log('   → Routing to Bolt Generator (UI)');
-        result = await this.boltGenerator.generate(prompt, jobId, callbacks);
-        break;
+    // Handle SaaS routing explicitly first
+    if (
+      generationType === 'saas-application'
+    ) {
+      callbacks?.onProgress?.('💸 Generating monetizable SaaS application...');
+      console.log('   → Routing to SaaS Generator (Business Engine)');
+      result = await this.saasGenerator.generate(prompt, jobId, callbacks);
+    } else {
+      // Handle standard routing
+      switch (generationType) {
+        case 'workflow-automation':
+        case 'hybrid-workflow-ui':
+          callbacks?.onProgress?.('🔄 Generating workflow automation system...');
+          console.log('   → Routing to Workflow Generator');
+          result = await this.workflowGenerator.generate(prompt, jobId, callbacks);
+          break;
+          
+        case 'ai-agent-network':
+        case 'hybrid-agent-ui':
+          callbacks?.onProgress?.('🤖 Generating AI agent network...');
+          console.log('   → Routing to Agent Generator');
+          result = await this.agentGenerator.generate(prompt, jobId, callbacks);
+          break;
+          
+        case 'ui-application':
+        default:
+          callbacks?.onProgress?.('🎨 Generating UI application...');
+          console.log('   → Routing to Bolt Generator (UI)');
+          result = await this.boltGenerator.generate(prompt, jobId, callbacks);
+          break;
+      }
     }
     
     return {
       ...result,
-      classificationType: generationType,
+      classificationType: generationType as GenerationType,
       classification,
     };
   }
@@ -145,6 +172,14 @@ export class UnifiedGenerator {
     callbacks?: StreamCallbacks
   ): Promise<GenerationResult> {
     return this.agentGenerator.generate(prompt, jobId, callbacks);
+  }
+
+  async generateSaaS(
+    prompt: string,
+    jobId?: string,
+    callbacks?: StreamCallbacks
+  ): Promise<GenerationResult> {
+    return this.saasGenerator.generate(prompt, jobId, callbacks);
   }
   
   /**
@@ -186,6 +221,15 @@ export function classifyUserPrompt(prompt: string): ClassificationResult {
 /**
  * Check what type of generation will be used
  */
-export function getGenerationType(prompt: string): GenerationType {
+export function getGenerationType(prompt: string): GenerationType | 'saas-application' {
+  const isSaaSIntent = 
+      prompt.toLowerCase().includes('saas') || 
+      prompt.toLowerCase().includes('subscription') || 
+      prompt.toLowerCase().includes('stripe') || 
+      prompt.toLowerCase().includes('payment') || 
+      prompt.toLowerCase().includes('monetize');
+      
+  if (isSaaSIntent) return 'saas-application';
+  
   return classifyPrompt(prompt).primaryType;
 }
