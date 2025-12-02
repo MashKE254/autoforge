@@ -8,19 +8,19 @@
   "files": [
     {
       "entry": "src/trigger/bolt-generate.ts",
-      "out": "C:\\Users\\Admin\\autoforge\\.trigger\\tmp\\build-mwo7By\\autoforge\\src\\trigger\\bolt-generate.mjs"
+      "out": "C:\\Users\\Admin\\autoforge\\.trigger\\tmp\\build-CvRC22\\autoforge\\src\\trigger\\bolt-generate.mjs"
     },
     {
       "entry": "src/trigger/enhanced-unified-generate.ts",
-      "out": "C:\\Users\\Admin\\autoforge\\.trigger\\tmp\\build-mwo7By\\autoforge\\src\\trigger\\enhanced-unified-generate.mjs"
+      "out": "C:\\Users\\Admin\\autoforge\\.trigger\\tmp\\build-CvRC22\\autoforge\\src\\trigger\\enhanced-unified-generate.mjs"
     },
     {
       "entry": "src/trigger/index.ts",
-      "out": "C:\\Users\\Admin\\autoforge\\.trigger\\tmp\\build-mwo7By\\autoforge\\src\\trigger\\index.mjs"
+      "out": "C:\\Users\\Admin\\autoforge\\.trigger\\tmp\\build-CvRC22\\autoforge\\src\\trigger\\index.mjs"
     },
     {
       "entry": "src/trigger/unified-generate.ts",
-      "out": "C:\\Users\\Admin\\autoforge\\.trigger\\tmp\\build-mwo7By\\autoforge\\src\\trigger\\unified-generate.mjs"
+      "out": "C:\\Users\\Admin\\autoforge\\.trigger\\tmp\\build-CvRC22\\autoforge\\src\\trigger\\unified-generate.mjs"
     }
   ],
   "sources": {
@@ -65,10 +65,10 @@
       "./src/trigger"
     ]
   },
-  "outputPath": "C:\\Users\\Admin\\autoforge\\.trigger\\tmp\\build-mwo7By",
-  "indexWorkerEntryPoint": "C:\\Users\\Admin\\autoforge\\.trigger\\tmp\\build-mwo7By\\AppData\\Local\\npm-cache\\_npx\\f51a09bd0abf5f10\\node_modules\\trigger.dev\\dist\\esm\\entryPoints\\dev-index-worker.mjs",
-  "runWorkerEntryPoint": "C:\\Users\\Admin\\autoforge\\.trigger\\tmp\\build-mwo7By\\AppData\\Local\\npm-cache\\_npx\\f51a09bd0abf5f10\\node_modules\\trigger.dev\\dist\\esm\\entryPoints\\dev-run-worker.mjs",
-  "configPath": "C:\\Users\\Admin\\autoforge\\.trigger\\tmp\\build-mwo7By\\autoforge\\trigger.config.mjs",
+  "outputPath": "C:\\Users\\Admin\\autoforge\\.trigger\\tmp\\build-CvRC22",
+  "indexWorkerEntryPoint": "C:\\Users\\Admin\\autoforge\\.trigger\\tmp\\build-CvRC22\\AppData\\Local\\npm-cache\\_npx\\f51a09bd0abf5f10\\node_modules\\trigger.dev\\dist\\esm\\entryPoints\\dev-index-worker.mjs",
+  "runWorkerEntryPoint": "C:\\Users\\Admin\\autoforge\\.trigger\\tmp\\build-CvRC22\\AppData\\Local\\npm-cache\\_npx\\f51a09bd0abf5f10\\node_modules\\trigger.dev\\dist\\esm\\entryPoints\\dev-run-worker.mjs",
+  "configPath": "C:\\Users\\Admin\\autoforge\\.trigger\\tmp\\build-CvRC22\\autoforge\\trigger.config.mjs",
   "customConditions": [],
   "deploy": {
     "env": {}
