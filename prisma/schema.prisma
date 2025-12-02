@@ -1,3 +1,15 @@
+// =============================================================================
+// AUTOFORGE PRISMA SCHEMA - WITH MONETIZATION
+// =============================================================================
+// 
+// File: prisma/schema.prisma
+// 
+// This is the COMPLETE schema including all existing models plus new
+// monetization models for Stripe Connect, subscriptions, and revenue tracking.
+//
+// To apply: npx prisma migrate dev --name add_monetization
+// =============================================================================
+
 generator client {
   provider        = "prisma-client-js"
   previewFeatures = ["postgresqlExtensions"]
@@ -8,6 +20,10 @@ datasource db {
   url       = env("DATABASE_URL")
   directUrl = env("DATABASE_DIRECT_URL")
 }
+
+// =============================================================================
+// AUTHENTICATION MODELS (NextAuth)
+// =============================================================================
 
 model Account {
   id                String  @id @default(cuid())
@@ -35,6 +51,18 @@ model Session {
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// =============================================================================
+// USER MODEL (Extended with Stripe fields)
+// =============================================================================
+
 model User {
   id             String          @id @default(cuid())
   name           String?
@@ -43,18 +71,360 @@ model User {
   image          String?
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @default(now()) @updatedAt
-  accounts       Account[]
-  generationJobs GenerationJob[]
-  sessions       Session[]
+  
+  // Stripe Customer ID (for platform subscription)
+  stripeCustomerId String?       @unique
+  
+  // Relations
+  accounts         Account[]
+  sessions         Session[]
+  generationJobs   GenerationJob[]
+  
+  // NEW: Monetization relations
+  subscription     CreatorSubscription?
+  connectedAccount StripeConnectedAccount?
+  publishedApps    PublishedApp[]
+  payouts          Payout[]
+
+  @@index([email])
+  @@index([stripeCustomerId])
 }
 
-model VerificationToken {
-  identifier String
-  token      String   @unique
-  expires    DateTime
+// =============================================================================
+// CREATOR SUBSCRIPTION (Platform billing - $49/mo)
+// =============================================================================
 
-  @@unique([identifier, token])
+model CreatorSubscription {
+  id                     String   @id @default(cuid())
+  userId                 String   @unique
+  
+  // Stripe subscription details
+  stripeSubscriptionId   String   @unique
+  stripePriceId          String
+  stripeCurrentPeriodEnd DateTime
+  
+  // Subscription status
+  status                 SubscriptionStatus @default(ACTIVE)
+  plan                   PlanTier           @default(STARTER)
+  
+  // Trial information
+  trialEndsAt            DateTime?
+  
+  // Cancellation
+  cancelAtPeriodEnd      Boolean  @default(false)
+  canceledAt             DateTime?
+  
+  // Timestamps
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+  
+  // Relations
+  user                   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([stripeSubscriptionId])
 }
+
+enum SubscriptionStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  INCOMPLETE
+  INCOMPLETE_EXPIRED
+  TRIALING
+  UNPAID
+  PAUSED
+}
+
+enum PlanTier {
+  STARTER    // $49/mo - 5 published apps, 8% fee
+  PRO        // $99/mo - 20 published apps, 6% fee
+  BUSINESS   // $249/mo - Unlimited apps, 4% fee
+  ENTERPRISE // Custom pricing
+}
+
+// =============================================================================
+// STRIPE CONNECTED ACCOUNT (For creator payouts)
+// =============================================================================
+
+model StripeConnectedAccount {
+  id                    String   @id @default(cuid())
+  userId                String   @unique
+  
+  // Stripe Connect account details
+  stripeAccountId       String   @unique
+  
+  // Onboarding status
+  onboardingComplete    Boolean  @default(false)
+  chargesEnabled        Boolean  @default(false)
+  payoutsEnabled        Boolean  @default(false)
+  detailsSubmitted      Boolean  @default(false)
+  
+  // Account type
+  accountType           String   @default("express") // express, standard, custom
+  
+  // Business information (from Stripe)
+  businessName          String?
+  businessUrl           String?
+  country               String   @default("US")
+  defaultCurrency       String   @default("usd")
+  
+  // Timestamps
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  
+  // Relations
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([stripeAccountId])
+  @@index([onboardingComplete])
+}
+
+// =============================================================================
+// PUBLISHED APP (Monetized applications)
+// =============================================================================
+
+model PublishedApp {
+  id                String   @id @default(cuid())
+  
+  // Owner
+  userId            String
+  generationJobId   String
+  
+  // App details
+  name              String
+  slug              String   @unique  // For subdomain: {slug}.autoforge.app
+  description       String?
+  logoUrl           String?
+  
+  // Custom domain (optional)
+  customDomain      String?  @unique
+  domainVerified    Boolean  @default(false)
+  
+  // Deployment
+  deploymentUrl     String?
+  vercelProjectId   String?
+  
+  // Pricing configuration
+  pricingModel      PricingModel @default(SUBSCRIPTION)
+  
+  // Subscription pricing
+  monthlyPrice      Int?     // In cents (e.g., 900 = $9.00)
+  yearlyPrice       Int?     // In cents
+  
+  // One-time pricing
+  oneTimePrice      Int?     // In cents
+  
+  // Free trial
+  trialDays         Int      @default(0)
+  
+  // Stripe product/price IDs (created when app is published)
+  stripeProductId   String?
+  stripePriceMonthly String?
+  stripePriceYearly  String?
+  stripePriceOneTime String?
+  
+  // App status
+  status            AppStatus @default(DRAFT)
+  publishedAt       DateTime?
+  
+  // Analytics
+  totalRevenue      Int      @default(0) // In cents
+  totalCustomers    Int      @default(0)
+  monthlyRecurring  Int      @default(0) // MRR in cents
+  
+  // Timestamps
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  // Relations
+  user              User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  generationJob     GenerationJob   @relation(fields: [generationJobId], references: [id], onDelete: Cascade)
+  customers         AppCustomer[]
+  transactions      Transaction[]
+
+  @@index([userId])
+  @@index([slug])
+  @@index([status])
+  @@index([customDomain])
+}
+
+enum PricingModel {
+  FREE
+  SUBSCRIPTION
+  ONE_TIME
+  FREEMIUM  // Free tier + paid features
+}
+
+enum AppStatus {
+  DRAFT
+  PENDING_REVIEW
+  PUBLISHED
+  SUSPENDED
+  ARCHIVED
+}
+
+// =============================================================================
+// APP CUSTOMER (End-users who pay for published apps)
+// =============================================================================
+
+model AppCustomer {
+  id                     String   @id @default(cuid())
+  
+  // Which app
+  publishedAppId         String
+  
+  // Customer details
+  email                  String
+  name                   String?
+  
+  // Stripe customer (on the connected account)
+  stripeCustomerId       String
+  
+  // Subscription details (if subscription model)
+  stripeSubscriptionId   String?
+  subscriptionStatus     String?  // active, canceled, past_due, etc.
+  currentPeriodEnd       DateTime?
+  
+  // One-time purchase (if one-time model)
+  purchasedAt            DateTime?
+  
+  // Access control
+  hasAccess              Boolean  @default(true)
+  accessExpiresAt        DateTime?
+  
+  // Timestamps
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+  
+  // Relations
+  publishedApp           PublishedApp @relation(fields: [publishedAppId], references: [id], onDelete: Cascade)
+
+  @@unique([publishedAppId, email])
+  @@index([publishedAppId])
+  @@index([stripeCustomerId])
+  @@index([email])
+}
+
+// =============================================================================
+// TRANSACTION (Revenue events)
+// =============================================================================
+
+model Transaction {
+  id                  String   @id @default(cuid())
+  
+  // Which app
+  publishedAppId      String
+  
+  // Stripe payment details
+  stripePaymentIntentId String? @unique
+  stripeChargeId      String?
+  stripeInvoiceId     String?
+  
+  // Amounts (all in cents)
+  grossAmount         Int      // Total charged to customer
+  stripeFee           Int      // Stripe's processing fee
+  platformFee         Int      // AutoForge's 8% fee
+  netAmount           Int      // Creator receives this
+  
+  // Fee percentage at time of transaction
+  platformFeePercent  Float    @default(8.0)
+  
+  // Currency
+  currency            String   @default("usd")
+  
+  // Transaction type
+  type                TransactionType
+  
+  // Status
+  status              TransactionStatus @default(PENDING)
+  
+  // Customer info
+  customerEmail       String?
+  
+  // Timestamps
+  createdAt           DateTime @default(now())
+  paidOutAt           DateTime?
+  
+  // Relations
+  publishedApp        PublishedApp @relation(fields: [publishedAppId], references: [id], onDelete: Cascade)
+  payout              Payout?      @relation(fields: [payoutId], references: [id])
+  payoutId            String?
+
+  @@index([publishedAppId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([payoutId])
+}
+
+enum TransactionType {
+  SUBSCRIPTION_PAYMENT
+  ONE_TIME_PAYMENT
+  REFUND
+  CHARGEBACK
+}
+
+enum TransactionStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  REFUNDED
+  DISPUTED
+}
+
+// =============================================================================
+// PAYOUT (Weekly payouts to creators)
+// =============================================================================
+
+model Payout {
+  id                  String   @id @default(cuid())
+  
+  // Creator
+  userId              String
+  
+  // Stripe payout details
+  stripePayoutId      String?  @unique
+  stripeTransferId    String?
+  
+  // Amount
+  amount              Int      // In cents
+  currency            String   @default("usd")
+  
+  // Period this payout covers
+  periodStart         DateTime
+  periodEnd           DateTime
+  
+  // Status
+  status              PayoutStatus @default(PENDING)
+  
+  // Failure info
+  failureCode         String?
+  failureMessage      String?
+  
+  // Timestamps
+  createdAt           DateTime @default(now())
+  arrivedAt           DateTime?
+  
+  // Relations
+  user                User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions        Transaction[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+enum PayoutStatus {
+  PENDING
+  IN_TRANSIT
+  PAID
+  FAILED
+  CANCELED
+}
+
+// =============================================================================
+// EXISTING MODELS (Unchanged - included for completeness)
+// =============================================================================
 
 model Module {
   id           String                @id @default(cuid())
@@ -112,12 +482,17 @@ model GenerationJob {
   generationCompletedAt DateTime?
   generationStartedAt   DateTime?
   totalModules          Int                   @default(0)
+  
+  // Relations
   files                 GeneratedFile[]
   user                  User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
   modules               GenerationModule[]
   telemetry             GenerationTelemetry[]
   previewSessions       PreviewSession[]
   deployments           Deployment[]
+  
+  // NEW: Monetization relation
+  publishedApps         PublishedApp[]
 
   @@index([userId])
   @@index([status])
@@ -187,14 +562,12 @@ model ModuleImprovement {
   @@index([createdAt])
 }
 
-// NEW MODELS FOR PREVIEW AND DEPLOYMENT
-
 model PreviewSession {
   id              String        @id @default(cuid())
   createdAt       DateTime      @default(now())
   expiresAt       DateTime
   generationJobId String
-  files           Json          // Stores the file structure and content
+  files           Json
   accessCount     Int           @default(0)
   lastAccessedAt  DateTime?
   generationJob   GenerationJob @relation(fields: [generationJobId], references: [id], onDelete: Cascade)
@@ -204,17 +577,17 @@ model PreviewSession {
 }
 
 model Deployment {
-  id                String        @id @default(cuid())
-  createdAt         DateTime      @default(now())
-  updatedAt         DateTime      @updatedAt
-  generationJobId   String
-  vercelDeploymentId String?      @unique
-  vercelProjectId   String?
-  deploymentUrl     String?
-  status            DeploymentStatus @default(PENDING)
-  errorMessage      String?
-  buildLogs         String?
-  generationJob     GenerationJob @relation(fields: [generationJobId], references: [id], onDelete: Cascade)
+  id                 String           @id @default(cuid())
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  generationJobId    String
+  vercelDeploymentId String?          @unique
+  vercelProjectId    String?
+  deploymentUrl      String?
+  status             DeploymentStatus @default(PENDING)
+  errorMessage       String?
+  buildLogs          String?
+  generationJob      GenerationJob    @relation(fields: [generationJobId], references: [id], onDelete: Cascade)
 
   @@index([generationJobId])
   @@index([status])
