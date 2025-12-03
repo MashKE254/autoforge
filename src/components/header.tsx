@@ -2,8 +2,11 @@
 
 /**
  * AutoForge Header - v0.dev/bolt.new Style
- * * File: src/components/header.tsx
- * * Sleek, minimal header with glass effect
+ * 
+ * File: src/components/header.tsx
+ * 
+ * Sleek, minimal header with glass effect
+ * Updated with monetization links (Billing, Earnings)
  */
 
 import Link from 'next/link';
@@ -17,15 +20,16 @@ import {
   ChevronDown,
   LogOut,
   Settings,
-  User,
   CreditCard,
   HelpCircle,
+  DollarSign,
+  Sparkles,
 } from 'lucide-react';
 
 const navLinks = [
   { href: '/dashboard', label: 'Dashboard' },
   { href: '/projects', label: 'Projects' },
-  { href: '/templates', label: 'Templates' },
+  { href: '/pricing', label: 'Pricing' },
   { href: '/docs', label: 'Docs' },
 ];
 
@@ -52,8 +56,7 @@ export default function Header() {
                 height={50} 
                 className="rounded-lg" 
               />
-              <span className="font-bold text-white">AutoForge</span>
-            </Link>
+</Link>
 
             {/* Desktop Nav */}
             <nav className="hidden md:flex items-center gap-1">
@@ -95,6 +98,7 @@ export default function Header() {
                       onClick={() => setUserMenuOpen(false)} 
                     />
                     <div className="absolute right-0 mt-2 w-56 bg-[#1A1A1C] border border-white/10 rounded-xl shadow-2xl z-50 py-2 animate-scale-in origin-top-right">
+                      {/* User Info */}
                       <div className="px-4 py-2 border-b border-white/10">
                         <p className="text-sm font-medium text-white truncate">
                           {session.user?.name || 'User'}
@@ -103,6 +107,8 @@ export default function Header() {
                           {session.user?.email}
                         </p>
                       </div>
+
+                      {/* Main Links */}
                       <div className="py-1">
                         <Link
                           href="/settings"
@@ -113,12 +119,20 @@ export default function Header() {
                           Settings
                         </Link>
                         <Link
-                          href="/billing"
+                          href="/dashboard/billing"
                           className="flex items-center gap-2 px-4 py-2 text-sm text-gray-400 hover:text-white hover:bg-white/5"
                           onClick={() => setUserMenuOpen(false)}
                         >
                           <CreditCard className="w-4 h-4" />
                           Billing
+                        </Link>
+                        <Link
+                          href="/dashboard/earnings"
+                          className="flex items-center gap-2 px-4 py-2 text-sm text-gray-400 hover:text-white hover:bg-white/5"
+                          onClick={() => setUserMenuOpen(false)}
+                        >
+                          <DollarSign className="w-4 h-4" />
+                          Earnings
                         </Link>
                         <Link
                           href="/help"
@@ -129,6 +143,20 @@ export default function Header() {
                           Help
                         </Link>
                       </div>
+
+                      {/* Upgrade CTA (show if not subscribed) */}
+                      <div className="border-t border-white/10 py-1">
+                        <Link
+                          href="/pricing"
+                          className="flex items-center gap-2 px-4 py-2 text-sm text-violet-400 hover:text-violet-300 hover:bg-white/5"
+                          onClick={() => setUserMenuOpen(false)}
+                        >
+                          <Sparkles className="w-4 h-4" />
+                          Upgrade Plan
+                        </Link>
+                      </div>
+
+                      {/* Sign Out */}
                       <div className="border-t border-white/10 py-1">
                         <button
                           onClick={() => signOut()}
@@ -188,6 +216,50 @@ export default function Header() {
                 {link.label}
               </Link>
             ))}
+            
+            {/* Mobile-only links when logged in */}
+            {session && (
+              <>
+                <div className="border-t border-white/10 my-2 pt-2">
+                  <Link
+                    href="/dashboard/billing"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center gap-2 px-3 py-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/5"
+                  >
+                    <CreditCard className="w-4 h-4" />
+                    Billing
+                  </Link>
+                  <Link
+                    href="/dashboard/earnings"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center gap-2 px-3 py-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/5"
+                  >
+                    <DollarSign className="w-4 h-4" />
+                    Earnings
+                  </Link>
+                  <Link
+                    href="/settings"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center gap-2 px-3 py-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/5"
+                  >
+                    <Settings className="w-4 h-4" />
+                    Settings
+                  </Link>
+                </div>
+                <div className="border-t border-white/10 my-2 pt-2">
+                  <button
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      signOut();
+                    }}
+                    className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-red-400 hover:text-red-300 hover:bg-white/5"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    Sign out
+                  </button>
+                </div>
+              </>
+            )}
           </nav>
         </div>
       )}

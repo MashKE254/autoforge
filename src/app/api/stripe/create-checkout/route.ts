@@ -15,6 +15,21 @@ import { prisma } from '@/lib/prisma';
 import { PLANS, PlanConfig } from '@/lib/stripe/plans';
 import { PlanTier } from '@prisma/client';
 
+// Helper to get the base URL with fallback
+function getBaseUrl(request: NextRequest): string {
+  // Try environment variable first
+  if (process.env.NEXT_PUBLIC_APP_URL) {
+    return process.env.NEXT_PUBLIC_APP_URL;
+  }
+  
+  // Fallback: construct from request headers
+  const host = request.headers.get('host') || 'localhost:3000';
+  const protocol = request.headers.get('x-forwarded-proto') || 
+                   (host.includes('localhost') ? 'http' : 'https');
+  
+  return `${protocol}://${host}`;
+}
+
 // =============================================================================
 // POST: Create checkout session
 // =============================================================================
@@ -107,7 +122,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 6. Create checkout session
+    // 6. Get base URL for redirects
+    const baseUrl = getBaseUrl(request);
+
+    // 7. Create checkout session
     const checkoutSession = await stripe.checkout.sessions.create({
       customer: stripeCustomerId,
       mode: 'subscription',
@@ -118,8 +136,8 @@ export async function POST(request: NextRequest) {
           quantity: 1,
         },
       ],
-      success_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard?subscription=success`,
-      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/pricing?canceled=true`,
+      success_url: `${baseUrl}/dashboard?subscription=success`,
+      cancel_url: `${baseUrl}/pricing?canceled=true`,
       allow_promotion_codes: true,
       billing_address_collection: 'auto',
       subscription_data: {
@@ -136,7 +154,7 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // 7. Return checkout URL
+    // 8. Return checkout URL
     return NextResponse.json({
       url: checkoutSession.url,
       sessionId: checkoutSession.id,

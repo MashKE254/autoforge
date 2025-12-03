@@ -322,7 +322,8 @@ export class AgentGenerator {
           devDependencies: {
             "typescript": "^5.5.2",
             "@types/node": "^20.0.0",
-            "@types/react": "^18.3.0"
+            "@types/react": "^18.3.0",
+            "source-map-js": "^1.2.0"
           }
         }, null, 2),
         language: 'json'

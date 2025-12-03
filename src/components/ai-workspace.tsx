@@ -1,15 +1,19 @@
 'use client';
 
 /**
- * AI Workspace - bolt.new Style Implementation
+ * AI Workspace - Complete Implementation
  * 
  * File: src/components/ai-workspace.tsx
  * 
- * Complete redesign to match bolt.new aesthetics:
+ * Features:
  * - Dark theme with subtle gradients
- * - Clean split-panel layout
- * - Minimal chrome
- * - Smooth animations
+ * - WebContainer live preview
+ * - Monaco code editor
+ * - Terminal output
+ * - Download as ZIP
+ * - Deploy to Vercel button (NO Stripe required)
+ * - Optional "Turn into Business" monetization
+ * - Double-initialization guard fixed
  */
 
 import { useState, useRef, useEffect, useCallback } from 'react';
@@ -32,6 +36,8 @@ import {
   MessageSquare,
   Copy,
   Check,
+  Rocket,
+  DollarSign,
 } from 'lucide-react';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
@@ -39,8 +45,13 @@ import { WebContainer } from '@webcontainer/api';
 import WebContainerManager from '@/lib/webcontainer-manager';
 import { ActionRunner, Action } from '@/lib/action-runner';
 import { getNextJsTemplate, mergeWithTemplate } from '@/lib/templates';
+import DeployModal from '@/components/DeployModal';
+import MonetizeModal from '@/components/monetization/monetizeModal';
 
-// Types
+// ============================================================================
+// TYPES
+// ============================================================================
+
 interface InitialFile {
   path: string;
   content: string;
@@ -73,7 +84,10 @@ interface FileNode {
   language: string;
 }
 
-// Utility functions
+// ============================================================================
+// UTILITY FUNCTIONS
+// ============================================================================
+
 function detectLanguageFromPath(path: string): string {
   const ext = path.split('.').pop()?.toLowerCase();
   const map: Record<string, string> = {
@@ -90,7 +104,10 @@ function detectLanguageFromPath(path: string): string {
   return map[ext || ''] || 'plaintext';
 }
 
-// File Tree Component
+// ============================================================================
+// FILE TREE COMPONENT
+// ============================================================================
+
 function FileTree({ 
   files, 
   selectedFile, 
@@ -100,7 +117,6 @@ function FileTree({
   selectedFile: FileNode | null;
   onSelectFile: (file: FileNode) => void;
 }) {
-  // Group files by directory
   const fileTree = files.reduce((acc, file) => {
     const parts = file.path.split('/');
     if (parts.length === 1) {
@@ -118,7 +134,6 @@ function FileTree({
 
   return (
     <div className="text-sm">
-      {/* Root files */}
       {fileTree.root?.map((file) => (
         <button
           key={file.path}
@@ -132,7 +147,6 @@ function FileTree({
         </button>
       ))}
 
-      {/* Directories */}
       {directories.map((dir) => (
         <div key={dir}>
           <div className="flex items-center gap-2 px-3 py-1.5 text-gray-500">
@@ -157,12 +171,15 @@ function FileTree({
   );
 }
 
-// Main Component
+// ============================================================================
+// MAIN COMPONENT
+// ============================================================================
+
 export default function AIWorkspace({
   projectName,
+  jobId,
   initialFiles,
 }: AIWorkspaceProps) {
-  // Compute initial files
   const initialFileNodes = initialFiles && initialFiles.length > 0
     ? initialFiles.map((f) => ({
         name: f.path.split('/').pop() || f.path,
@@ -172,7 +189,9 @@ export default function AIWorkspace({
       }))
     : [];
 
-  // State
+  // =========================================================================
+  // STATE
+  // =========================================================================
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [activeTab, setActiveTab] = useState<'preview' | 'code' | 'terminal'>('preview');
   const [files, setFiles] = useState<FileNode[]>(initialFileNodes);
@@ -183,23 +202,26 @@ export default function AIWorkspace({
   const [terminalOutput, setTerminalOutput] = useState<string[]>([]);
   const [isInstalling, setIsInstalling] = useState(false);
   const [isContainerReady, setIsContainerReady] = useState(false);
-  const [messages] = useState<Message[]>([
-    {
-      role: 'assistant',
-      content: `Welcome to your workspace! Your app "${projectName}" is ready to preview.`,
-      timestamp: new Date(),
-    },
-  ]);
-  const [inputMessage, setInputMessage] = useState('');
-  const [isProcessing] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [messages, setMessages] = useState<Message[]>([]);
+  
+  // Modal States
+  const [showDeployModal, setShowDeployModal] = useState(false);
+  const [showMonetizeModal, setShowMonetizeModal] = useState(false);
+  const [deployedUrl, setDeployedUrl] = useState<string | null>(null);
 
-  // Refs
+  // =========================================================================
+  // REFS
+  // =========================================================================
   const webContainerRef = useRef<WebContainer | null>(null);
   const terminalRef = useRef<HTMLDivElement>(null);
   const actionRunnerRef = useRef<ActionRunner | null>(null);
+  const isInitializingRef = useRef(false);
+  const hasInitializedRef = useRef(false);
 
-  // Terminal output helper
+  // =========================================================================
+  // TERMINAL OUTPUT HELPER
+  // =========================================================================
   const addTerminalOutput = useCallback((line: string) => {
     setTerminalOutput((prev) => [...prev, line]);
     if (terminalRef.current) {
@@ -207,11 +229,35 @@ export default function AIWorkspace({
     }
   }, []);
 
-  // Initialize WebContainer
+  // =========================================================================
+  // INITIALIZE WELCOME MESSAGE
+  // =========================================================================
+  useEffect(() => {
+    if (messages.length === 0) {
+      setMessages([
+        {
+          role: 'assistant',
+          content: `Welcome to your workspace! Your app "${projectName}" is ready to preview.`,
+          timestamp: new Date(),
+        },
+      ]);
+    }
+  }, [projectName, messages.length]);
+
+  // =========================================================================
+  // INITIALIZE WEBCONTAINER (WITH DOUBLE-INIT GUARD)
+  // =========================================================================
   useEffect(() => {
     if (files.length === 0) return;
+    
+    if (isInitializingRef.current || hasInitializedRef.current) {
+      console.log('⚠️ WebContainer init skipped (already initializing or initialized)');
+      return;
+    }
 
     const initContainer = async () => {
+      isInitializingRef.current = true;
+      
       try {
         addTerminalOutput('🚀 Initializing workspace...');
         
@@ -220,6 +266,7 @@ export default function AIWorkspace({
 
         if (!crossOriginIsolated) {
           addTerminalOutput('⚠️ WebContainer requires cross-origin isolation');
+          isInitializingRef.current = false;
           return;
         }
 
@@ -227,7 +274,6 @@ export default function AIWorkspace({
         const container = await WebContainerManager.boot();
         webContainerRef.current = container;
 
-        // Create ActionRunner
         actionRunnerRef.current = new ActionRunner(container, {
           onOutput: addTerminalOutput,
         });
@@ -235,19 +281,16 @@ export default function AIWorkspace({
         addTerminalOutput('✅ WebContainer initialized');
         addTerminalOutput('📦 Setting up project...');
 
-        // Get template and merge with files
         const template = getNextJsTemplate(projectName);
         const allFiles = mergeWithTemplate(
           template,
           files.map((f) => ({ path: f.path, content: f.content }))
         );
 
-        // Mount files
         for (const file of allFiles) {
           addTerminalOutput(`📄 ${file.path}`);
         }
 
-        // Build actions
         const actions: Action[] = allFiles.map((file) => ({
           type: 'file',
           filePath: file.path,
@@ -267,7 +310,6 @@ export default function AIWorkspace({
         addTerminalOutput('🚀 Starting Next.js dev server...');
         setIsInstalling(true);
 
-        // Listen for server ready
         container.on('server-ready', (port: number, url: string) => {
           addTerminalOutput(`✅ Server ready on port ${port}`);
           addTerminalOutput(`🌐 ${url}`);
@@ -276,20 +318,24 @@ export default function AIWorkspace({
           setIsContainerReady(true);
         });
 
-        // Execute actions
         await actionRunnerRef.current.runActions(actions);
+        hasInitializedRef.current = true;
 
       } catch (error) {
         console.error('WebContainer error:', error);
         addTerminalOutput(`❌ Error: ${error}`);
         setIsInstalling(false);
+      } finally {
+        isInitializingRef.current = false;
       }
     };
 
     initContainer();
   }, [files, projectName, addTerminalOutput]);
 
-  // Handle file changes
+  // =========================================================================
+  // HANDLERS
+  // =========================================================================
   const handleEditorChange = async (value: string | undefined) => {
     if (!selectedFile || !value) return;
 
@@ -307,7 +353,6 @@ export default function AIWorkspace({
     }
   };
 
-  // Download project
   const handleDownload = async () => {
     const zip = new JSZip();
     files.forEach((file) => zip.file(file.path, file.content));
@@ -317,7 +362,6 @@ export default function AIWorkspace({
     addTerminalOutput('📦 Project downloaded');
   };
 
-  // Copy preview URL
   const handleCopyUrl = () => {
     if (previewUrl) {
       navigator.clipboard.writeText(previewUrl);
@@ -326,7 +370,6 @@ export default function AIWorkspace({
     }
   };
 
-  // Restart server
   const handleRestartServer = async () => {
     if (actionRunnerRef.current) {
       addTerminalOutput('🔄 Restarting server...');
@@ -336,12 +379,21 @@ export default function AIWorkspace({
     }
   };
 
+  const handleDeploySuccess = (url: string) => {
+    setDeployedUrl(url);
+    addTerminalOutput(`🎉 Deployed successfully: ${url}`);
+  };
+
+  // =========================================================================
+  // RENDER
+  // =========================================================================
   return (
     <div className="h-screen flex bg-[#0A0A0B] text-white overflow-hidden">
-      {/* Sidebar - Chat & Files */}
+      {/* ================================================================== */}
+      {/* SIDEBAR */}
+      {/* ================================================================== */}
       {sidebarOpen && (
         <div className="w-80 border-r border-white/10 flex flex-col bg-[#111113]">
-          {/* Sidebar Header */}
           <div className="h-12 border-b border-white/10 flex items-center justify-between px-4">
             <div className="flex items-center gap-2">
               <Sparkles className="w-4 h-4 text-violet-400" />
@@ -355,71 +407,58 @@ export default function AIWorkspace({
             </button>
           </div>
 
-          {/* Tabs */}
           <Tabs defaultValue="chat" className="flex-1 flex flex-col">
-            <TabsList className="h-10 bg-transparent border-b border-white/10 rounded-none px-2">
+            <TabsList className="w-full justify-start gap-2 p-2 bg-transparent border-b border-white/10">
               <TabsTrigger 
                 value="chat" 
-                className="text-xs data-[state=active]:bg-white/10 data-[state=active]:text-white rounded"
+                className="data-[state=active]:bg-white/10 data-[state=active]:text-white text-gray-400 text-xs"
               >
                 <MessageSquare className="w-3 h-3 mr-1" />
                 Chat
               </TabsTrigger>
               <TabsTrigger 
-                value="files"
-                className="text-xs data-[state=active]:bg-white/10 data-[state=active]:text-white rounded"
+                value="files" 
+                className="data-[state=active]:bg-white/10 data-[state=active]:text-white text-gray-400 text-xs"
               >
                 <FolderTree className="w-3 h-3 mr-1" />
-                Files ({files.length})
+                Files
               </TabsTrigger>
             </TabsList>
 
-            {/* Chat Tab */}
-            <TabsContent value="chat" className="flex-1 flex flex-col m-0 overflow-hidden">
+            <TabsContent value="chat" className="flex-1 flex flex-col m-0 p-0">
               <div className="flex-1 overflow-y-auto p-4 space-y-4">
                 {messages.map((msg, i) => (
                   <div
                     key={i}
                     className={`${
-                      msg.role === 'user'
-                        ? 'ml-8 bg-violet-500/20 border-violet-500/30'
-                        : 'mr-8 bg-white/5 border-white/10'
-                    } p-3 rounded-xl border`}
+                      msg.role === 'assistant'
+                        ? 'mr-8 bg-white/5 rounded-lg p-3'
+                        : 'ml-8 bg-violet-500/20 rounded-lg p-3'
+                    }`}
                   >
                     <p className="text-sm text-gray-200">{msg.content}</p>
                     <p className="text-[10px] text-gray-500 mt-1">
-                      {msg.timestamp.toLocaleTimeString()}
+                      {typeof window !== 'undefined' ? msg.timestamp.toLocaleTimeString() : ''}
                     </p>
                   </div>
                 ))}
               </div>
 
-              {/* Chat Input */}
               <div className="p-4 border-t border-white/10">
                 <div className="flex gap-2">
                   <input
                     type="text"
-                    value={inputMessage}
-                    onChange={(e) => setInputMessage(e.target.value)}
-                    placeholder="Ask AI to modify your app..."
-                    className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm placeholder:text-gray-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                    placeholder="Ask about your code..."
+                    className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-violet-500"
                   />
-                  <button
-                    disabled={!inputMessage.trim() || isProcessing}
-                    className="p-2 bg-violet-500 rounded-lg hover:bg-violet-600 disabled:opacity-50 transition-colors"
-                  >
-                    {isProcessing ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <Send className="w-4 h-4" />
-                    )}
+                  <button className="p-2 bg-violet-600 rounded-lg hover:bg-violet-500 transition-colors">
+                    <Send className="w-4 h-4" />
                   </button>
                 </div>
               </div>
             </TabsContent>
 
-            {/* Files Tab */}
-            <TabsContent value="files" className="flex-1 overflow-y-auto m-0 py-2">
+            <TabsContent value="files" className="flex-1 overflow-y-auto m-0 p-0">
               <FileTree
                 files={files}
                 selectedFile={selectedFile}
@@ -430,63 +469,80 @@ export default function AIWorkspace({
         </div>
       )}
 
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      {/* ================================================================== */}
+      {/* MAIN CONTENT */}
+      {/* ================================================================== */}
+      <div className="flex-1 flex flex-col">
         {/* Toolbar */}
-        <div className="h-12 border-b border-white/10 flex items-center justify-between px-4 bg-[#111113]">
-          <div className="flex items-center gap-2">
-            {!sidebarOpen && (
+        <div className="h-12 border-b border-white/10 flex items-center px-4 gap-2 bg-[#111113]">
+          {!sidebarOpen && (
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="p-1.5 text-gray-400 hover:text-white rounded hover:bg-white/10"
+            >
+              <PanelLeftOpen className="w-4 h-4" />
+            </button>
+          )}
+
+          <div className="flex items-center gap-1 bg-white/5 rounded-lg p-1">
+            {(['preview', 'code', 'terminal'] as const).map((tab) => (
               <button
-                onClick={() => setSidebarOpen(true)}
-                className="p-1.5 text-gray-400 hover:text-white rounded hover:bg-white/10"
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                  activeTab === tab
+                    ? 'bg-white/10 text-white'
+                    : 'text-gray-400 hover:text-white'
+                }`}
               >
-                <PanelLeftOpen className="w-4 h-4" />
+                {tab === 'preview' && <Eye className="w-3 h-3 inline mr-1" />}
+                {tab === 'code' && <Code className="w-3 h-3 inline mr-1" />}
+                {tab === 'terminal' && <Terminal className="w-3 h-3 inline mr-1" />}
+                {tab.charAt(0).toUpperCase() + tab.slice(1)}
               </button>
-            )}
-            <span className="text-sm text-gray-400">{projectName}</span>
-            <span className="text-xs text-gray-600">•</span>
-            <span className="text-xs text-gray-500">{files.length} files</span>
+            ))}
           </div>
 
-          <div className="flex items-center gap-2">
-            {/* View Toggle */}
-            <div className="flex bg-white/5 rounded-lg p-0.5">
-              {(['preview', 'code', 'terminal'] as const).map((tab) => (
-                <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
-                  className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
-                    activeTab === tab
-                      ? 'bg-white/10 text-white'
-                      : 'text-gray-400 hover:text-white'
-                  }`}
-                >
-                  {tab === 'preview' && <Eye className="w-3 h-3 inline mr-1" />}
-                  {tab === 'code' && <Code className="w-3 h-3 inline mr-1" />}
-                  {tab === 'terminal' && <Terminal className="w-3 h-3 inline mr-1" />}
-                  {tab.charAt(0).toUpperCase() + tab.slice(1)}
-                </button>
-              ))}
-            </div>
+          <div className="w-px h-5 bg-white/10" />
 
-            <div className="w-px h-5 bg-white/10" />
+          <button
+            onClick={handleDownload}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-gray-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+          >
+            <Download className="w-3 h-3" />
+            Download
+          </button>
 
+          <button
+            onClick={handleRestartServer}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-gray-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+          >
+            <RefreshCw className="w-3 h-3" />
+            Restart
+          </button>
+
+          {/* Spacer */}
+          <div className="flex-1" />
+
+          {/* Deploy Button - PRIMARY ACTION */}
+          <button
+            onClick={() => setShowDeployModal(true)}
+            className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-medium bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:from-green-500 hover:to-emerald-500 transition-all shadow-lg shadow-green-500/25"
+          >
+            <Rocket className="w-3 h-3" />
+            Deploy
+          </button>
+
+          {/* Monetize Button - OPTIONAL */}
+          {deployedUrl && (
             <button
-              onClick={handleDownload}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-gray-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+              onClick={() => setShowMonetizeModal(true)}
+              className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-medium bg-gradient-to-r from-violet-600 to-purple-600 text-white rounded-lg hover:from-violet-500 hover:to-purple-500 transition-all"
             >
-              <Download className="w-3 h-3" />
-              Download
+              <DollarSign className="w-3 h-3" />
+              Monetize
             </button>
-
-            <button
-              onClick={handleRestartServer}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-gray-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
-            >
-              <RefreshCw className="w-3 h-3" />
-              Restart
-            </button>
-          </div>
+          )}
         </div>
 
         {/* Content Area */}
@@ -494,7 +550,6 @@ export default function AIWorkspace({
           {/* Preview Tab */}
           {activeTab === 'preview' && (
             <div className="h-full flex flex-col">
-              {/* URL Bar */}
               {previewUrl && (
                 <div className="h-10 border-b border-white/10 flex items-center px-4 gap-2 bg-[#111113]">
                   <div className="flex-1 flex items-center gap-2 bg-white/5 rounded-lg px-3 py-1.5">
@@ -518,7 +573,6 @@ export default function AIWorkspace({
                 </div>
               )}
 
-              {/* Preview Frame */}
               <div className="flex-1 bg-white">
                 {isInstalling ? (
                   <div className="h-full flex flex-col items-center justify-center bg-[#1A1A1C]">
@@ -546,7 +600,6 @@ export default function AIWorkspace({
           {/* Code Tab */}
           {activeTab === 'code' && (
             <div className="h-full flex">
-              {/* File List */}
               <div className="w-48 border-r border-white/10 overflow-y-auto bg-[#111113]">
                 <FileTree
                   files={files}
@@ -555,7 +608,6 @@ export default function AIWorkspace({
                 />
               </div>
 
-              {/* Editor */}
               <div className="flex-1">
                 {selectedFile ? (
                   <Editor
@@ -565,20 +617,17 @@ export default function AIWorkspace({
                     onChange={handleEditorChange}
                     theme="vs-dark"
                     options={{
-                      fontSize: 13,
-                      fontFamily: 'JetBrains Mono, Menlo, monospace',
                       minimap: { enabled: false },
-                      scrollBeyondLastLine: false,
-                      padding: { top: 16 },
+                      fontSize: 13,
                       lineNumbers: 'on',
-                      renderLineHighlight: 'gutter',
-                      cursorBlinking: 'smooth',
-                      smoothScrolling: true,
+                      scrollBeyondLastLine: false,
+                      wordWrap: 'on',
+                      padding: { top: 16 },
                     }}
                   />
                 ) : (
-                  <div className="h-full flex items-center justify-center text-gray-500">
-                    Select a file to edit
+                  <div className="h-full flex items-center justify-center bg-[#1E1E1E]">
+                    <p className="text-gray-500">Select a file to edit</p>
                   </div>
                 )}
               </div>
@@ -587,9 +636,12 @@ export default function AIWorkspace({
 
           {/* Terminal Tab */}
           {activeTab === 'terminal' && (
-            <div className="h-full bg-[#0D0D0F] p-4 overflow-y-auto font-mono text-sm" ref={terminalRef}>
+            <div
+              ref={terminalRef}
+              className="h-full overflow-y-auto bg-[#0D0D0D] p-4 font-mono text-xs"
+            >
               {terminalOutput.map((line, i) => (
-                <div key={i} className="text-gray-300 leading-relaxed whitespace-pre-wrap">
+                <div key={i} className="text-gray-300 whitespace-pre-wrap">
                   {line}
                 </div>
               ))}
@@ -600,6 +652,24 @@ export default function AIWorkspace({
           )}
         </div>
       </div>
+
+      {/* ================================================================== */}
+      {/* MODALS */}
+      {/* ================================================================== */}
+      <DeployModal
+        isOpen={showDeployModal}
+        onClose={() => setShowDeployModal(false)}
+        jobId={jobId}
+        appName={projectName}
+        onDeploySuccess={handleDeploySuccess}
+      />
+
+      <MonetizeModal
+        isOpen={showMonetizeModal}
+        onClose={() => setShowMonetizeModal(false)}
+        generationJobId={jobId}
+        appName={projectName}
+      />
     </div>
   );
 }

@@ -140,7 +140,8 @@ export function addMissingEssentialFiles(
     "@types/react-dom": "18.3.0",
     "tailwindcss": "3.4.4",
     "postcss": "8.4.38",
-    "autoprefixer": "10.4.19"
+    "autoprefixer": "10.4.19",
+    "source-map-js": "^1.2.0"
   }
 }`,
       language: 'json'

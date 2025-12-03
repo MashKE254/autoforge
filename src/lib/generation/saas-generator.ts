@@ -569,7 +569,8 @@ export class SaaSGenerator {
             '@types/react': '18.3.3',
             '@types/react-dom': '18.3.0',
             'autoprefixer': '10.4.19',
-            'postcss': '8.4.38'
+            'postcss': '8.4.38',
+            'source-map-js': '^1.2.0'
           }
         }, null, 2),
         language: 'json'

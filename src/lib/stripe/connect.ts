@@ -22,7 +22,7 @@ import type { PlanTier } from '@prisma/client';
 export async function createConnectAccount(
   userId: string,
   email: string,
-  country: string = 'US'
+  country: string = 'AE'
 ): Promise<{
   accountId: string;
   onboardingUrl: string;
@@ -51,10 +51,9 @@ export async function createConnectAccount(
     country,
     email,
     capabilities: {
-      card_payments: { requested: true },
       transfers: { requested: true },
     },
-    business_type: 'individual',
+    business_type: 'company',
     metadata: {
       autoforge_user_id: userId,
     },

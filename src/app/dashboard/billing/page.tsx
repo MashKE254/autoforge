@@ -25,6 +25,10 @@ import {
   RefreshCw,
 } from 'lucide-react';
 
+// Configure the country for Stripe Connect based on your platform
+// Change this to match your Stripe account's country
+const CONNECT_COUNTRY = 'AE'; // UAE - change to 'US' for US platforms, etc.
+
 interface SubscriptionData {
   plan: string;
   status: string;
@@ -48,6 +52,7 @@ export default function BillingPage() {
   const [connectStatus, setConnectStatus] = useState<ConnectStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (authStatus === 'unauthenticated') {
@@ -86,6 +91,7 @@ export default function BillingPage() {
 
   const handleManageBilling = async () => {
     setActionLoading('billing');
+    setError(null);
     try {
       const res = await fetch('/api/stripe/create-portal', {
         method: 'POST',
@@ -97,6 +103,7 @@ export default function BillingPage() {
       }
     } catch (error) {
       console.error('Failed to open billing portal:', error);
+      setError('Failed to open billing portal');
     } finally {
       setActionLoading(null);
     }
@@ -104,13 +111,21 @@ export default function BillingPage() {
 
   const handleConnectStripe = async () => {
     setActionLoading('connect');
+    setError(null);
     try {
       const res = await fetch('/api/stripe/create-connect-account', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ country: 'US' }),
+        body: JSON.stringify({ country: CONNECT_COUNTRY }),
       });
       const data = await res.json();
+      
+      if (!res.ok) {
+        // Handle error response
+        setError(data.error || data.suggestion || 'Failed to connect Stripe');
+        console.error('Connect error:', data);
+        return;
+      }
       
       if (data.onboardingUrl) {
         window.location.href = data.onboardingUrl;
@@ -119,6 +134,7 @@ export default function BillingPage() {
       }
     } catch (error) {
       console.error('Failed to setup Connect:', error);
+      setError('Failed to setup Connect account');
     } finally {
       setActionLoading(null);
     }
@@ -139,6 +155,23 @@ export default function BillingPage() {
         <p className="text-gray-400 mb-8">
           Manage your subscription and payment settings
         </p>
+
+        {/* Error Banner */}
+        {error && (
+          <div className="mb-6 p-4 rounded-lg bg-red-500/10 border border-red-500/20 flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
+            <div>
+              <p className="text-red-400 font-medium">Error</p>
+              <p className="text-sm text-gray-400">{error}</p>
+            </div>
+            <button 
+              onClick={() => setError(null)}
+              className="ml-auto text-gray-400 hover:text-white"
+            >
+              ×
+            </button>
+          </div>
+        )}
 
         <div className="space-y-6">
           {/* Subscription Card */}
@@ -356,7 +389,7 @@ export default function BillingPage() {
 
                 <button
                   onClick={handleConnectStripe}
-                  disabled={actionLoading === 'connect' || !subscription}
+                  disabled={actionLoading === 'connect'}
                   className="w-full py-3 px-4 rounded-lg bg-violet-600 hover:bg-violet-700 disabled:bg-gray-700 disabled:cursor-not-allowed transition-colors font-medium flex items-center justify-center gap-2"
                 >
                   {actionLoading === 'connect' ? (
@@ -369,11 +402,9 @@ export default function BillingPage() {
                   )}
                 </button>
 
-                {!subscription && (
-                  <p className="text-center text-sm text-gray-500">
-                    Subscribe to a plan first to connect Stripe
-                  </p>
-                )}
+                <p className="text-center text-xs text-gray-500">
+                  Connecting to Stripe for region: {CONNECT_COUNTRY}
+                </p>
               </div>
             )}
           </div>
