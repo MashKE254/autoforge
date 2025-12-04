@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { prisma } from '@/lib/prisma';
-import { authOptions } from '@/lib/auth';
+import { authOptions } from '../auth/[...nextauth]/route';
 import Stripe from 'stripe';
 
 // Fix: Cast version to avoid TypeScript literal mismatch

@@ -562,68 +562,11 @@ export default function AgentChat() {
 - Use @import for Tailwind (use @tailwind directives)
 - Add external API calls (no OpenAI, no LangChain)
 
-=== CRITICAL CSS RULES (PREVENTS BUILD ERRORS) ===
-
-**FORBIDDEN - These will BREAK the build:**
-\`\`\`
-❌ bg-dark-100, bg-dark-200 (doesn't exist)
-❌ border-border (doesn't exist)
-❌ bg-background (doesn't exist)  
-❌ text-foreground (doesn't exist)
-❌ ring-ring (doesn't exist)
-❌ bg-card, text-card-foreground (doesn't exist)
-❌ bg-muted, text-muted-foreground (doesn't exist)
-❌ Any custom color like bg-navy-500, bg-trading-green
-❌ @import for Tailwind (use @tailwind directives)
-❌ Custom font imports in CSS (use next/font in layout.tsx)
-\`\`\`
-
-**REQUIRED - Use ONLY these standard Tailwind classes:**
-\`\`\`
-✅ Backgrounds: bg-zinc-900, bg-zinc-800, bg-zinc-950, bg-black, bg-[#09090B], bg-[#0A0A0A]
-✅ Borders: border-white/10, border-white/20, border-zinc-800, border-zinc-700
-✅ Text: text-white, text-gray-100, text-gray-200, text-gray-300, text-gray-400, text-gray-500
-✅ Accent colors: bg-violet-600, bg-green-500, bg-red-500, bg-blue-500, bg-emerald-500
-✅ Opacity variants: bg-white/5, bg-white/10, text-white/60
-\`\`\`
-
-**globals.css MUST look like this (NO custom classes, NO @import for fonts):**
-\`\`\`css
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
-@layer base {
-  html {
-    @apply scroll-smooth antialiased;
-  }
-  
-  body {
-    @apply bg-zinc-950 text-white;
-  }
-}
-
-@layer components {
-  .btn-primary {
-    @apply px-4 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-500 transition-colors;
-  }
-}
-\`\`\`
-
-**For custom fonts, use next/font in layout.tsx (NOT CSS @import):**
-\`\`\`tsx
-import { Space_Grotesk } from 'next/font/google';
-
-const spaceGrotesk = Space_Grotesk({ subsets: ['latin'] });
-
-export default function RootLayout({ children }) {
-  return (
-    <html lang="en">
-      <body className={spaceGrotesk.className}>{children}</body>
-    </html>
-  );
-}
-\`\`\`
+**CSS RULES (CRITICAL - PREVENTS BUILD ERRORS):**
+- Use \`@tailwind base;\` NOT \`@import 'tailwindcss/base';\`
+- Use \`border-white/10\` NOT \`border-border\`
+- Use \`bg-zinc-900\` or \`bg-[#09090B]\` NOT \`bg-background\`
+- Use \`text-white\` or \`text-gray-400\` NOT \`text-foreground\`
 
 === FOR AI/AGENT REQUESTS ===
 

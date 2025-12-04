@@ -1,235 +1,205 @@
 /**
- * Unified Generator - Routes to Appropriate Generator
- * * File: src/lib/generation/unified-generator.ts
- * * This is the main entry point for generation. It:
- * 1. Classifies the user's prompt
- * 2. Routes to the appropriate generator (SaaS, UI, Workflow, Agent)
- * 3. Returns the generated files
- * * Usage:
- * const result = await unifiedGenerator.generate(prompt, jobId);
+ * SMART UNIFIED GENERATOR
+ * 
+ * File: src/lib/generation/unified-generator.ts
+ * 
+ * Automatically chooses the right generation strategy:
+ * - Simple prompts → Single-pass BoltGenerator (fast, 1 API call)
+ * - Complex prompts → Multi-pass OrchestratedGenerator (thorough, 6 API calls)
+ * 
+ * This is what makes AutoForge better than competitors:
+ * ONE PROMPT → COMPLETE APPLICATION (no matter how complex)
  */
 
+import { BoltGenerator, boltGenerator } from './bolt-generator';
+import { OrchestratedGenerator, orchestratedGenerator } from './orchestrated-generator';
+import { GeneratedFile, GenerationResult, StreamCallbacks } from './bolt-generator';
 import { prisma } from '../prisma';
-import { classifyPrompt, GenerationType, ClassificationResult } from './prompt-classifier';
-import { BoltGenerator, GeneratedFile, GenerationResult, StreamCallbacks } from './bolt-generator';
-import { WorkflowGenerator } from './workflow-generator';
-import { AgentGenerator } from './agent-generator';
-import { SaaSGenerator } from './saas-generator';
 
 // ============================================================================
-// TYPES
+// COMPLEXITY DETECTION
 // ============================================================================
 
-export interface UnifiedGenerationResult extends GenerationResult {
-  classificationType: GenerationType | 'saas-application';
-  classification: ClassificationResult;
+interface ComplexityAnalysis {
+  score: number;  // 0-100
+  isComplex: boolean;
+  reasons: string[];
 }
 
-export interface GenerationContext {
-  jobId?: string;
-  callbacks?: StreamCallbacks;
-  forceType?: GenerationType | 'saas-application'; // Override auto-classification
+function analyzePromptComplexity(prompt: string): ComplexityAnalysis {
+  const lower = prompt.toLowerCase();
+  let score = 0;
+  const reasons: string[] = [];
+  
+  // Length-based scoring
+  const wordCount = prompt.split(/\s+/).length;
+  if (wordCount > 100) {
+    score += 20;
+    reasons.push('Long detailed prompt');
+  } else if (wordCount > 50) {
+    score += 10;
+    reasons.push('Detailed prompt');
+  }
+  
+  // Feature count (numbered lists, bullet points)
+  const listItems = (prompt.match(/(\d+\.|[-•])\s+/g) || []).length;
+  if (listItems >= 5) {
+    score += 25;
+    reasons.push(`${listItems} distinct features requested`);
+  } else if (listItems >= 3) {
+    score += 15;
+    reasons.push(`${listItems} features requested`);
+  }
+  
+  // Multi-page indicators
+  const pageKeywords = ['dashboard', 'settings', 'page', 'screen', 'view', 'panel', 'section'];
+  const pageMatches = pageKeywords.filter(k => lower.includes(k)).length;
+  if (pageMatches >= 3) {
+    score += 20;
+    reasons.push('Multiple pages/views required');
+  }
+  
+  // Integration complexity
+  const integrationKeywords = [
+    'api', 'webhook', 'integration', 'connect', 'sync',
+    'stripe', 'payment', 'billing', 'subscription',
+    'auth', 'authentication', 'login', 'signup',
+    'database', 'prisma', 'storage',
+    'websocket', 'real-time', 'realtime', 'live',
+    'mt4', 'mt5', 'broker', 'trading',
+  ];
+  const integrationMatches = integrationKeywords.filter(k => lower.includes(k)).length;
+  if (integrationMatches >= 4) {
+    score += 25;
+    reasons.push('Complex integrations required');
+  } else if (integrationMatches >= 2) {
+    score += 15;
+    reasons.push('Multiple integrations needed');
+  }
+  
+  // Domain complexity
+  const complexDomains = [
+    'saas', 'platform', 'marketplace', 'copier', 'automation',
+    'crm', 'erp', 'inventory', 'booking', 'scheduling',
+    'analytics', 'reporting', 'monitoring',
+  ];
+  const domainMatches = complexDomains.filter(k => lower.includes(k)).length;
+  if (domainMatches >= 2) {
+    score += 15;
+    reasons.push('Complex domain requirements');
+  }
+  
+  // Multi-user/role indicators
+  const roleKeywords = ['admin', 'user', 'master', 'follower', 'subscriber', 'manager', 'team'];
+  const roleMatches = roleKeywords.filter(k => lower.includes(k)).length;
+  if (roleMatches >= 2) {
+    score += 10;
+    reasons.push('Multiple user roles');
+  }
+  
+  // "Complete" or "full" indicators
+  if (lower.includes('complete') || lower.includes('full') || lower.includes('entire')) {
+    score += 10;
+    reasons.push('Comprehensive application requested');
+  }
+  
+  return {
+    score: Math.min(score, 100),
+    isComplex: score >= 40,
+    reasons,
+  };
 }
 
 // ============================================================================
-// UNIFIED GENERATOR CLASS
+// UNIFIED GENERATOR
 // ============================================================================
 
 export class UnifiedGenerator {
   private boltGenerator: BoltGenerator;
-  private workflowGenerator: WorkflowGenerator;
-  private agentGenerator: AgentGenerator;
-  private saasGenerator: SaaSGenerator;
+  private orchestratedGenerator: OrchestratedGenerator;
   
   constructor() {
-    this.boltGenerator = new BoltGenerator();
-    this.workflowGenerator = new WorkflowGenerator();
-    this.agentGenerator = new AgentGenerator();
-    this.saasGenerator = new SaaSGenerator();
+    this.boltGenerator = boltGenerator;
+    this.orchestratedGenerator = orchestratedGenerator;
   }
   
   /**
-   * Main generation method - classifies and routes automatically
+   * Generate an application - automatically chooses the right strategy
    */
   async generate(
     prompt: string,
-    context: GenerationContext = {}
-  ): Promise<UnifiedGenerationResult> {
-    const { jobId, callbacks, forceType } = context;
-    
-    console.log('🎯 Unified Generator starting...');
-    
-    // Step 1: Classify the prompt
-    callbacks?.onProgress?.('🔍 Analyzing your request...');
-    const classification = classifyPrompt(prompt);
-    
-    console.log(`   Classification: ${classification.primaryType}`);
-    console.log(`   Confidence: ${(classification.confidence * 100).toFixed(1)}%`);
-    console.log(`   Reasoning: ${classification.reasoning}`);
-    
-    // Check for SaaS/Monetization intent (Keyword Override)
-    // This ensures that any mention of business/money gets the full SaaS Engine
-    const isSaaSIntent = 
-      prompt.toLowerCase().includes('saas') || 
-      prompt.toLowerCase().includes('subscription') || 
-      prompt.toLowerCase().includes('stripe') || 
-      prompt.toLowerCase().includes('payment') || 
-      prompt.toLowerCase().includes('billing') ||
-      prompt.toLowerCase().includes('business') ||
-      prompt.toLowerCase().includes('monetize');
-
-    // Determine final generation type
-    let generationType = forceType || classification.primaryType;
-
-    if (isSaaSIntent && !forceType) {
-      console.log('   → Detected SaaS/Monetization intent. Overriding to SaaS Generator.');
-      generationType = 'saas-application' as GenerationType | 'saas-application';
+    jobId?: string,
+    callbacks?: StreamCallbacks & {
+      onComplexityAnalysis?: (analysis: ComplexityAnalysis) => void;
+      onStrategySelected?: (strategy: 'simple' | 'orchestrated') => void;
     }
+  ): Promise<GenerationResult> {
+    // Analyze complexity
+    const complexity = analyzePromptComplexity(prompt);
+    callbacks?.onComplexityAnalysis?.(complexity);
     
-    // Update job with classification info
-    if (jobId) {
-      await prisma.generationJob.update({
-        where: { id: jobId },
-        data: {
-          // Store classification in blueprint field (JSON)
-          blueprint: JSON.stringify({
-            classification: generationType,
-            confidence: classification.confidence,
-            detectedFeatures: classification.detectedFeatures,
-            suggestedTechStack: classification.suggestedTechStack,
-            reasoning: classification.reasoning,
-            isSaaS: isSaaSIntent
-          }),
-        },
-      });
-    }
+    console.log(`\n📊 Complexity Analysis:`);
+    console.log(`   Score: ${complexity.score}/100`);
+    console.log(`   Complex: ${complexity.isComplex}`);
+    console.log(`   Reasons: ${complexity.reasons.join(', ')}`);
     
-    // Step 2: Route to appropriate generator
-    let result: GenerationResult;
-    
-    // Handle SaaS routing explicitly first
-    if (
-      generationType === 'saas-application'
-    ) {
-      callbacks?.onProgress?.('💸 Generating monetizable SaaS application...');
-      console.log('   → Routing to SaaS Generator (Business Engine)');
-      result = await this.saasGenerator.generate(prompt, jobId, callbacks);
+    // Choose strategy
+    if (complexity.isComplex) {
+      console.log(`\n🔧 Using ORCHESTRATED generation (multi-pass)`);
+      callbacks?.onStrategySelected?.('orchestrated');
+      callbacks?.onProgress?.(`Complex application detected (score: ${complexity.score}). Using multi-pass generation...`);
+      
+      return this.orchestratedGenerator.generate(prompt, jobId, callbacks);
     } else {
-      // Handle standard routing
-      switch (generationType) {
-        case 'workflow-automation':
-        case 'hybrid-workflow-ui':
-          callbacks?.onProgress?.('🔄 Generating workflow automation system...');
-          console.log('   → Routing to Workflow Generator');
-          result = await this.workflowGenerator.generate(prompt, jobId, callbacks);
-          break;
-          
-        case 'ai-agent-network':
-        case 'hybrid-agent-ui':
-          callbacks?.onProgress?.('🤖 Generating AI agent network...');
-          console.log('   → Routing to Agent Generator');
-          result = await this.agentGenerator.generate(prompt, jobId, callbacks);
-          break;
-          
-        case 'ui-application':
-        default:
-          callbacks?.onProgress?.('🎨 Generating UI application...');
-          console.log('   → Routing to Bolt Generator (UI)');
-          result = await this.boltGenerator.generate(prompt, jobId, callbacks);
-          break;
-      }
+      console.log(`\n⚡ Using SIMPLE generation (single-pass)`);
+      callbacks?.onStrategySelected?.('simple');
+      callbacks?.onProgress?.('Starting single-pass generation...');
+      
+      return this.boltGenerator.generate(prompt, jobId, callbacks);
     }
+  }
+  
+  /**
+   * Force orchestrated generation regardless of complexity
+   */
+  async generateComplex(
+    prompt: string,
+    jobId?: string,
+    callbacks?: StreamCallbacks
+  ): Promise<GenerationResult> {
+    console.log(`\n🔧 Forcing ORCHESTRATED generation`);
+    callbacks?.onProgress?.('Using multi-pass orchestrated generation...');
     
-    return {
-      ...result,
-      classificationType: generationType as GenerationType,
-      classification,
-    };
+    return this.orchestratedGenerator.generate(prompt, jobId, callbacks);
   }
   
   /**
-   * Generate with explicit type (skip classification)
+   * Force simple generation regardless of complexity
    */
-  async generateUI(
+  async generateSimple(
     prompt: string,
     jobId?: string,
     callbacks?: StreamCallbacks
   ): Promise<GenerationResult> {
+    console.log(`\n⚡ Forcing SIMPLE generation`);
+    callbacks?.onProgress?.('Using single-pass generation...');
+    
     return this.boltGenerator.generate(prompt, jobId, callbacks);
-  }
-  
-  async generateWorkflow(
-    prompt: string,
-    jobId?: string,
-    callbacks?: StreamCallbacks
-  ): Promise<GenerationResult> {
-    return this.workflowGenerator.generate(prompt, jobId, callbacks);
-  }
-  
-  async generateAgentNetwork(
-    prompt: string,
-    jobId?: string,
-    callbacks?: StreamCallbacks
-  ): Promise<GenerationResult> {
-    return this.agentGenerator.generate(prompt, jobId, callbacks);
-  }
-
-  async generateSaaS(
-    prompt: string,
-    jobId?: string,
-    callbacks?: StreamCallbacks
-  ): Promise<GenerationResult> {
-    return this.saasGenerator.generate(prompt, jobId, callbacks);
-  }
-  
-  /**
-   * Just classify without generating
-   */
-  classify(prompt: string): ClassificationResult {
-    return classifyPrompt(prompt);
   }
 }
 
-// ============================================================================
-// SINGLETON EXPORT
-// ============================================================================
-
+// Export singleton
 export const unifiedGenerator = new UnifiedGenerator();
 
-// ============================================================================
-// CONVENIENCE FUNCTIONS
-// ============================================================================
-
-/**
- * Quick generation - auto-classifies and generates
- */
+// Convenience function
 export async function generateFromPrompt(
   prompt: string,
   jobId?: string,
   callbacks?: StreamCallbacks
-): Promise<UnifiedGenerationResult> {
-  return unifiedGenerator.generate(prompt, { jobId, callbacks });
+): Promise<GenerationResult> {
+  return unifiedGenerator.generate(prompt, jobId, callbacks);
 }
 
-/**
- * Classify a prompt without generating
- */
-export function classifyUserPrompt(prompt: string): ClassificationResult {
-  return classifyPrompt(prompt);
-}
-
-/**
- * Check what type of generation will be used
- */
-export function getGenerationType(prompt: string): GenerationType | 'saas-application' {
-  const isSaaSIntent = 
-      prompt.toLowerCase().includes('saas') || 
-      prompt.toLowerCase().includes('subscription') || 
-      prompt.toLowerCase().includes('stripe') || 
-      prompt.toLowerCase().includes('payment') || 
-      prompt.toLowerCase().includes('monetize');
-      
-  if (isSaaSIntent) return 'saas-application';
-  
-  return classifyPrompt(prompt).primaryType;
-}
+// Re-export types
+export type { GeneratedFile, GenerationResult, StreamCallbacks };
+export type { ComplexityAnalysis };
