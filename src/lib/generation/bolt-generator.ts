@@ -1,18 +1,21 @@
 /**
- * Enhanced Bolt Generator with Premium UI v2
+ * BOLT GENERATOR - AutoForge 2.0
  * 
  * File: src/lib/generation/bolt-generator.ts
  * 
- * This generator creates STUNNING applications that:
- * - Look better than Bolt.new, v0.dev, Lovable
- * - Are worthy of Awwwards and Dribbble features
- * - Use bold, distinctive design choices
- * - Include rich animations and micro-interactions
+ * Single-pass application generator that creates complete Next.js applications
+ * using the AutoForge Managed Stack:
+ * - Clerk for authentication (NOT NextAuth)
+ * - Supabase for database (NOT raw Prisma)
+ * - Stripe for payments
+ * - Tailwind CSS for styling
+ * 
+ * This generator produces code that works INSTANTLY when deployed
+ * with AutoForge's managed infrastructure.
  */
 
 import Anthropic from '@anthropic-ai/sdk';
 import { prisma } from '../prisma';
-import { PREMIUM_UI_SYSTEM_PROMPT, buildPremiumUserPrompt } from './premium-ui-prompt';
 
 // ============================================================================
 // TYPES
@@ -32,305 +35,484 @@ export interface GenerationResult {
 }
 
 export interface StreamCallbacks {
-  onFileStart?: (path: string) => void;
-  onFileComplete?: (path: string, content: string) => void;
   onProgress?: (message: string) => void;
+  onFileComplete?: (path: string, content: string) => void;
   onError?: (error: string) => void;
 }
 
 // ============================================================================
-// PREMIUM GLOBALS CSS - BUILD-SAFE VERSION
+// MANAGED STACK SYSTEM PROMPT
 // ============================================================================
 
-const PREMIUM_GLOBALS_CSS = `@tailwind base;
-@tailwind components;
-@tailwind utilities;
+const MANAGED_STACK_SYSTEM_PROMPT = `You are an expert full-stack engineer building production-ready applications using the AutoForge Managed Stack.
 
-@layer base {
-  :root {
-    --bg-primary: 9 9 11;
-    --bg-secondary: 24 24 27;
-    --text-primary: 250 250 250;
-    --text-secondary: 161 161 170;
-    --accent: 139 92 246;
+## CRITICAL: TECH STACK (MANDATORY - DO NOT DEVIATE)
+
+- **Framework**: Next.js 14 (App Router)
+- **Language**: TypeScript (strict mode)
+- **Styling**: Tailwind CSS (dark theme, zinc/violet palette)
+- **Authentication**: Clerk (NOT NextAuth - NEVER use NextAuth)
+- **Database**: Supabase (PostgreSQL via @supabase/ssr)
+- **Payments**: Stripe
+- **State**: Zustand (client), React Query (server)
+- **Icons**: lucide-react
+
+## OUTPUT FORMAT
+
+You MUST output files using EXACTLY this format:
+
+<file path="package.json">
+{content}
+</file>
+
+<file path="app/page.tsx">
+{content}
+</file>
+
+## AUTHENTICATION WITH CLERK
+
+NEVER use NextAuth. ALWAYS use Clerk:
+
+### Server Components:
+\`\`\`tsx
+import { currentUser, auth } from '@clerk/nextjs/server';
+
+export default async function DashboardPage() {
+  const { userId } = await auth();
+  const user = await currentUser();
+  
+  if (!userId) {
+    redirect('/sign-in');
   }
   
-  html {
-    @apply scroll-smooth antialiased;
+  return <div>Hello {user?.firstName}</div>;
+}
+\`\`\`
+
+### Client Components:
+\`\`\`tsx
+'use client';
+import { useUser, useAuth } from '@clerk/nextjs';
+
+export function Profile() {
+  const { user, isLoaded } = useUser();
+  const { userId } = useAuth();
+  
+  if (!isLoaded) return <div>Loading...</div>;
+  
+  return <div>Hello {user?.firstName}</div>;
+}
+\`\`\`
+
+### API Routes:
+\`\`\`tsx
+import { auth } from '@clerk/nextjs/server';
+import { NextResponse } from 'next/server';
+
+export async function GET() {
+  const { userId } = await auth();
+  
+  if (!userId) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
   
-  body {
-    @apply bg-[#09090B] text-white;
+  return NextResponse.json({ userId });
+}
+\`\`\`
+
+### User Button:
+\`\`\`tsx
+import { UserButton } from '@clerk/nextjs';
+
+export function Header() {
+  return (
+    <header>
+      <UserButton afterSignOutUrl="/" />
+    </header>
+  );
+}
+\`\`\`
+
+## DATABASE WITH SUPABASE
+
+Use Supabase client, NOT raw Prisma:
+
+### Server-side Client (lib/supabase/server.ts):
+\`\`\`tsx
+import { createServerClient } from '@supabase/ssr';
+import { cookies } from 'next/headers';
+
+export async function createClient() {
+  const cookieStore = await cookies();
+
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll();
+        },
+        setAll(cookiesToSet) {
+          try {
+            cookiesToSet.forEach(({ name, value, options }) =>
+              cookieStore.set(name, value, options)
+            );
+          } catch {
+            // Server Component - ignore
+          }
+        },
+      },
+    }
+  );
+}
+\`\`\`
+
+### Client-side Client (lib/supabase/client.ts):
+\`\`\`tsx
+import { createBrowserClient } from '@supabase/ssr';
+
+export function createClient() {
+  return createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
+}
+\`\`\`
+
+### Using in Server Components:
+\`\`\`tsx
+import { createClient } from '@/lib/supabase/server';
+
+export default async function ProjectsPage() {
+  const supabase = await createClient();
+  
+  const { data: projects, error } = await supabase
+    .from('projects')
+    .select('*')
+    .order('created_at', { ascending: false });
+    
+  if (error) {
+    console.error('Error fetching projects:', error);
+    return <div>Error loading projects</div>;
+  }
+    
+  return <ProjectList projects={projects || []} />;
+}
+\`\`\`
+
+### Using in Client Components:
+\`\`\`tsx
+'use client';
+import { useEffect, useState } from 'react';
+import { createClient } from '@/lib/supabase/client';
+
+export function ProjectList() {
+  const [projects, setProjects] = useState([]);
+  const supabase = createClient();
+  
+  useEffect(() => {
+    async function fetchProjects() {
+      const { data } = await supabase
+        .from('projects')
+        .select('*');
+      setProjects(data || []);
+    }
+    fetchProjects();
+  }, []);
+  
+  return <div>{/* render projects */}</div>;
+}
+\`\`\`
+
+## STRIPE PAYMENTS
+
+\`\`\`tsx
+// app/api/stripe/checkout/route.ts
+import { auth } from '@clerk/nextjs/server';
+import { stripe } from '@/lib/stripe';
+import { NextResponse } from 'next/server';
+
+export async function POST(request: Request) {
+  const { userId } = await auth();
+  
+  if (!userId) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
   
-  ::selection {
-    @apply bg-violet-500/30 text-white;
-  }
+  const { priceId } = await request.json();
   
-  h1, h2, h3, h4, h5, h6 {
-    @apply tracking-tight font-semibold;
+  const session = await stripe.checkout.sessions.create({
+    mode: 'subscription',
+    payment_method_types: ['card'],
+    line_items: [{ price: priceId, quantity: 1 }],
+    success_url: \`\${process.env.NEXT_PUBLIC_APP_URL}/dashboard?success=true\`,
+    cancel_url: \`\${process.env.NEXT_PUBLIC_APP_URL}/pricing?canceled=true\`,
+    metadata: { userId },
+  });
+  
+  return NextResponse.json({ url: session.url });
+}
+\`\`\`
+
+## REQUIRED FILES FOR EVERY APP
+
+1. \`package.json\` - with correct dependencies
+2. \`middleware.ts\` - Clerk route protection
+3. \`app/layout.tsx\` - ClerkProvider wrapper
+4. \`app/sign-in/[[...sign-in]]/page.tsx\` - Sign in page
+5. \`app/sign-up/[[...sign-up]]/page.tsx\` - Sign up page
+6. \`lib/supabase/server.ts\` - Server-side Supabase client
+7. \`lib/supabase/client.ts\` - Client-side Supabase client
+8. \`app/globals.css\` - Tailwind styles
+9. \`tailwind.config.js\` - Tailwind configuration
+10. \`tsconfig.json\` - TypeScript configuration
+11. \`next.config.mjs\` - Next.js configuration
+
+## DEPENDENCIES (package.json)
+
+\`\`\`json
+{
+  "dependencies": {
+    "next": "14.2.5",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "@clerk/nextjs": "^5.0.0",
+    "@supabase/ssr": "^0.4.0",
+    "@supabase/supabase-js": "^2.45.0",
+    "stripe": "^14.0.0",
+    "lucide-react": "^0.400.0",
+    "zustand": "^4.5.0",
+    "@tanstack/react-query": "^5.0.0",
+    "clsx": "^2.1.1",
+    "tailwind-merge": "^2.3.0",
+    "recharts": "^2.12.0"
+  },
+  "devDependencies": {
+    "typescript": "5.5.2",
+    "@types/node": "20.14.2",
+    "@types/react": "18.3.3",
+    "@types/react-dom": "18.3.0",
+    "tailwindcss": "3.4.4",
+    "postcss": "8.4.38",
+    "autoprefixer": "10.4.19",
+    "source-map-js": "^1.2.0"
   }
 }
+\`\`\`
 
-/* Premium scrollbar */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
+## MIDDLEWARE (middleware.ts)
 
-::-webkit-scrollbar-track {
-  background: transparent;
-}
+\`\`\`tsx
+import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
 
-::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 4px;
-}
+const isPublicRoute = createRouteMatcher([
+  '/',
+  '/sign-in(.*)',
+  '/sign-up(.*)',
+  '/api/webhooks(.*)',
+  '/pricing',
+  '/about',
+]);
 
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.2);
-}
+export default clerkMiddleware(async (auth, request) => {
+  if (!isPublicRoute(request)) {
+    await auth.protect();
+  }
+});
 
-/* Component classes */
-@layer components {
-  .glass {
-    @apply bg-white/5 backdrop-blur-xl border border-white/10;
-  }
-  
-  .gradient-text {
-    @apply bg-gradient-to-r from-violet-400 via-pink-400 to-orange-400 bg-clip-text text-transparent;
-  }
-  
-  .btn-primary {
-    @apply relative inline-flex items-center justify-center gap-2 px-6 py-3 
-           font-semibold text-white bg-gradient-to-r from-violet-600 to-indigo-600 
-           rounded-xl shadow-lg shadow-violet-500/25
-           hover:from-violet-500 hover:to-indigo-500 hover:shadow-xl hover:shadow-violet-500/30
-           active:scale-95 transition-all duration-200;
-  }
-  
-  .btn-secondary {
-    @apply inline-flex items-center justify-center gap-2 px-6 py-3 
-           font-semibold text-white bg-white/5 border border-white/10 
-           rounded-xl hover:bg-white/10 hover:border-white/20
-           active:scale-95 transition-all duration-200;
-  }
-  
-  .card {
-    @apply relative bg-zinc-900 rounded-2xl border border-white/10 
-           hover:border-white/20 transition-all duration-300;
-  }
-  
-  .input {
-    @apply w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl 
-           text-white placeholder-gray-500 
-           focus:outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 
-           transition-all duration-200;
-  }
-}
+export const config = {
+  matcher: [
+    '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
+    '/(api|trpc)(.*)',
+  ],
+};
+\`\`\`
 
-/* Animations */
-@layer utilities {
-  .animate-fade-in {
-    animation: fadeIn 0.5s ease-out forwards;
-  }
-  
-  .animate-fade-in-up {
-    animation: fadeInUp 0.6s ease-out forwards;
-  }
-  
-  .animate-scale-in {
-    animation: scaleIn 0.4s ease-out forwards;
-  }
-  
-  .animate-blob {
-    animation: blob 7s infinite;
-  }
-  
-  .animate-shimmer {
-    animation: shimmer 2s infinite;
-  }
-  
-  .animation-delay-200 { animation-delay: 200ms; }
-  .animation-delay-400 { animation-delay: 400ms; }
-  .animation-delay-600 { animation-delay: 600ms; }
-  .animation-delay-2000 { animation-delay: 2000ms; }
-  .animation-delay-4000 { animation-delay: 4000ms; }
-}
+## ROOT LAYOUT (app/layout.tsx)
 
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
+\`\`\`tsx
+import { ClerkProvider } from '@clerk/nextjs';
+import { Inter } from 'next/font/google';
+import './globals.css';
 
-@keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
-}
+const inter = Inter({ subsets: ['latin'] });
 
-@keyframes scaleIn {
-  from { opacity: 0; transform: scale(0.9); }
-  to { opacity: 1; transform: scale(1); }
-}
+export const metadata = {
+  title: 'App Name',
+  description: 'App description',
+};
 
-@keyframes blob {
-  0% { transform: translate(0px, 0px) scale(1); }
-  33% { transform: translate(30px, -50px) scale(1.1); }
-  66% { transform: translate(-20px, 20px) scale(0.9); }
-  100% { transform: translate(0px, 0px) scale(1); }
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <ClerkProvider>
+      <html lang="en" className="dark">
+        <body className={inter.className}>{children}</body>
+      </html>
+    </ClerkProvider>
+  );
 }
+\`\`\`
 
-@keyframes shimmer {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(100%); }
-}
+## UI DESIGN PRINCIPLES
+
+Build APPLICATIONS like Linear, Notion, Figma - NOT marketing websites.
+
+**Layout Pattern (Sidebar + Main):**
+\`\`\`tsx
+<div className="flex h-screen bg-zinc-950">
+  <aside className="w-64 border-r border-white/10 p-4">
+    {/* Sidebar content */}
+  </aside>
+  <main className="flex-1 overflow-auto p-6">
+    {/* Main content */}
+  </main>
+</div>
+\`\`\`
+
+**Color Palette:**
+- Background: bg-zinc-950, bg-zinc-900
+- Borders: border-white/10, border-white/5
+- Text: text-white, text-gray-400, text-gray-500
+- Accent: violet-500, violet-600, indigo-500
+
+**Component Patterns:**
+- Cards: bg-zinc-900 border border-white/10 rounded-xl
+- Buttons: bg-violet-600 hover:bg-violet-500 rounded-lg
+- Inputs: bg-white/5 border border-white/10 rounded-lg
+
+## CSS RULES (CRITICAL)
+
+1. Use @tailwind directives, NOT @import
+2. Use border-white/10, NOT border-border
+3. Use bg-zinc-900, NOT bg-background
+4. Use text-white, NOT text-foreground
+5. NO Google Fonts @import in CSS (use next/font)
+
+## WHAT NOT TO DO
+
+- NEVER use NextAuth (use Clerk)
+- NEVER use raw Prisma Client (use Supabase client)
+- NEVER use border-border, bg-background, text-foreground
+- NEVER create marketing websites (build applications)
+- NEVER forget the middleware.ts file
+- NEVER forget the ClerkProvider in layout.tsx
 `;
 
 // ============================================================================
-// CSS SANITIZATION - Fixes common build errors
+// PREMIUM UI PROMPT BUILDER
 // ============================================================================
 
-function sanitizeGlobalsCss(content: string): string {
-  let sanitized = content;
+function buildUserPrompt(userRequest: string): string {
+  const isAIRequest = /\b(ai agent|chatbot|llm|gpt|claude|openai|langchain|langgraph|ai assistant|chat with ai|ai-powered|machine learning|neural)\b/i.test(userRequest);
+  const isDashboard = /\b(dashboard|analytics|admin|panel|metrics|monitoring|reporting)\b/i.test(userRequest);
+  const isKanban = /\b(kanban|board|trello|task|project management|todo)\b/i.test(userRequest);
+  const isCRM = /\b(crm|customer|contacts|leads|sales|pipeline)\b/i.test(userRequest);
+  const isInventory = /\b(inventory|stock|warehouse|products|catalog)\b/i.test(userRequest);
+  const needsAuth = /\b(auth|login|signup|user|account|profile|dashboard)\b/i.test(userRequest);
+  const needsPayments = /\b(payment|stripe|subscription|billing|checkout|pricing)\b/i.test(userRequest);
+
+  let appHint = '';
   
-  // Remove Google Fonts @import (should use next/font instead)
-  sanitized = sanitized.replace(/@import\s+url\([^)]+fonts\.googleapis\.com[^)]+\);?\s*/g, '');
-  
-  // Fix @import statements - convert to @tailwind directives
-  sanitized = sanitized.replace(/@import\s+['"]tailwindcss\/base['"];?/g, '@tailwind base;');
-  sanitized = sanitized.replace(/@import\s+['"]tailwindcss\/components['"];?/g, '@tailwind components;');
-  sanitized = sanitized.replace(/@import\s+['"]tailwindcss\/utilities['"];?/g, '@tailwind utilities;');
-  
-  // Remove ALL @apply statements with non-existent classes
-  // This regex finds @apply statements and removes problematic classes
-  const problematicPatterns = [
-    // Custom dark classes
-    /bg-dark-\d+/g,
-    /text-dark-\d+/g,
-    /border-dark-\d+/g,
-    // shadcn/ui classes
-    /border-border/g,
-    /bg-background/g,
-    /text-foreground/g,
-    /ring-ring/g,
-    /bg-card/g,
-    /text-card-foreground/g,
-    /bg-popover/g,
-    /text-popover-foreground/g,
-    /bg-primary(?![/-])/g,  // bg-primary but not bg-primary-500
-    /text-primary-foreground/g,
-    /bg-secondary(?![/-])/g,
-    /text-secondary-foreground/g,
-    /bg-muted/g,
-    /text-muted-foreground/g,
-    /bg-accent(?![/-])/g,
-    /text-accent-foreground/g,
-    /bg-destructive/g,
-    /text-destructive-foreground/g,
-    /border-input/g,
-    // Custom color classes that don't exist
-    /bg-navy-\d+/g,
-    /bg-trading-\w+/g,
-    /bg-forex-\w+/g,
-    /text-navy-\d+/g,
-  ];
-  
-  // Replacement map for known problematic classes
-  const replacements: Record<string, string> = {
-    'border-border': 'border-white/10',
-    'bg-background': 'bg-zinc-950',
-    'text-foreground': 'text-white',
-    'ring-ring': 'ring-violet-500',
-    'bg-card': 'bg-zinc-900',
-    'text-card-foreground': 'text-white',
-    'bg-popover': 'bg-zinc-900',
-    'text-popover-foreground': 'text-white',
-    'bg-muted': 'bg-zinc-800',
-    'text-muted-foreground': 'text-gray-400',
-    'border-input': 'border-white/10',
-  };
-  
-  // Apply specific replacements
-  for (const [problematic, safe] of Object.entries(replacements)) {
-    sanitized = sanitized.replace(new RegExp(problematic, 'g'), safe);
+  if (isDashboard) {
+    appHint = `
+APPLICATION TYPE: Dashboard/Analytics
+- Use sidebar + main content layout
+- Include stats cards at the top
+- Add charts using recharts (LineChart, BarChart, AreaChart)
+- Include a data table with recent items
+- Add date range filters
+- Include UserButton from Clerk in header`;
+  } else if (isKanban) {
+    appHint = `
+APPLICATION TYPE: Project/Task Management
+- Use sidebar navigation with projects list
+- Main content shows Kanban columns (To Do, In Progress, Review, Done)
+- Task cards with title, priority indicator, assignee avatar
+- Add new task button on each column
+- Include task count badges
+- Include UserButton from Clerk in header`;
+  } else if (isCRM) {
+    appHint = `
+APPLICATION TYPE: CRM/Contacts
+- Sidebar with navigation (Dashboard, Contacts, Deals, Tasks)
+- Main data table with contacts/leads
+- Status badges (Lead, Qualified, Customer)
+- Quick actions (Email, Call, Edit)
+- Search and filter bar
+- Include UserButton from Clerk in header`;
+  } else if (isInventory) {
+    appHint = `
+APPLICATION TYPE: Inventory/Catalog
+- Product table with image, name, SKU, quantity, price
+- Low stock warnings
+- Category filters
+- Add/Edit product modal
+- Search functionality
+- Include UserButton from Clerk in header`;
+  } else if (isAIRequest) {
+    appHint = `
+APPLICATION TYPE: AI Agent Interface
+- Chat interface with message history
+- User and AI message bubbles
+- Loading state with typing indicator
+- Input field with send button
+- Use MOCK RESPONSES (no real AI API calls)
+- Include UserButton from Clerk in header
+
+⚠️ CRITICAL: This runs in WebContainer with NO API access.
+Create a working SIMULATION with mock responses.
+NO LangChain, NO OpenAI SDK, NO Anthropic SDK.`;
+  }
+
+  // Add auth/payment hints
+  let featureHints = '';
+  if (needsAuth) {
+    featureHints += `
+AUTHENTICATION:
+- Use Clerk for all authentication
+- Add sign-in and sign-up pages
+- Protect dashboard routes with middleware
+- Show UserButton in authenticated areas`;
   }
   
-  // Remove lines with remaining problematic patterns
-  for (const pattern of problematicPatterns) {
-    // Find @apply lines with these patterns and fix them
-    sanitized = sanitized.replace(
-      new RegExp(`(@apply[^;]*)(${pattern.source})([^;]*);`, 'g'),
-      (match, before, _problem, after) => {
-        const remaining = (before + after).trim();
-        if (remaining === '@apply' || remaining === '@apply ;') {
-          return ''; // Remove empty @apply
-        }
-        return remaining + ';';
-      }
-    );
+  if (needsPayments) {
+    featureHints += `
+PAYMENTS:
+- Include Stripe integration
+- Add pricing page with plans
+- Create checkout API route
+- Add billing/subscription management`;
   }
-  
-  // Remove any remaining bg-dark-* classes inline
-  sanitized = sanitized.replace(/bg-dark-\d+/g, 'bg-zinc-900');
-  sanitized = sanitized.replace(/text-dark-\d+/g, 'text-gray-400');
-  sanitized = sanitized.replace(/border-dark-\d+/g, 'border-zinc-800');
-  
-  // Remove any * { @apply ... } that might cause issues
-  sanitized = sanitized.replace(/\*\s*\{[^}]*@apply[^}]*\}/g, '');
-  
-  // Ensure @tailwind directives are at the top
-  const hasBase = sanitized.includes('@tailwind base');
-  const hasComponents = sanitized.includes('@tailwind components');
-  const hasUtilities = sanitized.includes('@tailwind utilities');
-  
-  if (!hasBase || !hasComponents || !hasUtilities) {
-    // Remove any existing @tailwind directives
-    sanitized = sanitized.replace(/@tailwind\s+(base|components|utilities);?\s*/g, '');
-    // Add them at the top
-    sanitized = `@tailwind base;
-@tailwind components;
-@tailwind utilities;
 
-${sanitized.trim()}`;
-  }
-  
-  // Final cleanup - remove empty @layer blocks
-  sanitized = sanitized.replace(/@layer\s+(base|components|utilities)\s*\{\s*\}/g, '');
-  
-  return sanitized;
-}
+  return `Build a FUNCTIONAL APPLICATION for:
 
-// ============================================================================
-// FILE SANITIZATION - Fix all generated files
-// ============================================================================
+"${userRequest}"
+${appHint}
+${featureHints}
 
-function sanitizeGeneratedFiles(files: GeneratedFile[]): GeneratedFile[] {
-  return files.map(file => {
-    let content = file.content;
-    
-    // Sanitize globals.css
-    if (file.path === 'app/globals.css') {
-      content = sanitizeGlobalsCss(content);
-    }
-    
-    // Sanitize TSX/JSX files - replace problematic classes in className
-    if (file.path.endsWith('.tsx') || file.path.endsWith('.jsx')) {
-      // Replace custom dark classes
-      content = content.replace(/bg-dark-(\d+)/g, 'bg-zinc-900');
-      content = content.replace(/text-dark-(\d+)/g, 'text-gray-400');
-      content = content.replace(/border-dark-(\d+)/g, 'border-zinc-800');
-      
-      // Replace shadcn classes
-      content = content.replace(/\bborder-border\b/g, 'border-white/10');
-      content = content.replace(/\bbg-background\b/g, 'bg-zinc-950');
-      content = content.replace(/\btext-foreground\b/g, 'text-white');
-      content = content.replace(/\bbg-card\b/g, 'bg-zinc-900');
-      content = content.replace(/\bbg-muted\b/g, 'bg-zinc-800');
-      content = content.replace(/\btext-muted-foreground\b/g, 'text-gray-400');
-    }
-    
-    return { ...file, content };
-  });
+THIS IS AN APPLICATION, NOT A WEBSITE. Build it like Linear, Notion, or Figma.
+
+CRITICAL REQUIREMENTS:
+1. Use Clerk for authentication (NOT NextAuth)
+2. Use Supabase client for database (NOT raw Prisma)
+3. Include middleware.ts with Clerk protection
+4. Include sign-in and sign-up pages
+5. Use sidebar + main content layout
+6. Include proper navigation with icons
+7. Add data tables, forms, cards as needed
+8. Include loading states, empty states, hover states
+9. Dark mode with zinc/violet color scheme
+10. Use standard Tailwind classes (no border-border, bg-background)
+11. Include UserButton from @clerk/nextjs in authenticated areas
+12. Use realistic mock data (not placeholder text)
+
+Generate ALL required files starting with package.json.
+Make this a PRODUCTION-READY application that works with AutoForge's managed infrastructure.`;
 }
 
 // ============================================================================
@@ -373,19 +555,250 @@ function detectLanguage(path: string): string {
     prisma: 'prisma',
     yml: 'yaml',
     yaml: 'yaml',
+    sql: 'sql',
   };
   return map[ext] || 'plaintext';
 }
 
 // ============================================================================
-// ENSURE ESSENTIAL FILES
+// CSS SANITIZATION
 // ============================================================================
+
+function sanitizeGlobalsCss(css: string): string {
+  let sanitized = css;
+  
+  // Remove Google Fonts imports
+  sanitized = sanitized.replace(/@import\s+url\([^)]+fonts\.googleapis\.com[^)]+\);?\s*/g, '');
+  
+  // Fix Tailwind imports - convert @import to @tailwind
+  sanitized = sanitized.replace(/@import\s+['"]tailwindcss\/base['"];?/g, '@tailwind base;');
+  sanitized = sanitized.replace(/@import\s+['"]tailwindcss\/components['"];?/g, '@tailwind components;');
+  sanitized = sanitized.replace(/@import\s+['"]tailwindcss\/utilities['"];?/g, '@tailwind utilities;');
+  
+  // Remove problematic shadcn/custom classes from CSS
+  sanitized = sanitized.replace(
+    /--[\w-]+:\s*[^;]*(?:bg-dark|border-border|bg-background|text-foreground)[^;]*;/g, 
+    ''
+  );
+  
+  // Replace theme variables that reference non-existent classes
+  sanitized = sanitized.replace(
+    /@apply\s+[^;]*(?:bg-dark-\d+|border-border|bg-background|text-foreground|bg-card|bg-muted|text-muted-foreground)[^;]*/g,
+    (match) => {
+      const remaining = match
+        .replace(/bg-dark-\d+/g, 'bg-zinc-900')
+        .replace(/border-border/g, 'border-white/10')
+        .replace(/bg-background/g, 'bg-zinc-950')
+        .replace(/text-foreground/g, 'text-white')
+        .replace(/bg-card/g, 'bg-zinc-900')
+        .replace(/bg-muted/g, 'bg-zinc-800')
+        .replace(/text-muted-foreground/g, 'text-gray-400');
+      return remaining + ';';
+    }
+  );
+  
+  // Remove any remaining bg-dark-* classes inline
+  sanitized = sanitized.replace(/bg-dark-\d+/g, 'bg-zinc-900');
+  sanitized = sanitized.replace(/text-dark-\d+/g, 'text-gray-400');
+  sanitized = sanitized.replace(/border-dark-\d+/g, 'border-zinc-800');
+  
+  // Remove any * { @apply ... } that might cause issues
+  sanitized = sanitized.replace(/\*\s*\{[^}]*@apply[^}]*\}/g, '');
+  
+  // Ensure @tailwind directives are at the top
+  const hasBase = sanitized.includes('@tailwind base');
+  const hasComponents = sanitized.includes('@tailwind components');
+  const hasUtilities = sanitized.includes('@tailwind utilities');
+  
+  if (!hasBase || !hasComponents || !hasUtilities) {
+    // Remove any existing @tailwind directives
+    sanitized = sanitized.replace(/@tailwind\s+(base|components|utilities);?\s*/g, '');
+    // Add them at the top
+    sanitized = `@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+${sanitized.trim()}`;
+  }
+  
+  // Final cleanup - remove empty @layer blocks
+  sanitized = sanitized.replace(/@layer\s+(base|components|utilities)\s*\{\s*\}/g, '');
+  
+  return sanitized;
+}
+
+// ============================================================================
+// FILE SANITIZATION
+// ============================================================================
+
+function sanitizeGeneratedFiles(files: GeneratedFile[]): GeneratedFile[] {
+  return files.map(file => {
+    let content = file.content;
+    
+    // Sanitize globals.css
+    if (file.path === 'app/globals.css') {
+      content = sanitizeGlobalsCss(content);
+    }
+    
+    // Sanitize TSX/JSX files - replace problematic classes in className
+    if (file.path.endsWith('.tsx') || file.path.endsWith('.jsx')) {
+      // Replace custom dark classes
+      content = content.replace(/bg-dark-(\d+)/g, 'bg-zinc-900');
+      content = content.replace(/text-dark-(\d+)/g, 'text-gray-400');
+      content = content.replace(/border-dark-(\d+)/g, 'border-zinc-800');
+      
+      // Replace shadcn classes
+      content = content.replace(/\bborder-border\b/g, 'border-white/10');
+      content = content.replace(/\bbg-background\b/g, 'bg-zinc-950');
+      content = content.replace(/\btext-foreground\b/g, 'text-white');
+      content = content.replace(/\bbg-card\b/g, 'bg-zinc-900');
+      content = content.replace(/\bbg-muted\b/g, 'bg-zinc-800');
+      content = content.replace(/\btext-muted-foreground\b/g, 'text-gray-400');
+    }
+    
+    return { ...file, content };
+  });
+}
+
+// ============================================================================
+// ESSENTIAL FILES - CLERK + SUPABASE STACK
+// ============================================================================
+
+const CLERK_MIDDLEWARE = `import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
+
+const isPublicRoute = createRouteMatcher([
+  '/',
+  '/sign-in(.*)',
+  '/sign-up(.*)',
+  '/api/webhooks(.*)',
+  '/pricing',
+  '/about',
+]);
+
+export default clerkMiddleware(async (auth, request) => {
+  if (!isPublicRoute(request)) {
+    await auth.protect();
+  }
+});
+
+export const config = {
+  matcher: [
+    '/((?!_next|[^?]*\\\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
+    '/(api|trpc)(.*)',
+  ],
+};
+`;
+
+const CLERK_SIGN_IN_PAGE = `import { SignIn } from '@clerk/nextjs';
+
+export default function SignInPage() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-zinc-950">
+      <SignIn 
+        appearance={{
+          elements: {
+            rootBox: 'mx-auto',
+            card: 'bg-zinc-900 border border-white/10 shadow-xl',
+            headerTitle: 'text-white',
+            headerSubtitle: 'text-gray-400',
+            socialButtonsBlockButton: 'bg-white/5 border border-white/10 text-white hover:bg-white/10',
+            formFieldLabel: 'text-gray-400',
+            formFieldInput: 'bg-white/5 border-white/10 text-white',
+            footerActionLink: 'text-violet-400 hover:text-violet-300',
+          },
+        }}
+      />
+    </div>
+  );
+}
+`;
+
+const CLERK_SIGN_UP_PAGE = `import { SignUp } from '@clerk/nextjs';
+
+export default function SignUpPage() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-zinc-950">
+      <SignUp 
+        appearance={{
+          elements: {
+            rootBox: 'mx-auto',
+            card: 'bg-zinc-900 border border-white/10 shadow-xl',
+            headerTitle: 'text-white',
+            headerSubtitle: 'text-gray-400',
+            socialButtonsBlockButton: 'bg-white/5 border border-white/10 text-white hover:bg-white/10',
+            formFieldLabel: 'text-gray-400',
+            formFieldInput: 'bg-white/5 border-white/10 text-white',
+            footerActionLink: 'text-violet-400 hover:text-violet-300',
+          },
+        }}
+      />
+    </div>
+  );
+}
+`;
+
+const SUPABASE_SERVER_CLIENT = `import { createServerClient } from '@supabase/ssr';
+import { cookies } from 'next/headers';
+
+export async function createClient() {
+  const cookieStore = await cookies();
+
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll();
+        },
+        setAll(cookiesToSet) {
+          try {
+            cookiesToSet.forEach(({ name, value, options }) =>
+              cookieStore.set(name, value, options)
+            );
+          } catch {
+            // The \`setAll\` method was called from a Server Component.
+            // This can be ignored if you have middleware refreshing
+            // user sessions.
+          }
+        },
+      },
+    }
+  );
+}
+`;
+
+const SUPABASE_BROWSER_CLIENT = `import { createBrowserClient } from '@supabase/ssr';
+
+export function createClient() {
+  return createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
+}
+`;
+
+const STRIPE_CLIENT = `import Stripe from 'stripe';
+
+export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+  apiVersion: '2024-06-20',
+  typescript: true,
+});
+`;
+
+const UTILS_FILE = `import { clsx, type ClassValue } from 'clsx';
+import { twMerge } from 'tailwind-merge';
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
+`;
 
 function addMissingEssentialFiles(files: GeneratedFile[], prompt: string): GeneratedFile[] {
   const fileMap = new Map(files.map(f => [f.path, f]));
   const safeTitle = prompt.slice(0, 50).replace(/[^a-zA-Z0-9\s]/g, '').trim() || 'AutoForge App';
   
-  // Ensure package.json exists and has all required fields
+  // Ensure package.json with Clerk + Supabase stack
   if (!fileMap.has('package.json')) {
     fileMap.set('package.json', {
       path: 'package.json',
@@ -406,9 +819,14 @@ function addMissingEssentialFiles(files: GeneratedFile[], prompt: string): Gener
           next: '14.2.5',
           react: '18.3.1',
           'react-dom': '18.3.1',
+          '@clerk/nextjs': '^5.0.0',
+          '@supabase/ssr': '^0.4.0',
+          '@supabase/supabase-js': '^2.45.0',
           'lucide-react': '^0.400.0',
           clsx: '^2.1.1',
           'tailwind-merge': '^2.3.0',
+          recharts: '^2.12.0',
+          zustand: '^4.5.0',
         },
         devDependencies: {
           typescript: '5.5.2',
@@ -424,17 +842,40 @@ function addMissingEssentialFiles(files: GeneratedFile[], prompt: string): Gener
       language: 'json',
     });
   } else {
-    // Ensure existing package.json has engines field
+    // Ensure existing package.json has required dependencies
     try {
       const existing = fileMap.get('package.json')!;
       const pkg = JSON.parse(existing.content);
+      
+      // Ensure engines
       if (!pkg.engines) {
         pkg.engines = { node: '18.x' };
       }
-      if (!pkg.devDependencies?.['source-map-js']) {
-        pkg.devDependencies = pkg.devDependencies || {};
+      
+      // Ensure Clerk
+      pkg.dependencies = pkg.dependencies || {};
+      if (!pkg.dependencies['@clerk/nextjs']) {
+        pkg.dependencies['@clerk/nextjs'] = '^5.0.0';
+      }
+      
+      // Ensure Supabase
+      if (!pkg.dependencies['@supabase/ssr']) {
+        pkg.dependencies['@supabase/ssr'] = '^0.4.0';
+      }
+      if (!pkg.dependencies['@supabase/supabase-js']) {
+        pkg.dependencies['@supabase/supabase-js'] = '^2.45.0';
+      }
+      
+      // Ensure source-map-js for WebContainer
+      pkg.devDependencies = pkg.devDependencies || {};
+      if (!pkg.devDependencies['source-map-js']) {
         pkg.devDependencies['source-map-js'] = '^1.2.0';
       }
+      
+      // Remove NextAuth if present (we use Clerk)
+      delete pkg.dependencies['next-auth'];
+      delete pkg.dependencies['@auth/prisma-adapter'];
+      
       fileMap.set('package.json', {
         ...existing,
         content: JSON.stringify(pkg, null, 2),
@@ -444,6 +885,69 @@ function addMissingEssentialFiles(files: GeneratedFile[], prompt: string): Gener
     }
   }
   
+  // Ensure Clerk middleware
+  if (!fileMap.has('middleware.ts')) {
+    fileMap.set('middleware.ts', {
+      path: 'middleware.ts',
+      content: CLERK_MIDDLEWARE,
+      language: 'typescript',
+    });
+  }
+  
+  // Ensure Clerk sign-in page
+  if (!fileMap.has('app/sign-in/[[...sign-in]]/page.tsx')) {
+    fileMap.set('app/sign-in/[[...sign-in]]/page.tsx', {
+      path: 'app/sign-in/[[...sign-in]]/page.tsx',
+      content: CLERK_SIGN_IN_PAGE,
+      language: 'typescript',
+    });
+  }
+  
+  // Ensure Clerk sign-up page
+  if (!fileMap.has('app/sign-up/[[...sign-up]]/page.tsx')) {
+    fileMap.set('app/sign-up/[[...sign-up]]/page.tsx', {
+      path: 'app/sign-up/[[...sign-up]]/page.tsx',
+      content: CLERK_SIGN_UP_PAGE,
+      language: 'typescript',
+    });
+  }
+  
+  // Ensure Supabase server client
+  if (!fileMap.has('lib/supabase/server.ts')) {
+    fileMap.set('lib/supabase/server.ts', {
+      path: 'lib/supabase/server.ts',
+      content: SUPABASE_SERVER_CLIENT,
+      language: 'typescript',
+    });
+  }
+  
+  // Ensure Supabase browser client
+  if (!fileMap.has('lib/supabase/client.ts')) {
+    fileMap.set('lib/supabase/client.ts', {
+      path: 'lib/supabase/client.ts',
+      content: SUPABASE_BROWSER_CLIENT,
+      language: 'typescript',
+    });
+  }
+  
+  // Ensure Stripe client (if needed)
+  if (!fileMap.has('lib/stripe.ts')) {
+    fileMap.set('lib/stripe.ts', {
+      path: 'lib/stripe.ts',
+      content: STRIPE_CLIENT,
+      language: 'typescript',
+    });
+  }
+  
+  // Ensure utils
+  if (!fileMap.has('lib/utils.ts')) {
+    fileMap.set('lib/utils.ts', {
+      path: 'lib/utils.ts',
+      content: UTILS_FILE,
+      language: 'typescript',
+    });
+  }
+  
   // Ensure next.config.mjs
   if (!fileMap.has('next.config.mjs') && !fileMap.has('next.config.js')) {
     fileMap.set('next.config.mjs', {
@@ -451,6 +955,14 @@ function addMissingEssentialFiles(files: GeneratedFile[], prompt: string): Gener
       content: `/** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: '**',
+      },
+    ],
+  },
 };
 
 export default nextConfig;
@@ -488,12 +1000,13 @@ export default nextConfig;
     });
   }
   
-  // Ensure tailwind.config.js with premium animations
+  // Ensure tailwind.config.js
   if (!fileMap.has('tailwind.config.js') && !fileMap.has('tailwind.config.ts')) {
     fileMap.set('tailwind.config.js', {
       path: 'tailwind.config.js',
       content: `/** @type {import('tailwindcss').Config} */
 module.exports = {
+  darkMode: 'class',
   content: [
     './pages/**/*.{js,ts,jsx,tsx,mdx}',
     './components/**/*.{js,ts,jsx,tsx,mdx}',
@@ -501,35 +1014,23 @@ module.exports = {
   ],
   theme: {
     extend: {
+      colors: {
+        background: '#09090b',
+        foreground: '#fafafa',
+      },
       animation: {
-        'fade-in': 'fadeIn 0.5s ease-out forwards',
-        'fade-in-up': 'fadeInUp 0.6s ease-out forwards',
-        'scale-in': 'scaleIn 0.4s ease-out forwards',
-        'blob': 'blob 7s infinite',
-        'shimmer': 'shimmer 2s infinite',
+        'fade-in': 'fadeIn 0.5s ease-out',
+        'slide-up': 'slideUp 0.5s ease-out',
+        'pulse-slow': 'pulse 3s infinite',
       },
       keyframes: {
         fadeIn: {
           '0%': { opacity: '0' },
           '100%': { opacity: '1' },
         },
-        fadeInUp: {
-          '0%': { opacity: '0', transform: 'translateY(20px)' },
+        slideUp: {
+          '0%': { opacity: '0', transform: 'translateY(10px)' },
           '100%': { opacity: '1', transform: 'translateY(0)' },
-        },
-        scaleIn: {
-          '0%': { opacity: '0', transform: 'scale(0.9)' },
-          '100%': { opacity: '1', transform: 'scale(1)' },
-        },
-        blob: {
-          '0%': { transform: 'translate(0px, 0px) scale(1)' },
-          '33%': { transform: 'translate(30px, -50px) scale(1.1)' },
-          '66%': { transform: 'translate(-20px, 20px) scale(0.9)' },
-          '100%': { transform: 'translate(0px, 0px) scale(1)' },
-        },
-        shimmer: {
-          '0%': { transform: 'translateX(-100%)' },
-          '100%': { transform: 'translateX(100%)' },
         },
       },
     },
@@ -542,7 +1043,7 @@ module.exports = {
   }
   
   // Ensure postcss.config.js
-  if (!fileMap.has('postcss.config.js')) {
+  if (!fileMap.has('postcss.config.js') && !fileMap.has('postcss.config.mjs')) {
     fileMap.set('postcss.config.js', {
       path: 'postcss.config.js',
       content: `module.exports = {
@@ -556,149 +1057,62 @@ module.exports = {
     });
   }
   
-  // Ensure premium globals.css (with sanitization)
+  // Ensure globals.css
   if (!fileMap.has('app/globals.css')) {
     fileMap.set('app/globals.css', {
       path: 'app/globals.css',
-      content: PREMIUM_GLOBALS_CSS,
+      content: `@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #09090b;
+  --foreground: #fafafa;
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgb(255 255 255 / 0.1);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgb(255 255 255 / 0.2);
+}
+
+/* Focus styles */
+:focus-visible {
+  outline: 2px solid rgb(139 92 246 / 0.5);
+  outline-offset: 2px;
+}
+
+/* Smooth transitions */
+* {
+  transition-property: background-color, border-color, color, fill, stroke;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+}
+`,
       language: 'css',
-    });
-  } else {
-    // Sanitize existing globals.css to fix common errors
-    const existing = fileMap.get('app/globals.css')!;
-    fileMap.set('app/globals.css', {
-      ...existing,
-      content: sanitizeGlobalsCss(existing.content),
-    });
-  }
-  
-  // Ensure layout.tsx
-  if (!fileMap.has('app/layout.tsx')) {
-    fileMap.set('app/layout.tsx', {
-      path: 'app/layout.tsx',
-      content: `import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
-import './globals.css';
-
-const inter = Inter({ subsets: ['latin'], variable: '--font-sans' });
-
-export const metadata: Metadata = {
-  title: '${safeTitle}',
-  description: 'Built with AutoForge - AI-Powered Code Generation',
-};
-
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  return (
-    <html lang="en" className="dark">
-      <body className={inter.className}>{children}</body>
-    </html>
-  );
-}
-`,
-      language: 'typescript',
-    });
-  }
-  
-  // CRITICAL: Ensure app/page.tsx exists
-  if (!fileMap.has('app/page.tsx')) {
-    console.warn('⚠️ No app/page.tsx found! Adding fallback...');
-    fileMap.set('app/page.tsx', {
-      path: 'app/page.tsx',
-      content: `'use client';
-
-import { Sparkles, ArrowRight, Zap, Shield, Globe } from 'lucide-react';
-
-export default function Home() {
-  return (
-    <div className="min-h-screen bg-[#09090B] text-white">
-      {/* Atmospheric background */}
-      <div className="fixed inset-0 -z-10">
-        <div className="absolute inset-0 bg-[#09090B]" />
-        <div className="absolute top-0 -left-4 w-96 h-96 bg-violet-500 rounded-full mix-blend-multiply filter blur-[128px] opacity-30 animate-blob" />
-        <div className="absolute top-0 -right-4 w-96 h-96 bg-cyan-500 rounded-full mix-blend-multiply filter blur-[128px] opacity-30 animate-blob animation-delay-2000" />
-        <div className="absolute -bottom-8 left-20 w-96 h-96 bg-pink-500 rounded-full mix-blend-multiply filter blur-[128px] opacity-30 animate-blob animation-delay-4000" />
-        <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:60px_60px]" />
-      </div>
-
-      {/* Hero Section */}
-      <section className="relative min-h-screen flex items-center justify-center px-6">
-        <div className="max-w-4xl mx-auto text-center">
-          {/* Badge */}
-          <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 rounded-full text-sm text-gray-400 mb-8 animate-fade-in">
-            <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-            Built with AutoForge
-          </div>
-          
-          {/* Headline */}
-          <h1 className="text-5xl sm:text-7xl font-bold mb-6 tracking-tight animate-fade-in-up">
-            ${safeTitle}
-            <span className="block mt-2 bg-gradient-to-r from-violet-400 via-pink-400 to-orange-400 bg-clip-text text-transparent">
-              Powered by AI
-            </span>
-          </h1>
-          
-          {/* Subtitle */}
-          <p className="text-xl text-gray-400 max-w-2xl mx-auto mb-10 leading-relaxed animate-fade-in-up animation-delay-200">
-            Experience the next generation of intelligent applications, 
-            crafted with precision and designed for excellence.
-          </p>
-          
-          {/* CTAs */}
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 animate-fade-in-up animation-delay-400">
-            <button className="px-8 py-4 bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-semibold rounded-xl shadow-lg shadow-violet-500/25 hover:shadow-xl hover:shadow-violet-500/30 transition-all duration-200 flex items-center gap-2">
-              Get Started
-              <ArrowRight className="w-5 h-5" />
-            </button>
-            <button className="px-8 py-4 bg-white/5 border border-white/10 text-white font-semibold rounded-xl hover:bg-white/10 transition-all duration-200 flex items-center gap-2">
-              <Sparkles className="w-5 h-5" />
-              Learn More
-            </button>
-          </div>
-        </div>
-      </section>
-
-      {/* Features Section */}
-      <section className="py-24 px-6">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl sm:text-4xl font-bold mb-4">
-              Why Choose Us
-            </h2>
-            <p className="text-gray-400 max-w-2xl mx-auto">
-              Built with cutting-edge technology and designed for the future
-            </p>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {[
-              { icon: Zap, title: 'Lightning Fast', desc: 'Optimized for speed and performance' },
-              { icon: Shield, title: 'Secure by Default', desc: 'Enterprise-grade security built in' },
-              { icon: Globe, title: 'Global Scale', desc: 'Deploy anywhere in the world' },
-            ].map((feature, i) => (
-              <div
-                key={i}
-                className="group relative p-6 bg-white/5 rounded-2xl border border-white/10 hover:border-white/20 transition-all duration-300"
-                style={{ animationDelay: \`\${i * 100}ms\` }}
-              >
-                <div className="w-12 h-12 mb-4 rounded-xl bg-gradient-to-br from-violet-500/20 to-pink-500/20 flex items-center justify-center">
-                  <feature.icon className="w-6 h-6 text-violet-400" />
-                </div>
-                <h3 className="text-xl font-semibold text-white mb-2">{feature.title}</h3>
-                <p className="text-gray-400">{feature.desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-    </div>
-  );
-}
-`,
-      language: 'typescript',
     });
   }
   
@@ -726,8 +1140,9 @@ export class BoltGenerator {
     jobId?: string,
     callbacks?: StreamCallbacks
   ): Promise<GenerationResult> {
-    console.log('🚀 Premium UI Generation starting...');
+    console.log('🚀 AutoForge 2.0 Generation starting...');
     console.log(`   Prompt: "${prompt.slice(0, 100)}..."`);
+    console.log('   Stack: Clerk + Supabase + Stripe');
     
     try {
       if (jobId) {
@@ -740,17 +1155,17 @@ export class BoltGenerator {
         });
       }
       
-      callbacks?.onProgress?.('Starting Premium AI generation...');
+      callbacks?.onProgress?.('Starting AI generation with managed stack...');
       
       // Use streaming for better timeout handling
       const stream = await this.client.messages.stream({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 16000,
         temperature: 0.7,
-        system: PREMIUM_UI_SYSTEM_PROMPT,
+        system: MANAGED_STACK_SYSTEM_PROMPT,
         messages: [{
           role: 'user',
-          content: buildPremiumUserPrompt(prompt)
+          content: buildUserPrompt(prompt)
         }]
       });
       
@@ -771,7 +1186,7 @@ export class BoltGenerator {
       // Sanitize all generated files (fix CSS issues, replace bad classes)
       files = sanitizeGeneratedFiles(files);
       
-      // Add any missing essential files
+      // Add any missing essential files (Clerk, Supabase, etc.)
       files = addMissingEssentialFiles(files, prompt);
       
       console.log('   Generated files:');

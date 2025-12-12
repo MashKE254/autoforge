@@ -2,9 +2,12 @@
 
 /**
  * AutoForge Dashboard
- * * File: src/app/dashboard/page.tsx
- * * Updated: Integrated Smart Clarification System
- * * Flow:
+ * 
+ * File: src/app/dashboard/page.tsx
+ * 
+ * Updated: Fixed generation to use /api/generate and redirect to /job/[jobId]
+ * 
+ * Flow:
  * 1. User enters prompt -> Click Generate
  * 2. API Check: Needs clarification?
  * 3. YES -> Show interactive questions UI -> Enhance Prompt -> Generate
@@ -165,7 +168,7 @@ export default function Dashboard() {
 
   const fetchRecentGenerations = async () => {
     try {
-      const res = await fetch('/api/jobs/recent');
+      const res = await fetch('/api/jobs?limit=5');
       if (res.ok) {
         const data = await res.json();
         setRecentGenerations(data.jobs || []);
@@ -198,7 +201,7 @@ export default function Dashboard() {
       if (!clarifyResponse.ok) {
         // Fallback: If clarify fails, try to generate directly
         console.warn('Clarification check failed, falling back to direct generation');
-        await startGenerationStream(prompt.trim());
+        await startGeneration(prompt.trim());
         return;
       }
 
@@ -213,13 +216,13 @@ export default function Dashboard() {
         setIsClarifying(true);
       } else {
         // NO CLARIFICATION NEEDED: Generate immediately
-        await startGenerationStream(prompt.trim());
+        await startGeneration(prompt.trim());
       }
 
     } catch (error) {
       console.error('Analysis error:', error);
       // Fallback to direct generation on error
-      await startGenerationStream(prompt.trim());
+      await startGeneration(prompt.trim());
     } finally {
       setIsAnalyzing(false);
       setStatusMessage('');
@@ -251,75 +254,60 @@ export default function Dashboard() {
       
       // 2. Start generation with the enhanced prompt
       setIsClarifying(false);
-      await startGenerationStream(enhancedPrompt);
+      await startGeneration(enhancedPrompt);
       
     } catch (err) {
       console.error('Clarification complete error:', err);
       // Fallback: try generating with original prompt
       setIsClarifying(false);
-      await startGenerationStream(prompt.trim());
+      await startGeneration(prompt.trim());
     }
   };
 
   const handleSkipClarification = async () => {
     setIsClarifying(false);
-    await startGenerationStream(prompt.trim());
+    await startGeneration(prompt.trim());
   };
 
-  const startGenerationStream = async (finalPrompt: string) => {
+  /**
+   * Main generation function - calls /api/generate and redirects to /job/[jobId]
+   */
+  const startGeneration = async (finalPrompt: string) => {
     setIsGenerating(true);
     setGeneratedFiles([]);
     setStatusMessage('Starting generation...');
 
     try {
-      const response = await fetch('/api/generate/stream', {
+      // Call the main /api/generate endpoint
+      const response = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt: finalPrompt }),
       });
 
+      const data = await response.json();
+
       if (!response.ok) {
-        throw new Error('Generation failed');
+        throw new Error(data.error || 'Generation failed');
       }
 
-      const reader = response.body?.getReader();
-      const decoder = new TextDecoder();
-      let jobId = '';
-
-      while (reader) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        const chunk = decoder.decode(value);
-        const lines = chunk.split('\n');
-
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            try {
-              const data = JSON.parse(line.slice(6));
-              
-              if (data.type === 'job') {
-                jobId = data.jobId;
-              } else if (data.type === 'file') {
-                setGeneratedFiles(prev => [...prev, data.path]);
-              } else if (data.type === 'complete') {
-                setStatusMessage('Complete! Redirecting...');
-                setTimeout(() => {
-                  router.push(`/generate/result/${jobId}`);
-                }, 500);
-              } else if (data.type === 'error') {
-                throw new Error(data.message);
-              }
-            } catch (e) {
-              console.warn('Error parsing stream chunk', e);
-            }
-          }
-        }
+      // Success! Show file count and redirect
+      setStatusMessage(`Generated ${data.fileCount} files! Redirecting...`);
+      
+      // Update files list for UI
+      if (data.files) {
+        setGeneratedFiles(data.files.map((f: { path: string }) => f.path));
       }
+
+      // Redirect to the AI Workspace
+      setTimeout(() => {
+        router.push(`/generate/result/${data.jobId}`);
+      }, 500);
+
     } catch (error) {
       console.error('Generation error:', error);
       setIsGenerating(false);
-      setStatusMessage('Error occurred');
+      setStatusMessage(error instanceof Error ? error.message : 'Error occurred');
     }
   };
 
@@ -397,7 +385,7 @@ export default function Dashboard() {
   const currentQuestion = questions[currentQuestionIndex];
   const isLastQuestion = currentQuestionIndex === questions.length - 1;
   const answeredCount = Object.keys(answers).length;
-  const progress = questions.length > 0 ? ((currentQuestionIndex) / questions.length) * 100 : 0;
+  const progress = questions.length > 0 ? ((currentQuestionIndex + 1) / questions.length) * 100 : 0;
 
   // ==========================================================================
   // RENDER
@@ -405,169 +393,225 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-[#0A0A0B] text-white">
+      {/* Gradient Background */}
+      <div className="fixed inset-0 pointer-events-none">
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-violet-500/10 rounded-full blur-3xl" />
+        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl" />
+      </div>
 
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      {/* Content */}
+      <div className="relative max-w-4xl mx-auto px-4 py-12">
         
-        {/* CLARIFICATION MODE */}
-        {isClarifying && currentQuestion ? (
-          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-             {/* Header */}
-             <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 rounded-xl bg-violet-600/20 flex items-center justify-center">
-                  <MessageSquare className="w-5 h-5 text-violet-400" />
-                </div>
-                <div className="flex-1">
-                  <h2 className="text-lg font-semibold text-white">Quick Questions</h2>
-                  <p className="text-sm text-gray-400">Help me build exactly what you need</p>
-                </div>
-                <button
-                  onClick={handleSkipClarification}
-                  className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-300 transition-colors"
-                >
-                  <SkipForward className="w-4 h-4" />
-                  Skip
-                </button>
-              </div>
-
-              {/* Progress */}
-              <div className="mb-8">
-                <div className="flex items-center justify-between text-xs text-gray-500 mb-2">
-                  <span>Question {currentQuestionIndex + 1} of {questions.length}</span>
-                  <span>{answeredCount} answered</span>
-                </div>
-                <div className="h-1 bg-white/10 rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-gradient-to-r from-violet-500 to-purple-500 transition-all duration-500"
-                    style={{ width: `${progress}%` }}
-                  />
+        {/* =================================================================== */}
+        {/* GENERATING STATE */}
+        {/* =================================================================== */}
+        {isGenerating ? (
+          <div className="flex flex-col items-center justify-center py-20">
+            <div className="relative mb-8">
+              <div className="w-24 h-24 rounded-full bg-gradient-to-r from-violet-500 to-indigo-500 animate-pulse" />
+              <Sparkles className="absolute inset-0 m-auto w-10 h-10 text-white" />
+            </div>
+            <h2 className="text-2xl font-bold mb-2">Generating Your Application</h2>
+            <p className="text-gray-400 mb-6">{statusMessage || 'This usually takes 30-90 seconds...'}</p>
+            
+            {/* Show generated files */}
+            {generatedFiles.length > 0 && (
+              <div className="w-full max-w-md bg-white/5 rounded-xl p-4 border border-white/10">
+                <p className="text-sm text-gray-400 mb-2">Files generated: {generatedFiles.length}</p>
+                <div className="space-y-1 max-h-40 overflow-y-auto">
+                  {generatedFiles.slice(-5).map((file, i) => (
+                    <div key={i} className="flex items-center gap-2 text-sm text-gray-300">
+                      <FileCode className="w-3 h-3 text-violet-400" />
+                      {file}
+                    </div>
+                  ))}
                 </div>
               </div>
+            )}
+          </div>
+        ) : isClarifying && currentQuestion ? (
+          /* =================================================================== */
+          /* CLARIFICATION MODE */
+          /* =================================================================== */
+          <div className="max-w-2xl mx-auto py-8">
+            {/* Header */}
+            <div className="flex items-center justify-between mb-8">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-indigo-500 flex items-center justify-center">
+                  <MessageSquare className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-semibold">Quick Questions</h2>
+                  <p className="text-sm text-gray-400">Help us understand your vision better</p>
+                </div>
+              </div>
+              <button
+                onClick={handleSkipClarification}
+                className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-400 hover:text-white transition-colors"
+              >
+                <SkipForward className="w-4 h-4" />
+                Skip All
+              </button>
+            </div>
 
-              {/* Question Card */}
-              <div className="bg-[#1A1A1C] rounded-2xl border border-white/10 p-6 mb-6">
-                <div className="mb-6">
-                  <h3 className="text-xl font-medium text-white mb-2">
-                    {currentQuestion.question}
-                  </h3>
+            {/* Progress Bar */}
+            <div className="mb-8">
+              <div className="flex justify-between text-sm text-gray-400 mb-2">
+                <span>Question {currentQuestionIndex + 1} of {questions.length}</span>
+                <span>{answeredCount} answered</span>
+              </div>
+              <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-gradient-to-r from-violet-500 to-indigo-500 transition-all duration-300"
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
+            </div>
+
+            {/* Question Card */}
+            <div className="bg-white/5 rounded-2xl border border-white/10 p-8 mb-6">
+              <div className="flex items-start gap-3 mb-6">
+                <div className="w-8 h-8 rounded-lg bg-violet-500/20 flex items-center justify-center flex-shrink-0">
+                  <HelpCircle className="w-4 h-4 text-violet-400" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-medium mb-1">{currentQuestion.question}</h3>
                   {currentQuestion.why && (
-                    <p className="text-sm text-gray-500 flex items-center gap-1">
-                      <HelpCircle className="w-3 h-3" />
-                      {currentQuestion.why}
-                    </p>
+                    <p className="text-sm text-gray-400">{currentQuestion.why}</p>
                   )}
                 </div>
+              </div>
 
-                {/* Input Types */}
-                <div className="space-y-2">
-                  {currentQuestion.type === 'select' && currentQuestion.options?.map((option) => (
-                    <button
-                      key={option}
-                      onClick={() => handleAnswer(option)}
-                      className={`w-full px-4 py-3 rounded-xl text-left transition-all duration-200 flex items-center justify-between group ${
-                        answers[currentQuestion.id] === option
-                          ? 'bg-violet-600 text-white'
-                          : 'bg-white/5 text-gray-300 hover:bg-white/10 border border-white/10 hover:border-white/20'
-                      }`}
-                    >
-                      <span>{option}</span>
-                      {answers[currentQuestion.id] === option ? (
-                        <CheckCircle2 className="w-5 h-5" />
-                      ) : (
-                        <ChevronRight className="w-5 h-5 opacity-0 group-hover:opacity-50 transition-opacity" />
-                      )}
-                    </button>
-                  ))}
-
-                  {currentQuestion.type === 'multiselect' && currentQuestion.options?.map((option) => {
-                    const isSelected = (multiSelectValues[currentQuestion.id] || []).includes(option);
-                    return (
+              {/* Answer Options */}
+              <div className="space-y-3">
+                {currentQuestion.type === 'select' && currentQuestion.options && (
+                  <div className="grid gap-2">
+                    {currentQuestion.options.map((option) => (
                       <button
                         key={option}
-                        onClick={() => handleMultiSelect(option)}
-                        className={`w-full px-4 py-3 rounded-xl text-left transition-all duration-200 flex items-center justify-between ${
-                          isSelected
-                            ? 'bg-violet-600/20 text-violet-300 border border-violet-500/50'
-                            : 'bg-white/5 text-gray-300 hover:bg-white/10 border border-white/10'
-                        }`}
+                        onClick={() => handleAnswer(option)}
+                        className={`w-full p-3 rounded-xl text-left transition-all ${
+                          answers[currentQuestion.id] === option
+                            ? 'bg-violet-500/20 border-violet-500 text-white'
+                            : 'bg-white/5 border-white/10 text-gray-300 hover:bg-white/10'
+                        } border`}
                       >
-                        <span>{option}</span>
-                        {isSelected && <CheckCircle2 className="w-5 h-5" />}
+                        <div className="flex items-center justify-between">
+                          <span>{option}</span>
+                          {answers[currentQuestion.id] === option && (
+                            <CheckCircle2 className="w-5 h-5 text-violet-400" />
+                          )}
+                        </div>
                       </button>
-                    );
-                  })}
+                    ))}
+                  </div>
+                )}
 
-                   {currentQuestion.type === 'yesno' && (
-                    <div className="flex gap-3">
-                      {['Yes', 'No'].map((option) => (
+                {currentQuestion.type === 'multiselect' && currentQuestion.options && (
+                  <div className="grid gap-2">
+                    {currentQuestion.options.map((option) => {
+                      const selected = multiSelectValues[currentQuestion.id]?.includes(option);
+                      return (
                         <button
                           key={option}
-                          onClick={() => handleAnswer(option)}
-                          className={`flex-1 px-4 py-3 rounded-xl font-medium transition-all duration-200 ${
-                            answers[currentQuestion.id] === option
-                              ? 'bg-violet-600 text-white'
-                              : 'bg-white/5 text-gray-300 hover:bg-white/10 border border-white/10'
-                          }`}
+                          onClick={() => handleMultiSelect(option)}
+                          className={`w-full p-3 rounded-xl text-left transition-all ${
+                            selected
+                              ? 'bg-violet-500/20 border-violet-500 text-white'
+                              : 'bg-white/5 border-white/10 text-gray-300 hover:bg-white/10'
+                          } border`}
                         >
-                          {option}
+                          <div className="flex items-center justify-between">
+                            <span>{option}</span>
+                            {selected && (
+                              <CheckCircle2 className="w-5 h-5 text-violet-400" />
+                            )}
+                          </div>
                         </button>
-                      ))}
-                    </div>
-                  )}
+                      );
+                    })}
+                  </div>
+                )}
 
-                  {currentQuestion.type === 'text' && (
-                    <form onSubmit={handleTextSubmit}>
-                      <input
-                        name="answer"
-                        type="text"
-                        placeholder={currentQuestion.placeholder || 'Type your answer...'}
-                        defaultValue={answers[currentQuestion.id] || ''}
-                        autoFocus
-                        className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 transition-all"
-                      />
+                {currentQuestion.type === 'yesno' && (
+                  <div className="grid grid-cols-2 gap-3">
+                    {['Yes', 'No'].map((option) => (
                       <button
-                        type="submit"
-                        className="w-full mt-3 px-4 py-3 bg-violet-600 text-white rounded-xl font-medium hover:bg-violet-500 transition-colors flex items-center justify-center gap-2"
+                        key={option}
+                        onClick={() => handleAnswer(option)}
+                        className={`p-4 rounded-xl text-center transition-all ${
+                          answers[currentQuestion.id] === option
+                            ? 'bg-violet-500/20 border-violet-500 text-white'
+                            : 'bg-white/5 border-white/10 text-gray-300 hover:bg-white/10'
+                        } border`}
                       >
-                        Continue <ChevronRight className="w-4 h-4" />
+                        {option}
                       </button>
-                    </form>
-                  )}
+                    ))}
+                  </div>
+                )}
 
-                  {/* Continue button for multiselect */}
-                  {currentQuestion.type === 'multiselect' && (multiSelectValues[currentQuestion.id] || []).length > 0 && (
+                {currentQuestion.type === 'text' && (
+                  <form onSubmit={handleTextSubmit}>
+                    <input
+                      type="text"
+                      name="answer"
+                      placeholder={currentQuestion.placeholder || 'Type your answer...'}
+                      defaultValue={answers[currentQuestion.id] || ''}
+                      className="w-full p-4 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-violet-500"
+                      autoFocus
+                    />
                     <button
-                      onClick={() => !isLastQuestion && setCurrentQuestionIndex(prev => prev + 1)}
-                      className="w-full mt-4 px-4 py-3 bg-violet-600 text-white rounded-xl font-medium hover:bg-violet-500 transition-colors flex items-center justify-center gap-2"
+                      type="submit"
+                      className="mt-3 px-6 py-2.5 bg-violet-600 text-white rounded-xl font-medium hover:bg-violet-500 transition-colors flex items-center justify-center gap-2"
                     >
                       Continue <ChevronRight className="w-4 h-4" />
                     </button>
-                  )}
-                </div>
-              </div>
+                  </form>
+                )}
 
-              {/* Navigation */}
-              <div className="flex items-center justify-between">
-                <button
-                  onClick={goBack}
-                  disabled={currentQuestionIndex === 0}
-                  className="flex items-center gap-2 px-4 py-2 text-sm text-gray-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                >
-                  <ArrowLeft className="w-4 h-4" /> Back
-                </button>
-                
-                {isLastQuestion && answeredCount >= questions.length - 1 && (
+                {/* Continue button for multiselect */}
+                {currentQuestion.type === 'multiselect' && (
                   <button
-                    onClick={handleClarificationComplete}
-                    className="px-6 py-3 bg-gradient-to-r from-violet-600 to-purple-600 text-white rounded-xl font-medium hover:from-violet-500 hover:to-purple-500 transition-all shadow-lg shadow-violet-500/25 flex items-center gap-2"
+                    onClick={() => {
+                      if (currentQuestionIndex < questions.length - 1) {
+                        setCurrentQuestionIndex(prev => prev + 1);
+                      }
+                    }}
+                    disabled={!multiSelectValues[currentQuestion.id]?.length}
+                    className="mt-3 px-6 py-2.5 bg-violet-600 text-white rounded-xl font-medium hover:bg-violet-500 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <Sparkles className="w-4 h-4" />
-                    Generate App
+                    Continue <ChevronRight className="w-4 h-4" />
                   </button>
                 )}
               </div>
+            </div>
+
+            {/* Navigation */}
+            <div className="flex items-center justify-between">
+              <button
+                onClick={goBack}
+                disabled={currentQuestionIndex === 0}
+                className="flex items-center gap-2 px-4 py-2 text-sm text-gray-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              >
+                <ArrowLeft className="w-4 h-4" /> Back
+              </button>
+              
+              {isLastQuestion && answeredCount >= questions.length - 1 && (
+                <button
+                  onClick={handleClarificationComplete}
+                  className="px-6 py-3 bg-gradient-to-r from-violet-600 to-purple-600 text-white rounded-xl font-medium hover:from-violet-500 hover:to-purple-500 transition-all shadow-lg shadow-violet-500/25 flex items-center gap-2"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  Generate App
+                </button>
+              )}
+            </div>
           </div>
         ) : (
+          /* =================================================================== */
           /* STANDARD DASHBOARD MODE */
+          /* =================================================================== */
           <>
             {/* Hero Section */}
             <div className="text-center mb-12">
@@ -589,7 +633,7 @@ export default function Dashboard() {
                         handleInitialSubmit();
                       }
                     }}
-                    placeholder="Describe your application..."
+                    placeholder="Describe your application... (e.g., 'A Kanban board like Trello with drag-and-drop')"
                     rows={4}
                     disabled={isGenerating || isAnalyzing}
                     className="w-full bg-transparent text-white placeholder:text-gray-500 p-4 text-lg focus:outline-none resize-none disabled:opacity-50 font-sans"
@@ -624,104 +668,77 @@ export default function Dashboard() {
                   </div>
                 </div>
               </div>
-
-              {/* Status Message */}
-              {(statusMessage || (isGenerating && generatedFiles.length > 0)) && (
-                <div className="mt-4 p-4 bg-[#1A1A1C] border border-white/10 rounded-xl animate-in fade-in slide-in-from-top-2">
-                  <div className="flex items-center gap-2 text-sm text-gray-400 mb-3">
-                    <Loader2 className="w-4 h-4 animate-spin text-violet-400" />
-                    <span>{statusMessage || 'Generating files...'}</span>
-                  </div>
-                  {generatedFiles.length > 0 && (
-                    <div className="flex flex-wrap gap-2">
-                      {generatedFiles.map((file, i) => (
-                        <div
-                          key={i}
-                          className="flex items-center gap-1.5 px-2 py-1 bg-violet-500/10 text-violet-300 rounded text-xs animate-in zoom-in duration-300"
-                        >
-                          <FileCode className="w-3 h-3" />
-                          <span className="truncate max-w-[200px]">{file}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
             </div>
 
-            {/* Quick Start Templates */}
+            {/* Quick Templates */}
             <div className="mb-12">
-              <h2 className="text-sm font-medium text-gray-400 mb-4">Quick Start Templates</h2>
+              <h3 className="text-sm font-medium text-gray-400 mb-4">Quick Start Templates</h3>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {quickTemplates.map((template) => (
-                  <button
-                    key={template.id}
-                    onClick={() => handleTemplateClick(template)}
-                    disabled={isGenerating || isAnalyzing}
-                    className="group relative bg-[#1A1A1C] border border-white/10 rounded-xl p-4 text-left hover:border-white/20 hover:bg-white/5 transition-all disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
-                  >
-                    <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${template.color} flex items-center justify-center mb-3`}>
-                      <template.icon className="w-5 h-5 text-white" />
-                    </div>
-                    <h3 className="font-medium text-sm mb-1 text-white group-hover:text-violet-200 transition-colors">
-                      {template.title}
-                    </h3>
-                    <p className="text-xs text-gray-500 line-clamp-2">{template.prompt}</p>
-                  </button>
-                ))}
+                {quickTemplates.map((template) => {
+                  const Icon = template.icon;
+                  return (
+                    <button
+                      key={template.id}
+                      onClick={() => handleTemplateClick(template)}
+                      className="group p-4 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 hover:border-white/20 transition-all text-left"
+                    >
+                      <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${template.color} flex items-center justify-center mb-3`}>
+                        <Icon className="w-4 h-4 text-white" />
+                      </div>
+                      <p className="text-sm font-medium text-white">{template.title}</p>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
-            {/* Recent Generations List */}
+            {/* Recent Generations */}
             <div>
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-sm font-medium text-gray-400">Recent Generations</h2>
-                {recentGenerations.length > 0 && (
-                  <Link href="/projects" className="text-xs text-gray-500 hover:text-white transition-colors">
-                    View all →
-                  </Link>
-                )}
+                <h3 className="text-sm font-medium text-gray-400">Recent Generations</h3>
+                <Link 
+                  href="/projects" 
+                  className="text-sm text-violet-400 hover:text-violet-300 transition-colors"
+                >
+                  View all →
+                </Link>
               </div>
-
+              
               {isLoading ? (
-                <div className="flex items-center justify-center py-12 border border-white/5 rounded-xl bg-[#1A1A1C]/50">
-                  <Loader2 className="w-6 h-6 text-gray-400 animate-spin" />
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="w-6 h-6 text-gray-500 animate-spin" />
                 </div>
               ) : recentGenerations.length === 0 ? (
-                <div className="text-center py-12 bg-[#1A1A1C] border border-white/10 rounded-xl">
-                  <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center mx-auto mb-3">
-                    <Code2 className="w-6 h-6 text-gray-500" />
-                  </div>
-                  <p className="text-gray-400 mb-1">No generations yet</p>
-                  <p className="text-xs text-gray-500">Start by describing what you want to build</p>
+                <div className="text-center py-12 bg-white/5 rounded-xl border border-white/10">
+                  <Code2 className="w-10 h-10 text-gray-600 mx-auto mb-3" />
+                  <p className="text-gray-400">No generations yet</p>
+                  <p className="text-sm text-gray-500">Your generated apps will appear here</p>
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {recentGenerations.slice(0, 5).map((gen) => (
+                  {recentGenerations.map((gen) => (
                     <Link
                       key={gen.id}
-                      href={`/generate/result/${gen.id}`}
-                      className="flex items-center gap-4 p-4 bg-[#1A1A1C] border border-white/10 rounded-xl hover:border-white/20 hover:bg-white/5 transition-all group"
+                      href={`/job/${gen.id}`}
+                      className="flex items-center justify-between p-4 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 hover:border-white/20 transition-all group"
                     >
-                      <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-violet-500/20 to-indigo-500/20 flex items-center justify-center shrink-0">
-                        <Code2 className="w-5 h-5 text-violet-400" />
-                      </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-white truncate pr-4">{gen.prompt}</p>
+                        <p className="text-sm text-white truncate pr-4">{gen.prompt}</p>
                         <div className="flex items-center gap-3 mt-1">
-                          <StatusBadge status={gen.status} />
                           <span className="text-xs text-gray-500">
                             {new Date(gen.createdAt).toLocaleDateString()}
                           </span>
-                          {gen.fileCount !== undefined && (
-                            <span className="text-xs text-gray-500 flex items-center gap-1">
-                               <span className="w-1 h-1 rounded-full bg-gray-600"/>
-                               {gen.fileCount} files
+                          {gen.fileCount && (
+                            <span className="text-xs text-gray-500">
+                              {gen.fileCount} files
                             </span>
                           )}
                         </div>
                       </div>
-                      <ChevronRight className="w-5 h-5 text-gray-600 group-hover:text-white transition-colors shrink-0" />
+                      <div className="flex items-center gap-3">
+                        <StatusBadge status={gen.status} />
+                        <ChevronRight className="w-4 h-4 text-gray-500 group-hover:text-white transition-colors" />
+                      </div>
                     </Link>
                   ))}
                 </div>
@@ -729,7 +746,7 @@ export default function Dashboard() {
             </div>
           </>
         )}
-      </main>
+      </div>
     </div>
   );
 }

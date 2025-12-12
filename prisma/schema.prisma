@@ -1,13 +1,16 @@
 // =============================================================================
-// AUTOFORGE PRISMA SCHEMA - WITH MONETIZATION
+// AUTOFORGE PRISMA SCHEMA - VERSION 2.0
 // =============================================================================
 // 
 // File: prisma/schema.prisma
 // 
-// This is the COMPLETE schema including all existing models plus new
-// monetization models for Stripe Connect, subscriptions, and revenue tracking.
+// Complete schema including:
+// - Authentication (NextAuth for platform)
+// - Generation tracking
+// - Monetization (Stripe Connect, subscriptions, payouts)
+// - NEW: Managed Infrastructure (Supabase, Clerk, Vercel auto-provisioning)
 //
-// To apply: npx prisma migrate dev --name add_monetization
+// To apply: npx prisma migrate dev --name add_managed_infrastructure
 // =============================================================================
 
 generator client {
@@ -22,7 +25,7 @@ datasource db {
 }
 
 // =============================================================================
-// AUTHENTICATION MODELS (NextAuth)
+// AUTHENTICATION MODELS (NextAuth - for AutoForge platform itself)
 // =============================================================================
 
 model Account {
@@ -60,46 +63,49 @@ model VerificationToken {
 }
 
 // =============================================================================
-// USER MODEL (Extended with Stripe fields)
+// USER MODEL
 // =============================================================================
 
 model User {
-  id             String          @id @default(cuid())
-  name           String?
-  email          String?         @unique
-  emailVerified  DateTime?
-  image          String?
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @default(now()) @updatedAt
+  id               String    @id @default(cuid())
+  name             String?
+  email            String?   @unique
+  emailVerified    DateTime?
+  image            String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @default(now()) @updatedAt
   
   // Stripe Customer ID (for platform subscription)
-  stripeCustomerId String?       @unique
+  stripeCustomerId String?   @unique
   
   // Relations
   accounts         Account[]
   sessions         Session[]
   generationJobs   GenerationJob[]
   
-  // NEW: Monetization relations
+  // Monetization relations
   subscription     CreatorSubscription?
   connectedAccount StripeConnectedAccount?
   publishedApps    PublishedApp[]
   payouts          Payout[]
+  
+  // NEW: Managed Infrastructure
+  managedProjects  ManagedProject[]
 
   @@index([email])
   @@index([stripeCustomerId])
 }
 
 // =============================================================================
-// CREATOR SUBSCRIPTION (Platform billing - $49/mo)
+// CREATOR SUBSCRIPTION (Platform billing - $49/$99/$249 per month)
 // =============================================================================
 
 model CreatorSubscription {
-  id                     String   @id @default(cuid())
-  userId                 String   @unique
+  id                     String             @id @default(cuid())
+  userId                 String             @unique
   
   // Stripe subscription details
-  stripeSubscriptionId   String   @unique
+  stripeSubscriptionId   String             @unique
   stripePriceId          String
   stripeCurrentPeriodEnd DateTime
   
@@ -111,15 +117,15 @@ model CreatorSubscription {
   trialEndsAt            DateTime?
   
   // Cancellation
-  cancelAtPeriodEnd      Boolean  @default(false)
+  cancelAtPeriodEnd      Boolean            @default(false)
   canceledAt             DateTime?
   
   // Timestamps
-  createdAt              DateTime @default(now())
-  updatedAt              DateTime @updatedAt
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime           @updatedAt
   
   // Relations
-  user                   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user                   User               @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([status])
   @@index([stripeSubscriptionId])
@@ -137,6 +143,7 @@ enum SubscriptionStatus {
 }
 
 enum PlanTier {
+  FREE       // Limited features, 1 app, 14-day preview expiration
   STARTER    // $49/mo - 5 published apps, 8% fee
   PRO        // $99/mo - 20 published apps, 6% fee
   BUSINESS   // $249/mo - Unlimited apps, 4% fee
@@ -185,7 +192,7 @@ model StripeConnectedAccount {
 // =============================================================================
 
 model PublishedApp {
-  id                String   @id @default(cuid())
+  id                String       @id @default(cuid())
   
   // Owner
   userId            String
@@ -193,13 +200,13 @@ model PublishedApp {
   
   // App details
   name              String
-  slug              String   @unique  // For subdomain: {slug}.autoforge.app
+  slug              String       @unique  // For subdomain: {slug}.autoforge.app
   description       String?
   logoUrl           String?
   
   // Custom domain (optional)
-  customDomain      String?  @unique
-  domainVerified    Boolean  @default(false)
+  customDomain      String?      @unique
+  domainVerified    Boolean      @default(false)
   
   // Deployment
   deploymentUrl     String?
@@ -208,38 +215,38 @@ model PublishedApp {
   // Pricing configuration
   pricingModel      PricingModel @default(SUBSCRIPTION)
   
-  // Subscription pricing
-  monthlyPrice      Int?     // In cents (e.g., 900 = $9.00)
-  yearlyPrice       Int?     // In cents
+  // Subscription pricing (in cents)
+  monthlyPrice      Int?         // e.g., 900 = $9.00
+  yearlyPrice       Int?
   
-  // One-time pricing
-  oneTimePrice      Int?     // In cents
+  // One-time pricing (in cents)
+  oneTimePrice      Int?
   
   // Free trial
-  trialDays         Int      @default(0)
+  trialDays         Int          @default(0)
   
-  // Stripe product/price IDs (created when app is published)
-  stripeProductId   String?
+  // Stripe product/price IDs
+  stripeProductId    String?
   stripePriceMonthly String?
   stripePriceYearly  String?
   stripePriceOneTime String?
   
   // App status
-  status            AppStatus @default(DRAFT)
+  status            AppStatus    @default(DRAFT)
   publishedAt       DateTime?
   
   // Analytics
-  totalRevenue      Int      @default(0) // In cents
-  totalCustomers    Int      @default(0)
-  monthlyRecurring  Int      @default(0) // MRR in cents
+  totalRevenue      Int          @default(0) // In cents
+  totalCustomers    Int          @default(0)
+  monthlyRecurring  Int          @default(0) // MRR in cents
   
   // Timestamps
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
   
   // Relations
-  user              User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  generationJob     GenerationJob   @relation(fields: [generationJobId], references: [id], onDelete: Cascade)
+  user              User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  generationJob     GenerationJob  @relation(fields: [generationJobId], references: [id], onDelete: Cascade)
   customers         AppCustomer[]
   transactions      Transaction[]
 
@@ -269,7 +276,7 @@ enum AppStatus {
 // =============================================================================
 
 model AppCustomer {
-  id                     String   @id @default(cuid())
+  id                     String       @id @default(cuid())
   
   // Which app
   publishedAppId         String
@@ -283,19 +290,19 @@ model AppCustomer {
   
   // Subscription details (if subscription model)
   stripeSubscriptionId   String?
-  subscriptionStatus     String?  // active, canceled, past_due, etc.
+  subscriptionStatus     String?      // active, canceled, past_due, etc.
   currentPeriodEnd       DateTime?
   
   // One-time purchase (if one-time model)
   purchasedAt            DateTime?
   
   // Access control
-  hasAccess              Boolean  @default(true)
+  hasAccess              Boolean      @default(true)
   accessExpiresAt        DateTime?
   
   // Timestamps
-  createdAt              DateTime @default(now())
-  updatedAt              DateTime @updatedAt
+  createdAt              DateTime     @default(now())
+  updatedAt              DateTime     @updatedAt
   
   // Relations
   publishedApp           PublishedApp @relation(fields: [publishedAppId], references: [id], onDelete: Cascade)
@@ -311,45 +318,45 @@ model AppCustomer {
 // =============================================================================
 
 model Transaction {
-  id                  String   @id @default(cuid())
+  id                    String            @id @default(cuid())
   
   // Which app
-  publishedAppId      String
+  publishedAppId        String
   
   // Stripe payment details
-  stripePaymentIntentId String? @unique
-  stripeChargeId      String?
-  stripeInvoiceId     String?
+  stripePaymentIntentId String?           @unique
+  stripeChargeId        String?
+  stripeInvoiceId       String?
   
   // Amounts (all in cents)
-  grossAmount         Int      // Total charged to customer
-  stripeFee           Int      // Stripe's processing fee
-  platformFee         Int      // AutoForge's 8% fee
-  netAmount           Int      // Creator receives this
+  grossAmount           Int               // Total charged to customer
+  stripeFee             Int               // Stripe's processing fee
+  platformFee           Int               // AutoForge's fee (4-8%)
+  netAmount             Int               // Creator receives this
   
   // Fee percentage at time of transaction
-  platformFeePercent  Float    @default(8.0)
+  platformFeePercent    Float             @default(8.0)
   
   // Currency
-  currency            String   @default("usd")
+  currency              String            @default("usd")
   
   // Transaction type
-  type                TransactionType
+  type                  TransactionType
   
   // Status
-  status              TransactionStatus @default(PENDING)
+  status                TransactionStatus @default(PENDING)
   
   // Customer info
-  customerEmail       String?
+  customerEmail         String?
   
   // Timestamps
-  createdAt           DateTime @default(now())
-  paidOutAt           DateTime?
+  createdAt             DateTime          @default(now())
+  paidOutAt             DateTime?
   
   // Relations
-  publishedApp        PublishedApp @relation(fields: [publishedAppId], references: [id], onDelete: Cascade)
-  payout              Payout?      @relation(fields: [payoutId], references: [id])
-  payoutId            String?
+  publishedApp          PublishedApp      @relation(fields: [publishedAppId], references: [id], onDelete: Cascade)
+  payout                Payout?           @relation(fields: [payoutId], references: [id])
+  payoutId              String?
 
   @@index([publishedAppId])
   @@index([status])
@@ -377,18 +384,18 @@ enum TransactionStatus {
 // =============================================================================
 
 model Payout {
-  id                  String   @id @default(cuid())
+  id                  String       @id @default(cuid())
   
   // Creator
   userId              String
   
   // Stripe payout details
-  stripePayoutId      String?  @unique
+  stripePayoutId      String?      @unique
   stripeTransferId    String?
   
   // Amount
-  amount              Int      // In cents
-  currency            String   @default("usd")
+  amount              Int          // In cents
+  currency            String       @default("usd")
   
   // Period this payout covers
   periodStart         DateTime
@@ -402,7 +409,7 @@ model Payout {
   failureMessage      String?
   
   // Timestamps
-  createdAt           DateTime @default(now())
+  createdAt           DateTime     @default(now())
   arrivedAt           DateTime?
   
   // Relations
@@ -423,7 +430,215 @@ enum PayoutStatus {
 }
 
 // =============================================================================
-// EXISTING MODELS (Unchanged - included for completeness)
+// MANAGED INFRASTRUCTURE (NEW - AutoForge 2.0)
+// =============================================================================
+// These models support the "Go Live" feature that auto-provisions:
+// - Supabase (PostgreSQL database)
+// - Clerk (Authentication)
+// - Stripe (Payments in test mode)
+// - Vercel (Hosting)
+// =============================================================================
+
+model ManagedProject {
+  id                    String               @id @default(cuid())
+  userId                String
+  generationJobId       String               @unique
+  
+  // Supabase
+  supabaseProjectId     String?
+  supabaseUrl           String?
+  supabaseAnonKey       String?
+  supabaseServiceKey    String?              // Encrypted
+  supabaseDbPassword    String?              // Encrypted
+  
+  // Clerk (if using per-project instances)
+  clerkInstanceId       String?
+  clerkPublishableKey   String?
+  clerkSecretKey        String?              // Encrypted
+  
+  // Vercel
+  vercelProjectId       String?
+  vercelDeploymentId    String?
+  vercelUrl             String?
+  vercelTeamId          String?
+  
+  // Stripe (Test Mode for Preview)
+  stripeTestPublishable String?
+  stripeTestSecret      String?              // Encrypted
+  stripeTestWebhookId   String?
+  stripeTestWebhookSecret String?            // Encrypted
+  
+  // Production Stripe (after Go Live)
+  stripeLivePublishable String?
+  stripeLiveSecret      String?              // Encrypted
+  stripeLiveWebhookId   String?
+  stripeLiveWebhookSecret String?            // Encrypted
+  
+  // Environment Variables (JSON blob of all env vars)
+  environmentVariables  Json?
+  
+  // Status
+  status                ManagedProjectStatus @default(PROVISIONING)
+  provisioningStep      String?              // Current step being executed
+  errorMessage          String?
+  
+  // Lifecycle
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+  expiresAt             DateTime?            // For free tier cleanup (7 days)
+  
+  // Whether this is a paid/permanent project
+  isPermanent           Boolean              @default(false)
+  
+  // Relations
+  user                  User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  generationJob         GenerationJob        @relation(fields: [generationJobId], references: [id], onDelete: Cascade)
+  provisioningLogs      ProvisioningLog[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([expiresAt])
+  @@index([vercelUrl])
+}
+
+enum ManagedProjectStatus {
+  PROVISIONING       // Initial state - setting up infrastructure
+  DATABASE_READY     // Supabase provisioned
+  AUTH_READY         // Clerk configured
+  PAYMENTS_READY     // Stripe test mode configured
+  PREVIEW_READY      // Deployed to Vercel, ready to use
+  DEPLOYED           // Production deployment complete
+  UPGRADING          // Being upgraded (e.g., adding production Stripe)
+  ERROR              // Something went wrong
+  EXPIRED            // Free tier expired and cleaned up
+  DELETED            // Manually deleted by user
+}
+
+// Track each provisioning step for debugging and progress reporting
+model ProvisioningLog {
+  id                String         @id @default(cuid())
+  managedProjectId  String
+  
+  // Step information
+  step              String         // 'supabase_create', 'supabase_migrate', 'clerk_setup', etc.
+  status            String         // 'started', 'completed', 'failed', 'skipped'
+  
+  // Timing
+  startedAt         DateTime       @default(now())
+  completedAt       DateTime?
+  duration          Int?           // Duration in milliseconds
+  
+  // Error information
+  errorMessage      String?
+  errorStack        String?
+  
+  // Additional metadata
+  metadata          Json?          // Any extra info about this step
+  
+  // Relations
+  managedProject    ManagedProject @relation(fields: [managedProjectId], references: [id], onDelete: Cascade)
+
+  @@index([managedProjectId])
+  @@index([step])
+  @@index([status])
+  @@index([startedAt])
+}
+
+// =============================================================================
+// GENERATION MODELS
+// =============================================================================
+
+model GenerationJob {
+  id                    String                @id @default(cuid())
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+  status                JobStatus             @default(PENDING)
+  prompt                String
+  enhancedPrompt        String?
+  enhancementUsed       Boolean               @default(false)
+  planJson              String?
+  result                String?
+  filesJson             String?
+  userId                String
+  blueprint             String?
+  blueprintApprovedAt   DateTime?
+  blueprintGeneratedAt  DateTime?
+  completedModules      Int                   @default(0)
+  errorLog              String?
+  failedModules         Int                   @default(0)
+  generationCompletedAt DateTime?
+  generationStartedAt   DateTime?
+  totalModules          Int                   @default(0)
+  
+  // Relations
+  files                 GeneratedFile[]
+  user                  User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  modules               GenerationModule[]
+  telemetry             GenerationTelemetry[]
+  previewSessions       PreviewSession[]
+  deployments           Deployment[]
+  
+  // Monetization relation
+  publishedApps         PublishedApp[]
+  
+  // NEW: Managed Infrastructure relation
+  managedProject        ManagedProject?
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model GeneratedFile {
+  id              String        @id @default(cuid())
+  createdAt       DateTime      @default(now())
+  generationJobId String
+  path            String
+  content         String
+  language        String
+  size            Int           @default(0)
+  generationJob   GenerationJob @relation(fields: [generationJobId], references: [id], onDelete: Cascade)
+
+  @@unique([generationJobId, path])
+  @@index([generationJobId])
+}
+
+model GenerationModule {
+  id              String        @id @default(cuid())
+  createdAt       DateTime      @default(now())
+  generationJobId String
+  moduleId        String
+  status          String        @default("pending")
+  generatedCode   String?
+  error           String?
+  generationJob   GenerationJob @relation(fields: [generationJobId], references: [id], onDelete: Cascade)
+  module          Module        @relation(fields: [moduleId], references: [id])
+
+  @@unique([generationJobId, moduleId])
+  @@index([generationJobId])
+  @@index([status])
+}
+
+model GenerationTelemetry {
+  id              String        @id @default(cuid())
+  createdAt       DateTime      @default(now())
+  generationJobId String
+  moduleId        String?
+  eventType       String
+  errorMessage    String?
+  stackTrace      String?
+  metadata        Json?
+  generationJob   GenerationJob @relation(fields: [generationJobId], references: [id], onDelete: Cascade)
+  module          Module?       @relation(fields: [moduleId], references: [id])
+
+  @@index([generationJobId])
+  @@index([moduleId])
+  @@index([eventType])
+  @@index([createdAt])
+}
+
+// =============================================================================
+// MODULE SYSTEM
 // =============================================================================
 
 model Module {
@@ -462,91 +677,6 @@ model ModuleDependency {
   @@index([dependsOnId])
 }
 
-model GenerationJob {
-  id                    String                @id @default(cuid())
-  createdAt             DateTime              @default(now())
-  updatedAt             DateTime              @updatedAt
-  status                JobStatus             @default(PENDING)
-  prompt                String
-  enhancedPrompt        String?
-  enhancementUsed       Boolean               @default(false)
-  planJson              String?
-  result                String?
-  userId                String
-  blueprint             String?
-  blueprintApprovedAt   DateTime?
-  blueprintGeneratedAt  DateTime?
-  completedModules      Int                   @default(0)
-  errorLog              String?
-  failedModules         Int                   @default(0)
-  generationCompletedAt DateTime?
-  generationStartedAt   DateTime?
-  totalModules          Int                   @default(0)
-  
-  // Relations
-  files                 GeneratedFile[]
-  user                  User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  modules               GenerationModule[]
-  telemetry             GenerationTelemetry[]
-  previewSessions       PreviewSession[]
-  deployments           Deployment[]
-  
-  // NEW: Monetization relation
-  publishedApps         PublishedApp[]
-
-  @@index([userId])
-  @@index([status])
-  @@index([createdAt])
-}
-
-model GenerationModule {
-  id              String        @id @default(cuid())
-  createdAt       DateTime      @default(now())
-  generationJobId String
-  moduleId        String
-  status          String        @default("pending")
-  generatedCode   String?
-  error           String?
-  generationJob   GenerationJob @relation(fields: [generationJobId], references: [id], onDelete: Cascade)
-  module          Module        @relation(fields: [moduleId], references: [id])
-
-  @@unique([generationJobId, moduleId])
-  @@index([generationJobId])
-  @@index([status])
-}
-
-model GeneratedFile {
-  id              String        @id @default(cuid())
-  createdAt       DateTime      @default(now())
-  generationJobId String
-  path            String
-  content         String
-  language        String
-  size            Int           @default(0)
-  generationJob   GenerationJob @relation(fields: [generationJobId], references: [id], onDelete: Cascade)
-
-  @@unique([generationJobId, path])
-  @@index([generationJobId])
-}
-
-model GenerationTelemetry {
-  id              String        @id @default(cuid())
-  createdAt       DateTime      @default(now())
-  generationJobId String
-  moduleId        String?
-  eventType       String
-  errorMessage    String?
-  stackTrace      String?
-  metadata        Json?
-  generationJob   GenerationJob @relation(fields: [generationJobId], references: [id], onDelete: Cascade)
-  module          Module?       @relation(fields: [moduleId], references: [id])
-
-  @@index([generationJobId])
-  @@index([moduleId])
-  @@index([eventType])
-  @@index([createdAt])
-}
-
 model ModuleImprovement {
   id              String   @id @default(cuid())
   createdAt       DateTime @default(now())
@@ -561,6 +691,23 @@ model ModuleImprovement {
   @@index([moduleId])
   @@index([createdAt])
 }
+
+enum ModuleCategory {
+  AUTH
+  PAYMENT
+  DATABASE
+  UI
+  API
+  WORKFLOW
+  AGENT
+  INFRASTRUCTURE
+  UTILITY
+  TESTING
+}
+
+// =============================================================================
+// PREVIEW AND DEPLOYMENT
+// =============================================================================
 
 model PreviewSession {
   id              String        @id @default(cuid())
@@ -602,19 +749,6 @@ enum DeploymentStatus {
   CANCELLED
 }
 
-enum ModuleCategory {
-  AUTH
-  PAYMENT
-  DATABASE
-  UI
-  API
-  WORKFLOW
-  AGENT
-  INFRASTRUCTURE
-  UTILITY
-  TESTING
-}
-
 enum JobStatus {
   PENDING
   RUNNING
@@ -626,4 +760,88 @@ enum JobStatus {
   TESTING
   DEPLOYING
   CANCELLED
+}
+
+// =============================================================================
+// INFRASTRUCTURE CLEANUP TRACKING
+// =============================================================================
+// Track when free tier projects should be cleaned up
+
+model CleanupTask {
+  id                String        @id @default(cuid())
+  managedProjectId  String
+  
+  // What to clean up
+  cleanupType       CleanupType
+  resourceId        String        // Supabase project ID, Vercel project ID, etc.
+  
+  // Scheduling
+  scheduledFor      DateTime
+  
+  // Status
+  status            CleanupStatus @default(PENDING)
+  
+  // Execution
+  executedAt        DateTime?
+  errorMessage      String?
+  retryCount        Int           @default(0)
+  
+  // Timestamps
+  createdAt         DateTime      @default(now())
+
+  @@index([scheduledFor])
+  @@index([status])
+  @@index([managedProjectId])
+}
+
+enum CleanupType {
+  SUPABASE_PROJECT
+  CLERK_INSTANCE
+  VERCEL_PROJECT
+  STRIPE_WEBHOOK
+  FULL_PROJECT      // Clean up everything
+}
+
+enum CleanupStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+// =============================================================================
+// USAGE TRACKING (For billing and limits)
+// =============================================================================
+
+model UsageRecord {
+  id          String      @id @default(cuid())
+  userId      String
+  
+  // What was used
+  usageType   UsageType
+  quantity    Int         @default(1)
+  
+  // Context
+  resourceId  String?     // generationJobId, managedProjectId, etc.
+  
+  // Billing period
+  periodStart DateTime
+  periodEnd   DateTime
+  
+  // Timestamps
+  createdAt   DateTime    @default(now())
+
+  @@index([userId])
+  @@index([usageType])
+  @@index([periodStart, periodEnd])
+  @@index([createdAt])
+}
+
+enum UsageType {
+  GENERATION          // App generation
+  MANAGED_PROJECT     // Provisioned infrastructure
+  DEPLOYMENT          // Vercel deployment
+  AI_TOKENS           // Claude API tokens used
+  BANDWIDTH           // Data transfer
 }

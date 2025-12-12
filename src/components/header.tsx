@@ -6,7 +6,7 @@
  * File: src/components/header.tsx
  * 
  * Sleek, minimal header with glass effect
- * Updated with monetization links (Billing, Earnings)
+ * Updated with Recommender link and monetization links (Billing, Earnings)
  */
 
 import Link from 'next/link';
@@ -24,10 +24,12 @@ import {
   HelpCircle,
   DollarSign,
   Sparkles,
+  Lightbulb,
 } from 'lucide-react';
 
 const navLinks = [
   { href: '/dashboard', label: 'Dashboard' },
+  { href: '/recommend', label: 'Recommender', icon: Lightbulb },
   { href: '/projects', label: 'Projects' },
   { href: '/pricing', label: 'Pricing' },
   { href: '/docs', label: 'Docs' },
@@ -56,23 +58,29 @@ export default function Header() {
                 height={50} 
                 className="rounded-lg" 
               />
-</Link>
+            </Link>
 
             {/* Desktop Nav */}
             <nav className="hidden md:flex items-center gap-1">
-              {navLinks.map((link) => (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
-                    pathname === link.href || pathname.startsWith(link.href + '/')
-                      ? 'text-white bg-white/10'
-                      : 'text-gray-400 hover:text-white hover:bg-white/5'
-                  }`}
-                >
-                  {link.label}
-                </Link>
-              ))}
+              {navLinks.map((link) => {
+                const isActive = pathname === link.href || pathname.startsWith(link.href + '/');
+                const IconComponent = 'icon' in link ? link.icon : null;
+                
+                return (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    className={`px-3 py-1.5 text-sm rounded-md transition-colors flex items-center gap-1.5 ${
+                      isActive
+                        ? 'text-white bg-white/10'
+                        : 'text-gray-400 hover:text-white hover:bg-white/5'
+                    } ${link.href === '/recommend' ? 'text-violet-400 hover:text-violet-300' : ''}`}
+                  >
+                    {IconComponent && <IconComponent className="w-3.5 h-3.5" />}
+                    {link.label}
+                  </Link>
+                );
+              })}
             </nav>
           </div>
 
@@ -110,6 +118,14 @@ export default function Header() {
 
                       {/* Main Links */}
                       <div className="py-1">
+                        <Link
+                          href="/recommend"
+                          className="flex items-center gap-2 px-4 py-2 text-sm text-violet-400 hover:text-violet-300 hover:bg-white/5"
+                          onClick={() => setUserMenuOpen(false)}
+                        >
+                          <Lightbulb className="w-4 h-4" />
+                          Software Recommender
+                        </Link>
                         <Link
                           href="/settings"
                           className="flex items-center gap-2 px-4 py-2 text-sm text-gray-400 hover:text-white hover:bg-white/5"
@@ -202,25 +218,38 @@ export default function Header() {
       {mobileMenuOpen && (
         <div className="md:hidden border-t border-white/10 bg-[#0A0A0B]">
           <nav className="px-4 py-4 space-y-1">
-            {navLinks.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                onClick={() => setMobileMenuOpen(false)}
-                className={`block px-3 py-2 rounded-lg transition-colors ${
-                  pathname === link.href || pathname.startsWith(link.href + '/')
-                    ? 'text-white bg-white/10'
-                    : 'text-gray-400 hover:text-white hover:bg-white/5'
-                }`}
-              >
-                {link.label}
-              </Link>
-            ))}
+            {navLinks.map((link) => {
+              const IconComponent = 'icon' in link ? link.icon : null;
+              
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
+                    pathname === link.href || pathname.startsWith(link.href + '/')
+                      ? 'text-white bg-white/10'
+                      : 'text-gray-400 hover:text-white hover:bg-white/5'
+                  } ${link.href === '/recommend' ? 'text-violet-400' : ''}`}
+                >
+                  {IconComponent && <IconComponent className="w-4 h-4" />}
+                  {link.label}
+                </Link>
+              );
+            })}
             
             {/* Mobile-only links when logged in */}
             {session && (
               <>
                 <div className="border-t border-white/10 my-2 pt-2">
+                  <Link
+                    href="/recommend"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center gap-2 px-3 py-2 rounded-lg text-violet-400 hover:text-violet-300 hover:bg-white/5"
+                  >
+                    <Lightbulb className="w-4 h-4" />
+                    Software Recommender
+                  </Link>
                   <Link
                     href="/dashboard/billing"
                     onClick={() => setMobileMenuOpen(false)}
