@@ -168,10 +168,14 @@ export default function GenerationInterface() {
     setStatusMessage('Creating your application...');
     
     try {
-      const response = await fetch('/api/generate/instant', {
+      // ✅ UPDATED: Points to Trigger.dev background worker
+      const response = await fetch('/api/generate/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: finalPrompt }),
+        body: JSON.stringify({ 
+          prompt: finalPrompt,
+          originalPrompt: prompt // vital for tracking enhancements
+        }),
       });
       
       const data = await response.json();
@@ -193,7 +197,7 @@ export default function GenerationInterface() {
       setError(err instanceof Error ? err.message : 'Generation failed');
       setState('error');
     }
-  };
+  }; 
   
   // ============================================================================
   // CLARIFICATION HANDLERS

@@ -2,10 +2,9 @@
 
 /**
  * Projects Page
- * 
- * File: src/app/projects/page.tsx
- * 
- * Displays all user's generated projects with delete functionality
+ * * File: src/app/projects/page.tsx
+ * * Displays all user's generated projects with delete functionality.
+ * Updated to force fresh data fetching and use the correct API endpoint.
  */
 
 import { useState, useEffect } from 'react';
@@ -20,7 +19,6 @@ import {
   XCircle,
   AlertCircle,
   FolderOpen,
-  ChevronRight,
   Search,
   LayoutGrid,
   List,
@@ -29,7 +27,9 @@ import {
   ExternalLink,
 } from 'lucide-react';
 
-// --- Types ---
+// ============================================================================
+// TYPES
+// ============================================================================
 
 interface Project {
   id: string;
@@ -39,7 +39,9 @@ interface Project {
   fileCount: number;
 }
 
-// --- Sub-components ---
+// ============================================================================
+// SUB-COMPONENTS
+// ============================================================================
 
 function StatusBadge({ status }: { status: string }) {
   const config: Record<string, { color: string; icon: React.ElementType; label: string }> = {
@@ -155,7 +157,9 @@ function EmptyState() {
   );
 }
 
-// --- Main Component ---
+// ============================================================================
+// MAIN COMPONENT
+// ============================================================================
 
 export default function ProjectsPage() {
   const { data: session, status: authStatus } = useSession();
@@ -195,13 +199,25 @@ export default function ProjectsPage() {
   const fetchProjects = async () => {
     try {
       setIsLoading(true);
-      const res = await fetch('/api/jobs/recent?limit=100');
+      // FIXED: Added cache: 'no-store' to ensure we always get fresh data
+      // FIXED: Using limit=100 to fetch more history
+      const res = await fetch('/api/jobs?limit=100', { 
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        }
+      });
+      
       if (res.ok) {
         const data = await res.json();
+        console.log('✅ Fetched projects:', data.jobs); // Debug log
         setProjects(data.jobs || []);
+      } else {
+        console.error('❌ API response not ok:', res.status);
       }
     } catch (error) {
-      console.error('Failed to fetch projects:', error);
+      console.error('❌ Failed to fetch projects:', error);
     } finally {
       setIsLoading(false);
     }
@@ -251,8 +267,9 @@ export default function ProjectsPage() {
     project.prompt.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // Format date
+  // Format date helper
   const formatDate = (dateString: string) => {
+    if (!dateString) return 'Unknown date';
     const date = new Date(dateString);
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
@@ -459,7 +476,7 @@ export default function ProjectsPage() {
               </div>
             )}
 
-            {/* No Results */}
+            {/* No Results Search */}
             {filteredProjects.length === 0 && searchQuery && (
               <div className="text-center py-12">
                 <Search className="w-12 h-12 text-gray-600 mx-auto mb-4" />
