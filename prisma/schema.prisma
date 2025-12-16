@@ -710,6 +710,11 @@ enum ModuleCategory {
   PDF             // PDF generation (invoices, reports)
   PACKAGE_MANAGER // Package manager integration (npm, pip, composer)
   MARKETPLACE     // Marketplace & revenue split logic
+  BOT             // Chat bots (Discord, Slack, Telegram, WhatsApp, Twitter)
+  SCRAPING        // Web scraping & browser automation (Puppeteer, Playwright)
+  ECOMMERCE       // E-commerce (cart, checkout, inventory, shipping, tax)
+  MESSAGING       // Messaging (SMS, push notifications, email templates)
+  CMS             // Content management (rich text, media, versioning, SEO)
 }
 
 // =============================================================================

@@ -11,6 +11,11 @@ import { generateVectorDBModule, getVectorDBModulePrompt } from './vector-db';
 import { generatePDFModule, getPDFModulePrompt } from './pdf';
 import { generatePackageManagerModule, getPackageManagerModulePrompt } from './package-manager';
 import { generateMarketplaceModule, getMarketplaceModulePrompt } from './marketplace';
+import { generateBotModule, getBotModulePrompt } from './bot';
+import { generateScrapingModule, getScrapingModulePrompt } from './scraping';
+import { generateEcommerceModule, getEcommerceModulePrompt } from './ecommerce';
+import { generateMessagingModule, getMessagingModulePrompt } from './messaging';
+import { generateCMSModule, getCMSModulePrompt } from './cms';
 
 export interface DetectedModule {
   category: string;
@@ -180,6 +185,134 @@ export function detectRequiredModules(userPrompt: string): DetectedModule[] {
       category: 'MARKETPLACE',
       config,
       prompt: getMarketplaceModulePrompt(config),
+      ...output,
+    });
+  }
+
+  // Bot (Discord, Slack, Telegram, etc.)
+  if (
+    /bot|discord|slack|telegram|whatsapp|twitter bot|chatbot|chat bot/i.test(userPrompt)
+  ) {
+    const platforms: Array<'discord' | 'slack' | 'telegram' | 'whatsapp' | 'twitter'> = [];
+
+    if (/discord/i.test(userPrompt)) platforms.push('discord');
+    if (/slack/i.test(userPrompt)) platforms.push('slack');
+    if (/telegram/i.test(userPrompt)) platforms.push('telegram');
+    if (/whatsapp/i.test(userPrompt)) platforms.push('whatsapp');
+    if (/twitter/i.test(userPrompt)) platforms.push('twitter');
+
+    // Default to Discord if no specific platform mentioned but "bot" keyword present
+    if (platforms.length === 0) platforms.push('discord');
+
+    const config = {
+      platforms,
+      features: ['slash-commands' as const, 'message-handling' as const, 'webhooks' as const],
+    };
+
+    const output = generateBotModule(config);
+
+    modules.push({
+      category: 'BOT',
+      config,
+      prompt: getBotModulePrompt(config),
+      ...output,
+    });
+  }
+
+  // Web Scraping & Browser Automation
+  if (
+    /scrap|scraping|crawler|crawling|puppeteer|playwright|browser automation|web scraping|data extraction|screenshot/i.test(userPrompt)
+  ) {
+    const config = {
+      engine: 'puppeteer' as const,
+      features: ['screenshots' as const, 'data-extraction' as const, 'form-automation' as const],
+    };
+
+    const output = generateScrapingModule(config);
+
+    modules.push({
+      category: 'SCRAPING',
+      config,
+      prompt: getScrapingModulePrompt(config),
+      ...output,
+    });
+  }
+
+  // E-commerce
+  if (
+    /e-commerce|ecommerce|shop|store|cart|checkout|product|inventory|shipping|order/i.test(userPrompt)
+  ) {
+    const features: Array<'cart' | 'checkout' | 'inventory' | 'shipping' | 'tax' | 'discounts' | 'reviews'> = ['cart', 'checkout', 'inventory'];
+
+    if (/shipping|ship|delivery/i.test(userPrompt)) features.push('shipping');
+    if (/tax/i.test(userPrompt)) features.push('tax');
+    if (/discount|coupon|promo/i.test(userPrompt)) features.push('discounts');
+    if (/review|rating/i.test(userPrompt)) features.push('reviews');
+
+    const config = {
+      features,
+      currency: 'USD',
+      shippingProviders: ['manual' as const],
+    };
+
+    const output = generateEcommerceModule(config);
+
+    modules.push({
+      category: 'ECOMMERCE',
+      config,
+      prompt: getEcommerceModulePrompt(config),
+      ...output,
+    });
+  }
+
+  // Messaging (SMS, Push, Email Templates)
+  if (
+    /sms|text message|push notification|email template|twilio|sendgrid|resend|email campaign/i.test(userPrompt)
+  ) {
+    const providers: Array<'twilio' | 'resend' | 'sendgrid' | 'firebase'> = [];
+
+    if (/sms|text|twilio/i.test(userPrompt)) providers.push('twilio');
+    if (/email|resend/i.test(userPrompt)) providers.push('resend');
+    if (/sendgrid/i.test(userPrompt)) providers.push('sendgrid');
+    if (/push|firebase/i.test(userPrompt)) providers.push('firebase');
+
+    // Default to Resend for email
+    if (providers.length === 0) providers.push('resend');
+
+    const config = {
+      providers,
+      features: ['sms' as const, 'email' as const, 'templates' as const],
+    };
+
+    const output = generateMessagingModule(config);
+
+    modules.push({
+      category: 'MESSAGING',
+      config,
+      prompt: getMessagingModulePrompt(config),
+      ...output,
+    });
+  }
+
+  // CMS (Content Management System)
+  if (
+    /cms|content management|blog|article|post|rich text|editor|tiptap|media library|publishing/i.test(userPrompt)
+  ) {
+    const features: Array<'rich-text' | 'media-library' | 'versioning' | 'seo' | 'scheduling' | 'multi-language'> = ['rich-text', 'media-library'];
+
+    if (/version|history/i.test(userPrompt)) features.push('versioning');
+    if (/seo/i.test(userPrompt)) features.push('seo');
+    if (/schedule|publish later/i.test(userPrompt)) features.push('scheduling');
+    if (/multi-language|i18n|translation/i.test(userPrompt)) features.push('multi-language');
+
+    const config = { features };
+
+    const output = generateCMSModule(config);
+
+    modules.push({
+      category: 'CMS',
+      config,
+      prompt: getCMSModulePrompt(config),
       ...output,
     });
   }
