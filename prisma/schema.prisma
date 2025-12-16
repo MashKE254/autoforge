@@ -703,6 +703,18 @@ enum ModuleCategory {
   INFRASTRUCTURE
   UTILITY
   TESTING
+  GITHUB          // GitHub integration (OAuth, webhooks, PR automation)
+  STORAGE         // File storage (S3, Supabase Storage, uploads)
+  VECTOR_DB       // Vector databases (Pinecone, pgvector, Chroma)
+  REALTIME        // Real-time/WebSocket (Socket.io, Supabase Realtime)
+  PDF             // PDF generation (invoices, reports)
+  PACKAGE_MANAGER // Package manager integration (npm, pip, composer)
+  MARKETPLACE     // Marketplace & revenue split logic
+  BOT             // Chat bots (Discord, Slack, Telegram, WhatsApp, Twitter)
+  SCRAPING        // Web scraping & browser automation (Puppeteer, Playwright)
+  ECOMMERCE       // E-commerce (cart, checkout, inventory, shipping, tax)
+  MESSAGING       // Messaging (SMS, push notifications, email templates)
+  CMS             // Content management (rich text, media, versioning, SEO)
 }
 
 // =============================================================================
