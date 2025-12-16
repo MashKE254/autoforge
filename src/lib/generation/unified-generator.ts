@@ -15,6 +15,7 @@ import { BoltGenerator, boltGenerator } from './bolt-generator';
 import { OrchestratedGenerator, orchestratedGenerator } from './orchestrated-generator';
 import { GeneratedFile, GenerationResult, StreamCallbacks } from './bolt-generator';
 import { prisma } from '../prisma';
+import { detectRequiredModules, getModulesPrompt, getModuleFiles, DetectedModule } from '../modules/module-detector';
 
 // ============================================================================
 // COMPLEXITY DETECTION
@@ -132,31 +133,62 @@ export class UnifiedGenerator {
     callbacks?: StreamCallbacks & {
       onComplexityAnalysis?: (analysis: ComplexityAnalysis) => void;
       onStrategySelected?: (strategy: 'simple' | 'orchestrated') => void;
+      onModulesDetected?: (modules: DetectedModule[]) => void;
     }
   ): Promise<GenerationResult> {
+    // Detect required modules
+    const detectedModules = detectRequiredModules(prompt);
+    callbacks?.onModulesDetected?.(detectedModules);
+
+    console.log(`\n🔍 Module Detection:`);
+    console.log(`   Detected ${detectedModules.length} modules: ${detectedModules.map(m => m.category).join(', ') || 'none'}`);
+
+    // Enhance prompt with module requirements
+    let enhancedPrompt = prompt;
+    if (detectedModules.length > 0) {
+      const modulesPrompt = getModulesPrompt(detectedModules);
+      enhancedPrompt = `${prompt}\n\n${modulesPrompt}`;
+      callbacks?.onProgress?.(`Detected ${detectedModules.length} modules to include...`);
+    }
+
     // Analyze complexity
     const complexity = analyzePromptComplexity(prompt);
     callbacks?.onComplexityAnalysis?.(complexity);
-    
+
     console.log(`\n📊 Complexity Analysis:`);
     console.log(`   Score: ${complexity.score}/100`);
     console.log(`   Complex: ${complexity.isComplex}`);
     console.log(`   Reasons: ${complexity.reasons.join(', ')}`);
-    
+
     // Choose strategy
+    let result: GenerationResult;
+
     if (complexity.isComplex) {
       console.log(`\n🔧 Using ORCHESTRATED generation (multi-pass)`);
       callbacks?.onStrategySelected?.('orchestrated');
       callbacks?.onProgress?.(`Complex application detected (score: ${complexity.score}). Using multi-pass generation...`);
-      
-      return this.orchestratedGenerator.generate(prompt, jobId, callbacks);
+
+      result = await this.orchestratedGenerator.generate(enhancedPrompt, jobId, callbacks);
     } else {
       console.log(`\n⚡ Using SIMPLE generation (single-pass)`);
       callbacks?.onStrategySelected?.('simple');
       callbacks?.onProgress?.('Starting single-pass generation...');
-      
-      return this.boltGenerator.generate(prompt, jobId, callbacks);
+
+      result = await this.boltGenerator.generate(enhancedPrompt, jobId, callbacks);
     }
+
+    // Append module files to generated files
+    if (detectedModules.length > 0) {
+      const moduleFiles = getModuleFiles(detectedModules);
+      console.log(`\n📦 Adding ${moduleFiles.length} module files`);
+
+      result.files.push(...moduleFiles.map(f => ({
+        path: f.path,
+        content: f.content,
+      })));
+    }
+
+    return result;
   }
   
   /**
