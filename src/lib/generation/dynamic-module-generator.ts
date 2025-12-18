@@ -118,9 +118,9 @@ Return a JSON object with this EXACT structure. CRITICAL: All code content must 
 }
 
 ESCAPING RULES FOR JSON:
-- Replace all " with \\"
-- Replace all \` with \\`
-- Replace all \\ with \\\\
+- Replace all double quotes with escaped quotes
+- Replace all backticks with escaped backticks
+- Replace all backslashes with double backslashes
 - Keep code simple and avoid complex template literals in JSON
 
 IMPORTANT RULES:
