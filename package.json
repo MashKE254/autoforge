@@ -68,7 +68,7 @@
     "semver": "^7.5.4",
     "shadcn": "^3.5.0",
     "sharp": "^0.33.1",
-    "slack-bolt": "^3.17.0",
+    "@slack/bolt": "^3.17.0",
     "socket.io": "^4.6.1",
     "socket.io-client": "^4.6.1",
     "stripe": "^20.0.0",
