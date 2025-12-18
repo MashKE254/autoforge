@@ -330,5 +330,5 @@ export function generateCMSModule(config: CMSModuleConfig): CMSModuleOutput {
 }
 
 export function getCMSModulePrompt(config: CMSModuleConfig): string {
-  return \`## CMS Module\n\nFeatures: \${config.features?.join(', ') || 'rich-text, media-library, versioning'}\n\nIncludes rich text editor (TipTap), media library, post versioning, and SEO management.\`;
+  return `## CMS Module\n\nFeatures: ${config.features?.join(', ') || 'rich-text, media-library, versioning'}\n\nIncludes rich text editor (TipTap), media library, post versioning, and SEO management.`;
 }

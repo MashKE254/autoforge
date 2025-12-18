@@ -138,5 +138,5 @@ export function generateVectorDBModule(config: VectorDBModuleConfig): VectorDBMo
 }
 
 export function getVectorDBModulePrompt(config: VectorDBModuleConfig): string {
-  return \`## Vector Database Module\n\nProvider: \${config.provider}\nDimension: \${config.dimension || 1536}\n\nIncludes vector storage, similarity search, and embedding management.\`;
+  return `## Vector Database Module\n\nProvider: ${config.provider}\nDimension: ${config.dimension || 1536}\n\nIncludes vector storage, similarity search, and embedding management.`;
 }
