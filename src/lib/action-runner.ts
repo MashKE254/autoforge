@@ -182,35 +182,51 @@ export class ActionRunner {
   private async runShellAction(action: ShellAction): Promise<void> {
     const command = action.content.trim();
     this.output(`\n$ ${command}`);
-    
+
     const { executable, args } = this.parseCommand(command);
-    
+
     const process = await this.webContainer.spawn(executable, args);
-    
+
+    let outputBuffer = '';
+    let hasError = false;
+
     // Stream output to terminal
     process.output.pipeTo(
       new WritableStream({
         write: (data) => {
-          // Filter noisy output but keep important messages
+          outputBuffer += data;
+
+          // Check for errors
+          if (data.toLowerCase().includes('error') || data.includes('ERR!')) {
+            hasError = true;
+          }
+
+          // Show all output for failed commands or important messages
           if (this.shouldShowOutput(data)) {
             this.output(data);
           }
         },
       })
     );
-    
+
     // Wait for command to complete
     const exitCode = await process.exit;
-    
+
     if (exitCode !== 0) {
       this.output(`⚠️ Command exited with code ${exitCode}`);
-      
-      // Auto-retry npm install with --force on failure
-      if (command.includes('npm install') && !command.includes('--force')) {
-        this.output(`🔄 Retrying with --force...`);
+
+      // Show buffered output if we haven't shown much yet
+      if (!hasError && outputBuffer) {
+        this.output('\n📋 Full command output:');
+        this.output(outputBuffer);
+      }
+
+      // Auto-retry npm install with --force on failure (but only once)
+      if (command.includes('npm install') && !command.includes('--force') && !command.includes('--legacy-peer-deps')) {
+        this.output(`🔄 Retrying with --legacy-peer-deps...`);
         await this.runShellAction({
           type: 'shell',
-          content: command.replace('npm install', 'npm install --force')
+          content: command + ' --legacy-peer-deps'
         });
       }
     }
