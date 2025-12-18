@@ -59,43 +59,74 @@ interface ArchitecturePlan {
 // SYSTEM PROMPTS FOR EACH PASS
 // ============================================================================
 
-const ARCHITECTURE_PROMPT = `You are a senior software architect. Analyze the user's request and create a detailed architecture plan.
+const ARCHITECTURE_PROMPT = `You are a WORLD-CLASS software architect designing PRODUCTION-GRADE applications that exceed bolt.new and lovable.dev quality.
+
+AutoForge is NOT for MVPs. Design a COMPLETE, PROFESSIONAL system architecture.
 
 OUTPUT FORMAT (JSON only, no markdown):
 {
   "appName": "app-name-kebab-case",
-  "description": "One sentence description",
-  "features": ["feature1", "feature2", ...],
+  "description": "Professional one-sentence description",
+  "features": ["feature1", "feature2", "feature3", ...],
   "pages": [
-    { "path": "app/page.tsx", "description": "Main dashboard" },
-    { "path": "app/settings/page.tsx", "description": "User settings" }
+    { "path": "app/page.tsx", "description": "Landing/Dashboard" },
+    { "path": "app/dashboard/page.tsx", "description": "Main dashboard with stats" },
+    { "path": "app/dashboard/[resource]/page.tsx", "description": "Resource management" },
+    { "path": "app/dashboard/analytics/page.tsx", "description": "Analytics dashboard" },
+    { "path": "app/dashboard/settings/page.tsx", "description": "User settings" },
+    { "path": "app/(auth)/sign-in/[[...sign-in]]/page.tsx", "description": "Clerk sign-in" },
+    { "path": "app/(auth)/sign-up/[[...sign-up]]/page.tsx", "description": "Clerk sign-up" }
   ],
   "components": [
-    { "name": "Sidebar", "description": "Main navigation sidebar" },
-    { "name": "DataTable", "description": "Reusable data table component" }
+    { "name": "Sidebar", "description": "Navigation sidebar with active states" },
+    { "name": "Header", "description": "Top bar with user menu" },
+    { "name": "DataTable", "description": "Advanced table with sorting/filtering" },
+    { "name": "StatsCard", "description": "Dashboard stat card" },
+    { "name": "CreateForm", "description": "Create resource form with validation" },
+    { "name": "EditDialog", "description": "Edit resource modal" },
+    ... 15-25 total components
   ],
   "apiRoutes": [
-    { "path": "app/api/users/route.ts", "description": "User CRUD operations" }
+    { "path": "app/api/resources/route.ts", "description": "Resource CRUD with auth" },
+    { "path": "app/api/resources/[id]/route.ts", "description": "Single resource operations" },
+    { "path": "app/api/analytics/route.ts", "description": "Analytics data endpoint" },
+    ... 10-20 total API routes
   ],
   "dataModels": [
-    { "name": "User", "fields": ["id", "email", "name", "createdAt"] },
-    { "name": "Account", "fields": ["id", "userId", "broker", "accountId", "balance"] }
+    { "name": "users", "fields": ["id uuid", "clerk_user_id text", "email text", "name text", "created_at timestamp", "updated_at timestamp"] },
+    { "name": "resources", "fields": ["id uuid", "user_id uuid FK", "title text", "description text", "status text", "created_at timestamp", "updated_at timestamp"] },
+    ... comprehensive data model
   ]
 }
 
-Rules:
-- Be comprehensive but realistic
-- Max 8-10 pages
-- Max 15-20 components
-- Max 10-15 API routes
-- Focus on the CORE features that make the app functional`;
+CRITICAL REQUIREMENTS:
+- Design for 30-50+ total files
+- Include authentication pages (Clerk)
+- Include dashboard with sidebar navigation
+- Include analytics/reporting pages
+- Design complete data model with relationships
+- Plan for loading states, error states, empty states
+- Include comprehensive component library (buttons, cards, inputs, dialogs, tables, etc.)
+- API routes must have full CRUD operations
+- Database must have proper relationships and indexes`;
 
-const INFRASTRUCTURE_PROMPT = `You are a senior full-stack engineer. Generate the infrastructure files for a Next.js application.
+const INFRASTRUCTURE_PROMPT = `You are a WORLD-CLASS full-stack engineer building PRODUCTION-GRADE infrastructure that exceeds bolt.new and lovable.dev quality.
+
+AutoForge builds PROFESSIONAL, INDUSTRY-GRADE applications - NOT MVPs.
 
 OUTPUT FORMAT - Generate files using this exact format:
 <file path="package.json">
 {content}
 </file>
+
+MANDATORY REQUIREMENTS:
+- Complete implementations (NO TODOs, NO placeholders)
+- Production-ready error handling
+- Type-safe throughout (no 'any' types)
+- Professional UI with animations
+- Comprehensive validation
+- Proper database schema
+- Full authentication flow
 
 REQUIRED FILES:
 1. package.json - with ALL needed dependencies
