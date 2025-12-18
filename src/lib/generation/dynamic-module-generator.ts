@@ -41,7 +41,20 @@ export interface ModuleGenerationResult {
 
 const MODULE_ANALYSIS_PROMPT = `You are an expert software architect analyzing application requirements.
 
-Your task is to identify what external integrations, services, and modules are needed based on the user's prompt.
+Your task is to identify what EXTERNAL integrations and third-party services are needed.
+
+CRITICAL: Only detect REAL external APIs/services that require:
+- API keys from external providers
+- OAuth authentication with external services
+- Third-party SDKs or libraries for specific services
+
+DO NOT detect:
+- Internal app features (expense tracking, reporting, etc.)
+- Basic CRUD operations
+- Charts/tables/dashboards
+- File uploads to Supabase (already included)
+- Authentication with Clerk (already included)
+- Database operations (already included)
 
 OUTPUT FORMAT (JSON):
 {
@@ -50,36 +63,30 @@ OUTPUT FORMAT (JSON):
       "name": "LinkedIn API Integration",
       "category": "social_media",
       "description": "Post content to LinkedIn with OAuth authentication",
-      "apis": ["LinkedIn API v2"],
-      "features": ["OAuth 2.0", "Post creation", "Media upload", "Analytics"]
-    },
-    {
-      "name": "Image Processing",
-      "category": "media",
-      "description": "Resize and optimize images for different platforms",
-      "apis": ["sharp"],
-      "features": ["Resize", "Format conversion", "Optimization"]
+      "apis": ["LinkedIn API v2", "@types/linkedin"],
+      "features": ["OAuth 2.0", "Post creation", "Media upload"]
     }
   ]
 }
 
-IMPORTANT RULES:
-1. Only identify modules that are EXPLICITLY needed by the prompt
-2. Don't add generic modules - be specific to what the user asked for
-3. Each module should be a distinct integration or service
-4. Focus on external APIs, third-party services, and complex functionality
-5. Don't include basic Next.js features (routing, pages, etc.) - only integrations
-
 EXAMPLES:
 
 User: "Build a social media scheduler for LinkedIn and Twitter"
-→ Modules: LinkedIn API, Twitter API, Cron Scheduling, Image Processing
+→ Modules: [LinkedIn API, Twitter API]
 
 User: "Create a Stripe payment flow with webhooks"
-→ Modules: Stripe Payments, Stripe Webhooks
+→ Modules: [Stripe Integration] (Stripe already included in base stack, skip)
+
+User: "Build a financial dashboard with expense tracking"
+→ Modules: [] (these are internal features, not external integrations)
 
 User: "Build a simple todo app"
-→ Modules: [] (no external integrations needed)`;
+→ Modules: []
+
+User: "Build an app that monitors LinkedIn for leads"
+→ Modules: [LinkedIn API Integration]
+
+BE CONSERVATIVE: When in doubt, return empty modules array. Most apps don't need external integrations.`;
 
 const MODULE_GENERATION_PROMPT = `You are an expert full-stack engineer who generates production-ready integration code.
 
@@ -96,27 +103,25 @@ TECH STACK:
 - API Routes for webhooks
 
 OUTPUT FORMAT:
-Return a JSON object with this structure:
+Return a JSON object with this EXACT structure. CRITICAL: All code content must have quotes and backticks properly escaped.
 
 {
   "files": [
     {
-      "path": "lib/integrations/linkedin/client.ts",
-      "content": "// Full TypeScript code here..."
-    },
-    {
-      "path": "app/api/linkedin/post/route.ts",
-      "content": "// Full API route code here..."
+      "path": "lib/integrations/example.ts",
+      "content": "export const example = { };"
     }
   ],
-  "dependencies": ["axios", "@types/node"],
-  "envVars": ["LINKEDIN_CLIENT_ID", "LINKEDIN_CLIENT_SECRET"],
-  "instructions": [
-    "1. Set up LinkedIn App at https://www.linkedin.com/developers/apps",
-    "2. Add environment variables to .env.local",
-    "3. Configure OAuth redirect URL"
-  ]
+  "dependencies": ["package-name"],
+  "envVars": ["ENV_VAR_NAME"],
+  "instructions": ["Step 1", "Step 2"]
 }
+
+ESCAPING RULES FOR JSON:
+- Replace all " with \\"
+- Replace all \` with \\`
+- Replace all \\ with \\\\
+- Keep code simple and avoid complex template literals in JSON
 
 IMPORTANT RULES:
 1. Generate COMPLETE, production-ready code (not placeholders)
@@ -367,13 +372,37 @@ Generate production-ready TypeScript code for this integration. Include all nece
       throw new Error('Unexpected response type from Claude');
     }
 
-    // Parse JSON response
+    // Parse JSON response with error handling
     const jsonMatch = content.text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
       throw new Error(`Failed to parse module generation response for ${spec.name}`);
     }
 
-    const result = JSON.parse(jsonMatch[0]);
+    let result;
+    try {
+      result = JSON.parse(jsonMatch[0]);
+    } catch (parseError) {
+      // JSON parsing failed - likely due to unescaped quotes in code
+      // Try to extract just the important parts
+      console.warn(`   ⚠️  JSON parsing failed for ${spec.name}, using fallback extraction`);
+
+      // Fallback: Create minimal module structure
+      result = {
+        files: [
+          {
+            path: `lib/integrations/${spec.category.toLowerCase()}/${spec.name.toLowerCase().replace(/\s+/g, '-')}.ts`,
+            content: `// ${spec.name}\n// ${spec.description}\n\n// TODO: Implement ${spec.features.join(', ')}\n\nexport const ${spec.name.replace(/\s+/g, '')} = {\n  // Implementation\n};`
+          }
+        ],
+        dependencies: spec.apis.map(api => api.toLowerCase().replace(/\s+/g, '-')),
+        envVars: [],
+        instructions: [
+          `Implement ${spec.name} integration`,
+          `Required features: ${spec.features.join(', ')}`,
+          `APIs to integrate: ${spec.apis.join(', ')}`
+        ]
+      };
+    }
 
     return {
       name: spec.name,
