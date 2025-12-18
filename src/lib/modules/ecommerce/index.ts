@@ -408,5 +408,5 @@ export function generateEcommerceModule(config: EcommerceModuleConfig): Ecommerc
 }
 
 export function getEcommerceModulePrompt(config: EcommerceModuleConfig): string {
-  return \`## E-commerce Module\n\nFeatures: \${config.features?.join(', ') || 'cart, checkout, inventory'}\nCurrency: \${config.currency || 'USD'}\n\nIncludes shopping cart, Stripe checkout, order management, and inventory tracking.\`;
+  return `## E-commerce Module\n\nFeatures: ${config.features?.join(', ') || 'cart, checkout, inventory'}\nCurrency: ${config.currency || 'USD'}\n\nIncludes shopping cart, Stripe checkout, order management, and inventory tracking.`;
 }

@@ -218,5 +218,5 @@ export function generateScrapingModule(config: ScrapingModuleConfig): ScrapingMo
 }
 
 export function getScrapingModulePrompt(config: ScrapingModuleConfig): string {
-  return \`## Web Scraping Module\n\nEngine: \${config.engine}\nFeatures: \${config.features?.join(', ') || 'basic scraping'}\n\nIncludes browser automation, data extraction, and screenshot capture.\`;
+  return `## Web Scraping Module\n\nEngine: ${config.engine}\nFeatures: ${config.features?.join(', ') || 'basic scraping'}\n\nIncludes browser automation, data extraction, and screenshot capture.`;
 }

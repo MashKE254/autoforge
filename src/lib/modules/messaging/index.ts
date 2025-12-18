@@ -251,5 +251,5 @@ export function generateMessagingModule(config: MessagingModuleConfig): Messagin
 }
 
 export function getMessagingModulePrompt(config: MessagingModuleConfig): string {
-  return \`## Messaging Module\n\nProviders: \${config.providers.join(', ')}\nFeatures: \${config.features?.join(', ') || 'SMS, email, push'}\n\nIncludes multi-channel messaging with SMS, email templates, and push notifications.\`;
+  return `## Messaging Module\n\nProviders: ${config.providers.join(', ')}\nFeatures: ${config.features?.join(', ') || 'SMS, email, push'}\n\nIncludes multi-channel messaging with SMS, email templates, and push notifications.`;
 }

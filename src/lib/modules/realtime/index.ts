@@ -189,5 +189,5 @@ export function generateRealtimeModule(config: RealtimeModuleConfig): RealtimeMo
 }
 
 export function getRealtimeModulePrompt(config: RealtimeModuleConfig): string {
-  return \`## Real-time Module\n\nProvider: \${config.provider}\nChannels: \${config.channels?.join(', ') || 'default'}\n\nIncludes WebSocket connection, room-based messaging, and real-time updates.\`;
+  return `## Real-time Module\n\nProvider: ${config.provider}\nChannels: ${config.channels?.join(', ') || 'default'}\n\nIncludes WebSocket connection, room-based messaging, and real-time updates.`;
 }
