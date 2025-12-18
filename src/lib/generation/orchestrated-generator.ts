@@ -370,13 +370,62 @@ function mergeFiles(existing: GeneratedFile[], newFiles: GeneratedFile[]): Gener
 
 export class OrchestratedGenerator {
   private client: Anthropic;
-  
+
   constructor() {
     this.client = new Anthropic({
       apiKey: process.env.ANTHROPIC_API_KEY!,
     });
   }
-  
+
+  /**
+   * Retry API calls with exponential backoff when hitting rate limits
+   */
+  private async retryWithBackoff<T>(
+    fn: () => Promise<T>,
+    maxRetries: number = 3,
+    callbacks?: StreamCallbacks
+  ): Promise<T> {
+    let lastError: any;
+
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        return await fn();
+      } catch (error: any) {
+        lastError = error;
+
+        // Check if it's a rate limit error (429)
+        const isRateLimit = error?.status === 429 || error?.error?.type === 'rate_limit_error';
+
+        if (!isRateLimit || attempt === maxRetries) {
+          throw error; // Not a rate limit or out of retries
+        }
+
+        // Extract retry-after header or use exponential backoff
+        const retryAfter = error?.headers?.['retry-after'] || Math.pow(2, attempt) * 10;
+        const waitSeconds = typeof retryAfter === 'string' ? parseInt(retryAfter) : retryAfter;
+
+        callbacks?.onProgress?.(
+          `⏳ Rate limit hit. Waiting ${waitSeconds}s before retry (${attempt + 1}/${maxRetries})...`
+        );
+
+        await new Promise(resolve => setTimeout(resolve, waitSeconds * 1000));
+      }
+    }
+
+    throw lastError;
+  }
+
+  /**
+   * Add delay between passes to avoid rate limits
+   */
+  private async delayBetweenPasses(passNumber: number, callbacks?: StreamCallbacks): Promise<void> {
+    // Add 2-second delay between passes to avoid hitting rate limits
+    if (passNumber > 1) {
+      callbacks?.onProgress?.('⏳ Brief pause to avoid rate limits...');
+      await new Promise(resolve => setTimeout(resolve, 2000));
+    }
+  }
+
   /**
    * Generate a complete application from a complex prompt
    */
@@ -400,16 +449,21 @@ export class OrchestratedGenerator {
       }
       
       // ========== PASS 1: Architecture Planning ==========
+      await this.delayBetweenPasses(1, callbacks);
       callbacks?.onPassStart?.(1, 'Architecture Planning');
       callbacks?.onProgress?.('Pass 1/6: Analyzing requirements and planning architecture...');
-      
-      const archResponse = await this.client.messages.create({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 4000,
-        temperature: 0.3,
-        system: ARCHITECTURE_PROMPT,
-        messages: [{ role: 'user', content: `Create an architecture plan for:\n\n${prompt}` }]
-      });
+
+      const archResponse = await this.retryWithBackoff(
+        () => this.client.messages.create({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 3000, // Reduced to stay under 8K rate limit
+          temperature: 0.3,
+          system: ARCHITECTURE_PROMPT,
+          messages: [{ role: 'user', content: `Create an architecture plan for:\n\n${prompt}` }]
+        }),
+        3,
+        callbacks
+      );
       
       const archText = archResponse.content
         .filter((b): b is Anthropic.TextBlock => b.type === 'text')
@@ -429,23 +483,28 @@ export class OrchestratedGenerator {
       callbacks?.onPassComplete?.(1, 0);
       
       // ========== PASS 2: Infrastructure ==========
+      await this.delayBetweenPasses(2, callbacks);
       callbacks?.onPassStart?.(2, 'Infrastructure');
       callbacks?.onProgress?.('Pass 2/6: Generating infrastructure (package.json, configs, types)...');
-      
+
       const infraContext = `
 App: ${plan.appName}
 Description: ${plan.description}
 Features: ${plan.features.join(', ')}
 Data Models: ${plan.dataModels.map(m => `${m.name}(${m.fields.join(', ')})`).join('; ')}
 `;
-      
-      const infraResponse = await this.client.messages.create({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 8000,
-        temperature: 0.2,
-        system: INFRASTRUCTURE_PROMPT,
-        messages: [{ role: 'user', content: `Generate infrastructure for:\n${infraContext}` }]
-      });
+
+      const infraResponse = await this.retryWithBackoff(
+        () => this.client.messages.create({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 6000, // Reduced from 8000 to stay under 8K rate limit
+          temperature: 0.2,
+          system: INFRASTRUCTURE_PROMPT,
+          messages: [{ role: 'user', content: `Generate infrastructure for:\n${infraContext}` }]
+        }),
+        3,
+        callbacks
+      );
       
       const infraText = infraResponse.content
         .filter((b): b is Anthropic.TextBlock => b.type === 'text')
@@ -460,21 +519,26 @@ Data Models: ${plan.dataModels.map(m => `${m.name}(${m.fields.join(', ')})`).joi
       callbacks?.onPassComplete?.(2, infraFiles.length);
       
       // ========== PASS 3: UI Components ==========
+      await this.delayBetweenPasses(3, callbacks);
       callbacks?.onPassStart?.(3, 'UI Components');
       callbacks?.onProgress?.('Pass 3/6: Building reusable UI components...');
-      
+
       const componentsContext = `
 App: ${plan.appName}
 Components needed: ${plan.components.map(c => `${c.name}: ${c.description}`).join('\n')}
 `;
-      
-      const compResponse = await this.client.messages.create({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 12000,
-        temperature: 0.3,
-        system: COMPONENTS_PROMPT,
-        messages: [{ role: 'user', content: `Generate UI components for:\n${componentsContext}` }]
-      });
+
+      const compResponse = await this.retryWithBackoff(
+        () => this.client.messages.create({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 7000, // Reduced from 12000 to stay under 8K rate limit
+          temperature: 0.3,
+          system: COMPONENTS_PROMPT,
+          messages: [{ role: 'user', content: `Generate UI components for:\n${componentsContext}` }]
+        }),
+        3,
+        callbacks
+      );
       
       const compText = compResponse.content
         .filter((b): b is Anthropic.TextBlock => b.type === 'text')
@@ -489,23 +553,28 @@ Components needed: ${plan.components.map(c => `${c.name}: ${c.description}`).joi
       callbacks?.onPassComplete?.(3, compFiles.length);
       
       // ========== PASS 4: API Routes ==========
+      await this.delayBetweenPasses(4, callbacks);
       callbacks?.onPassStart?.(4, 'API Routes');
       callbacks?.onProgress?.('Pass 4/6: Creating API endpoints...');
-      
+
       const apiContext = `
 App: ${plan.appName}
 Data Models: ${JSON.stringify(plan.dataModels, null, 2)}
 API Routes needed:
 ${plan.apiRoutes.map(r => `- ${r.path}: ${r.description}`).join('\n')}
 `;
-      
-      const apiResponse = await this.client.messages.create({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 10000,
-        temperature: 0.3,
-        system: API_ROUTES_PROMPT,
-        messages: [{ role: 'user', content: `Generate API routes for:\n${apiContext}` }]
-      });
+
+      const apiResponse = await this.retryWithBackoff(
+        () => this.client.messages.create({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 7000, // Reduced from 10000 to stay under 8K rate limit
+          temperature: 0.3,
+          system: API_ROUTES_PROMPT,
+          messages: [{ role: 'user', content: `Generate API routes for:\n${apiContext}` }]
+        }),
+        3,
+        callbacks
+      );
       
       const apiText = apiResponse.content
         .filter((b): b is Anthropic.TextBlock => b.type === 'text')
@@ -520,9 +589,10 @@ ${plan.apiRoutes.map(r => `- ${r.path}: ${r.description}`).join('\n')}
       callbacks?.onPassComplete?.(4, apiFiles.length);
       
       // ========== PASS 5: Pages ==========
+      await this.delayBetweenPasses(5, callbacks);
       callbacks?.onPassStart?.(5, 'Pages');
       callbacks?.onProgress?.('Pass 5/6: Building application pages...');
-      
+
       const pagesContext = `
 App: ${plan.appName}
 Description: ${plan.description}
@@ -539,14 +609,18 @@ ${plan.pages.map(p => `- ${p.path}: ${p.description}`).join('\n')}
 Features to implement:
 ${plan.features.join('\n')}
 `;
-      
-      const pagesResponse = await this.client.messages.create({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 16000,
-        temperature: 0.4,
-        system: PAGES_PROMPT,
-        messages: [{ role: 'user', content: `Generate pages for:\n${pagesContext}` }]
-      });
+
+      const pagesResponse = await this.retryWithBackoff(
+        () => this.client.messages.create({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 7000, // Reduced from 16000 to stay under 8K rate limit
+          temperature: 0.4,
+          system: PAGES_PROMPT,
+          messages: [{ role: 'user', content: `Generate pages for:\n${pagesContext}` }]
+        }),
+        3,
+        callbacks
+      );
       
       const pagesText = pagesResponse.content
         .filter((b): b is Anthropic.TextBlock => b.type === 'text')
@@ -561,23 +635,28 @@ ${plan.features.join('\n')}
       callbacks?.onPassComplete?.(5, pagesFiles.length);
       
       // ========== PASS 6: Integration ==========
+      await this.delayBetweenPasses(6, callbacks);
       callbacks?.onPassStart?.(6, 'Integration');
       callbacks?.onProgress?.('Pass 6/6: Connecting everything together...');
-      
+
       const integrationContext = `
 App: ${plan.appName}
 Data Models: ${JSON.stringify(plan.dataModels, null, 2)}
 API Routes: ${plan.apiRoutes.map(r => r.path).join(', ')}
 Pages: ${plan.pages.map(p => p.path).join(', ')}
 `;
-      
-      const intResponse = await this.client.messages.create({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 6000,
-        temperature: 0.3,
-        system: INTEGRATION_PROMPT,
-        messages: [{ role: 'user', content: `Generate integration layer for:\n${integrationContext}` }]
-      });
+
+      const intResponse = await this.retryWithBackoff(
+        () => this.client.messages.create({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 5000, // Reduced from 6000 to stay under 8K rate limit
+          temperature: 0.3,
+          system: INTEGRATION_PROMPT,
+          messages: [{ role: 'user', content: `Generate integration layer for:\n${integrationContext}` }]
+        }),
+        3,
+        callbacks
+      );
       
       const intText = intResponse.content
         .filter((b): b is Anthropic.TextBlock => b.type === 'text')
