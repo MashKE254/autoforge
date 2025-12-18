@@ -112,10 +112,19 @@ Return a JSON object with this EXACT structure. CRITICAL: All code content must 
       "content": "export const example = { };"
     }
   ],
-  "dependencies": ["package-name"],
+  "dependencies": ["valid-npm-package-name"],
   "envVars": ["ENV_VAR_NAME"],
   "instructions": ["Step 1", "Step 2"]
 }
+
+CRITICAL: Dependencies must be REAL, VALID npm package names:
+- ✅ VALID: "axios", "stripe", "@sendgrid/mail", "linkedin-api-client"
+- ❌ INVALID: "mql4/mql5-bridge" (slashes not allowed except @scope/name)
+- ❌ INVALID: "API Bridge" (spaces not allowed)
+- ❌ INVALID: "custom_package" (if it doesn't exist on npm)
+- Only use packages that actually exist on npm registry
+- Use kebab-case for package names (not underscores or camelCase)
+- If no real npm package exists for the integration, return empty dependencies array
 
 ESCAPING RULES FOR JSON:
 - Replace all double quotes with escaped quotes

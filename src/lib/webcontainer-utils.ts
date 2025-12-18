@@ -45,11 +45,34 @@ const PACKAGE_REPLACEMENTS: Record<string, string> = {
 // ============================================================================
 
 /**
+ * Check if a package name is valid according to npm rules
+ */
+function isValidPackageName(name: string): boolean {
+  // Scoped packages are allowed: @scope/package
+  // Regular packages: package-name
+  // Invalid: contains / without @, contains spaces, etc.
+
+  if (name.startsWith('@')) {
+    // Scoped package - must be @scope/name format
+    return /^@[a-z0-9-~][a-z0-9-._~]*\/[a-z0-9-~][a-z0-9-._~]*$/.test(name);
+  }
+
+  // Regular package - no slashes allowed
+  if (name.includes('/')) {
+    return false;
+  }
+
+  // Must be URL-friendly characters only
+  return /^[a-z0-9-~][a-z0-9-._~]*$/.test(name);
+}
+
+/**
  * Sanitize package.json for WebContainer compatibility
  *
  * Strategy:
  * - Remove packages requiring native binaries
  * - Replace problematic packages with alternatives
+ * - Remove invalid package names (like "mql4/mql5-bridge")
  * - Keep the structure lightweight
  * - Ensure Next.js, React, and Tailwind work properly
  */
@@ -65,6 +88,25 @@ export function sanitizePackageJsonForWebContainer(packageJsonContent: string): 
     for (const incompatiblePkg of INCOMPATIBLE_PACKAGES) {
       delete pkg.dependencies[incompatiblePkg];
       delete pkg.devDependencies[incompatiblePkg];
+    }
+
+    // Remove invalid package names
+    const invalidDeps: string[] = [];
+    for (const depName of Object.keys(pkg.dependencies)) {
+      if (!isValidPackageName(depName)) {
+        console.warn(`⚠️ Removing invalid package name from dependencies: ${depName}`);
+        invalidDeps.push(depName);
+        delete pkg.dependencies[depName];
+      }
+    }
+
+    const invalidDevDeps: string[] = [];
+    for (const depName of Object.keys(pkg.devDependencies)) {
+      if (!isValidPackageName(depName)) {
+        console.warn(`⚠️ Removing invalid package name from devDependencies: ${depName}`);
+        invalidDevDeps.push(depName);
+        delete pkg.devDependencies[depName];
+      }
     }
 
     // Apply package replacements
