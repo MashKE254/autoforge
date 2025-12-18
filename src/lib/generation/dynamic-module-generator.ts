@@ -169,7 +169,7 @@ export class DynamicModuleGenerator {
   /**
    * Calculate cost based on token usage
    * Sonnet 4: $3/M input, $15/M output
-   * Haiku: $0.25/M input, $1.25/M output
+   * Haiku 3.5: $0.25/M input, $1.25/M output
    */
   private calculateCost(inputTokens: number, outputTokens: number, model: 'sonnet' | 'haiku'): number {
     if (model === 'haiku') {
@@ -265,7 +265,7 @@ export class DynamicModuleGenerator {
     tokensUsed: { input: number; output: number };
   }> {
     const response = await this.client.messages.create({
-      model: 'claude-haiku-4-20250514', // Use Haiku for analysis (5x cheaper than Sonnet)
+      model: 'claude-3-5-haiku-20241022', // Use Haiku 3.5 for analysis (5x cheaper than Sonnet)
       max_tokens: 2000, // Reduced from 4000 (analysis needs less)
       temperature: 0.3,
       system: [
