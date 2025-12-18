@@ -52,6 +52,7 @@ import { WebContainer } from '@webcontainer/api';
 import WebContainerManager from '@/lib/webcontainer-manager';
 import { ActionRunner, Action } from '@/lib/action-runner';
 import { getNextJsTemplate, mergeWithTemplate } from '@/lib/templates';
+import { sanitizeFilesForWebContainer } from '@/lib/webcontainer-utils';
 import DeployModal from '@/components/DeployModal';
 import MonetizeModal from '@/components/monetization/monetizeModal';
 
@@ -706,10 +707,14 @@ export default function AIWorkspace({
         addTerminalOutput('📦 Setting up project...');
 
         const template = getNextJsTemplate(projectName);
-        const allFiles = mergeWithTemplate(
+        let allFiles = mergeWithTemplate(
           template,
           files.map((f) => ({ path: f.path, content: f.content }))
         );
+
+        // Sanitize files for WebContainer compatibility
+        addTerminalOutput('🔧 Optimizing for WebContainer...');
+        allFiles = sanitizeFilesForWebContainer(allFiles);
 
         for (const file of allFiles) {
           addTerminalOutput(`📄 ${file.path}`);
@@ -723,7 +728,7 @@ export default function AIWorkspace({
 
         actions.push({
           type: 'shell',
-          content: 'npm install --silent --no-fund --no-audit --prefer-offline',
+          content: 'npm install --no-fund --no-audit',
         });
 
         actions.push({
@@ -740,8 +745,10 @@ export default function AIWorkspace({
           addTerminalOutput(`🌐 ${url}`);
           addTerminalOutput('');
           addTerminalOutput('📍 This is a SANDBOX preview.');
-          addTerminalOutput('   Database and auth are simulated.');
-          addTerminalOutput('   Click "Go Live" for real infrastructure.');
+          addTerminalOutput('   ⚠️  Some dependencies removed for browser compatibility');
+          addTerminalOutput('   ⚠️  Database and auth are mocked (not real)');
+          addTerminalOutput('   ✅ Click "Go Live" for full production deployment');
+          addTerminalOutput('   ✅ Or download to run locally with all features');
           setSandboxUrl(url);
           setIsInstalling(false);
           setIsContainerReady(true);
@@ -752,7 +759,13 @@ export default function AIWorkspace({
       } catch (error) {
         console.error('WebContainer error:', error);
         addTerminalOutput(`❌ Error: ${error}`);
-        addTerminalOutput('💡 Try using "Go Live" for a fully functional preview');
+        addTerminalOutput('');
+        addTerminalOutput('💡 WebContainer Preview Failed');
+        addTerminalOutput('   This can happen due to browser compatibility or complex dependencies.');
+        addTerminalOutput('');
+        addTerminalOutput('   ✅ Solution 1: Click "Go Live" for production deployment');
+        addTerminalOutput('   ✅ Solution 2: Download project and run locally');
+        addTerminalOutput('   ✅ Solution 3: Try a different browser (Chrome recommended)');
         setIsInstalling(false);
       } finally {
         isInitializingRef.current = false;
