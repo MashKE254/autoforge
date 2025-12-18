@@ -169,5 +169,5 @@ export function generatePackageManagerModule(config: PackageManagerModuleConfig)
 }
 
 export function getPackageManagerModulePrompt(config: PackageManagerModuleConfig): string {
-  return \`## Package Manager Module\n\nManagers: \${config.managers.join(', ')}\nSchedule: \${config.schedule || 'weekly'}\n\nIncludes automated dependency scanning, vulnerability checking, and PR creation.\`;
+  return `## Package Manager Module\n\nManagers: ${config.managers.join(', ')}\nSchedule: ${config.schedule || 'weekly'}\n\nIncludes automated dependency scanning, vulnerability checking, and PR creation.`;
 }

@@ -211,5 +211,5 @@ export function generateMarketplaceModule(config: MarketplaceModuleConfig): Mark
 }
 
 export function getMarketplaceModulePrompt(config: MarketplaceModuleConfig): string {
-  return \`## Marketplace Module\n\nPlatform Fee: \${config.platformFeePercent}%\nPayout Schedule: \${config.payoutSchedule}\nMinimum Payout: \$\${config.minimumPayout / 100}\n\nIncludes revenue sharing, automated payouts, and analytics.\`;
+  return `## Marketplace Module\n\nPlatform Fee: ${config.platformFeePercent}%\nPayout Schedule: ${config.payoutSchedule}\nMinimum Payout: $${config.minimumPayout / 100}\n\nIncludes revenue sharing, automated payouts, and analytics.`;
 }
