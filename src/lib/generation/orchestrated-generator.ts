@@ -63,11 +63,18 @@ const ARCHITECTURE_PROMPT = `You are a WORLD-CLASS software architect designing 
 
 AutoForge is NOT for MVPs. Design a COMPLETE, PROFESSIONAL system architecture.
 
-OUTPUT FORMAT (JSON only, no markdown):
+CRITICAL JSON RULES:
+- Return ONLY valid JSON (no markdown, no code blocks)
+- NO trailing commas before ] or }
+- NO comments in the JSON
+- Properly escape all quotes in strings
+- Use double quotes for all keys and string values
+
+OUTPUT FORMAT (valid JSON only):
 {
   "appName": "app-name-kebab-case",
   "description": "Professional one-sentence description",
-  "features": ["feature1", "feature2", "feature3", ...],
+  "features": ["feature1", "feature2", "feature3"],
   "pages": [
     { "path": "app/page.tsx", "description": "Landing/Dashboard" },
     { "path": "app/dashboard/page.tsx", "description": "Main dashboard with stats" },
@@ -83,19 +90,16 @@ OUTPUT FORMAT (JSON only, no markdown):
     { "name": "DataTable", "description": "Advanced table with sorting/filtering" },
     { "name": "StatsCard", "description": "Dashboard stat card" },
     { "name": "CreateForm", "description": "Create resource form with validation" },
-    { "name": "EditDialog", "description": "Edit resource modal" },
-    ... 15-25 total components
+    { "name": "EditDialog", "description": "Edit resource modal" }
   ],
   "apiRoutes": [
     { "path": "app/api/resources/route.ts", "description": "Resource CRUD with auth" },
     { "path": "app/api/resources/[id]/route.ts", "description": "Single resource operations" },
-    { "path": "app/api/analytics/route.ts", "description": "Analytics data endpoint" },
-    ... 10-20 total API routes
+    { "path": "app/api/analytics/route.ts", "description": "Analytics data endpoint" }
   ],
   "dataModels": [
     { "name": "users", "fields": ["id uuid", "clerk_user_id text", "email text", "name text", "created_at timestamp", "updated_at timestamp"] },
-    { "name": "resources", "fields": ["id uuid", "user_id uuid FK", "title text", "description text", "status text", "created_at timestamp", "updated_at timestamp"] },
-    ... comprehensive data model
+    { "name": "resources", "fields": ["id uuid", "user_id uuid FK", "title text", "description text", "status text", "created_at timestamp", "updated_at timestamp"] }
   ]
 }
 
@@ -307,12 +311,90 @@ function parseArchitecturePlan(response: string): ArchitecturePlan | null {
     // Try to extract JSON from response
     const jsonMatch = response.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
-      return JSON.parse(jsonMatch[0]);
+      let jsonStr = jsonMatch[0];
+
+      // Fix common JSON errors
+      // 1. Remove trailing commas before ] or }
+      jsonStr = jsonStr.replace(/,(\s*[\]}])/g, '$1');
+
+      // 2. Fix unescaped quotes in strings (basic attempt)
+      // This is tricky, but we can try to fix obvious cases
+
+      // 3. Remove comments if any
+      jsonStr = jsonStr.replace(/\/\/[^\n]*/g, '');
+      jsonStr = jsonStr.replace(/\/\*[\s\S]*?\*\//g, '');
+
+      try {
+        return JSON.parse(jsonStr);
+      } catch (parseError) {
+        console.error('JSON parsing failed after cleanup:', parseError);
+
+        // Fallback: Try to extract basic structure manually
+        console.warn('⚠️ Using fallback architecture plan extraction');
+
+        // Extract appName
+        const nameMatch = jsonStr.match(/"appName"\s*:\s*"([^"]+)"/);
+        const descMatch = jsonStr.match(/"description"\s*:\s*"([^"]+)"/);
+
+        if (nameMatch && descMatch) {
+          return {
+            appName: nameMatch[1],
+            description: descMatch[1],
+            features: [
+              'Core functionality',
+              'User management',
+              'Dashboard and analytics',
+              'API integrations'
+            ],
+            pages: [
+              { path: 'app/page.tsx', description: 'Landing page' },
+              { path: 'app/dashboard/page.tsx', description: 'Main dashboard' },
+              { path: 'app/(auth)/sign-in/[[...sign-in]]/page.tsx', description: 'Sign in' },
+              { path: 'app/(auth)/sign-up/[[...sign-up]]/page.tsx', description: 'Sign up' }
+            ],
+            components: [
+              { name: 'Sidebar', description: 'Navigation sidebar' },
+              { name: 'Header', description: 'Top bar' },
+              { name: 'DataTable', description: 'Data table' },
+              { name: 'StatsCard', description: 'Stats card' }
+            ],
+            apiRoutes: [
+              { path: 'app/api/data/route.ts', description: 'Main data API' },
+              { path: 'app/api/data/[id]/route.ts', description: 'Single item API' }
+            ],
+            dataModels: [
+              { name: 'users', fields: ['id uuid', 'clerk_user_id text', 'email text', 'name text', 'created_at timestamp'] },
+              { name: 'data', fields: ['id uuid', 'user_id uuid', 'title text', 'content text', 'created_at timestamp'] }
+            ]
+          };
+        }
+      }
     }
   } catch (e) {
     console.error('Failed to parse architecture plan:', e);
   }
-  return null;
+
+  // Ultimate fallback
+  console.warn('⚠️ Using minimal fallback architecture plan');
+  return {
+    appName: 'generated-app',
+    description: 'Generated application',
+    features: ['Core features', 'User management', 'Data handling'],
+    pages: [
+      { path: 'app/page.tsx', description: 'Home page' },
+      { path: 'app/dashboard/page.tsx', description: 'Dashboard' }
+    ],
+    components: [
+      { name: 'Layout', description: 'Main layout' },
+      { name: 'Navigation', description: 'Navigation' }
+    ],
+    apiRoutes: [
+      { path: 'app/api/data/route.ts', description: 'Data API' }
+    ],
+    dataModels: [
+      { name: 'users', fields: ['id uuid', 'email text', 'created_at timestamp'] }
+    ]
+  };
 }
 
 function sanitizeFiles(files: GeneratedFile[]): GeneratedFile[] {
