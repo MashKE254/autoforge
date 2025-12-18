@@ -15,7 +15,7 @@ import { BoltGenerator, boltGenerator } from './bolt-generator';
 import { OrchestratedGenerator, orchestratedGenerator } from './orchestrated-generator';
 import { GeneratedFile, GenerationResult, StreamCallbacks } from './bolt-generator';
 import { prisma } from '../prisma';
-import { detectRequiredModules, getModulesPrompt, getModuleFiles, DetectedModule } from '../modules/module-detector';
+import { dynamicModuleGenerator, DynamicModule, DynamicModuleGenerator } from './dynamic-module-generator';
 
 // ============================================================================
 // COMPLEXITY DETECTION
@@ -133,22 +133,29 @@ export class UnifiedGenerator {
     callbacks?: StreamCallbacks & {
       onComplexityAnalysis?: (analysis: ComplexityAnalysis) => void;
       onStrategySelected?: (strategy: 'simple' | 'orchestrated') => void;
-      onModulesDetected?: (modules: DetectedModule[]) => void;
+      onModulesDetected?: (modules: DynamicModule[]) => void;
     }
   ): Promise<GenerationResult> {
-    // Detect required modules
-    const detectedModules = detectRequiredModules(prompt);
+    // Generate required modules dynamically using Claude API
+    callbacks?.onProgress?.('Analyzing required integrations...');
+    const moduleResult = await dynamicModuleGenerator.generateModules(prompt);
+    const detectedModules = moduleResult.modules;
+
     callbacks?.onModulesDetected?.(detectedModules);
 
-    console.log(`\n🔍 Module Detection:`);
-    console.log(`   Detected ${detectedModules.length} modules: ${detectedModules.map(m => m.category).join(', ') || 'none'}`);
+    console.log(`\n🔍 Dynamic Module Analysis:`);
+    console.log(`   ${moduleResult.summary}`);
+    if (detectedModules.length > 0) {
+      console.log(`   Generated modules:`);
+      detectedModules.forEach(m => console.log(`     - ${m.name}: ${m.description}`));
+    }
 
     // Enhance prompt with module requirements
     let enhancedPrompt = prompt;
     if (detectedModules.length > 0) {
-      const modulesPrompt = getModulesPrompt(detectedModules);
+      const modulesPrompt = DynamicModuleGenerator.getModulesPrompt(detectedModules);
       enhancedPrompt = `${prompt}\n\n${modulesPrompt}`;
-      callbacks?.onProgress?.(`Detected ${detectedModules.length} modules to include...`);
+      callbacks?.onProgress?.(`Generated ${detectedModules.length} integration modules...`);
     }
 
     // Analyze complexity
@@ -177,15 +184,47 @@ export class UnifiedGenerator {
       result = await this.boltGenerator.generate(enhancedPrompt, jobId, callbacks);
     }
 
-    // Append module files to generated files
+    // Append dynamically generated module files to result
     if (detectedModules.length > 0) {
-      const moduleFiles = getModuleFiles(detectedModules);
-      console.log(`\n📦 Adding ${moduleFiles.length} module files`);
+      const moduleFiles = DynamicModuleGenerator.getModuleFiles(detectedModules);
+      console.log(`\n📦 Adding ${moduleFiles.length} integration files`);
 
       result.files.push(...moduleFiles.map(f => ({
         path: f.path,
         content: f.content,
+        language: 'typescript',
       })));
+
+      // Add module dependencies to package.json if it exists
+      const packageJsonFile = result.files.find(f => f.path === 'package.json');
+      if (packageJsonFile) {
+        const moduleDeps = DynamicModuleGenerator.getAllDependencies(detectedModules);
+        if (moduleDeps.length > 0) {
+          console.log(`   Adding ${moduleDeps.length} dependencies: ${moduleDeps.join(', ')}`);
+
+          try {
+            const packageJson = JSON.parse(packageJsonFile.content);
+            packageJson.dependencies = packageJson.dependencies || {};
+
+            // Add module dependencies with latest version
+            moduleDeps.forEach(dep => {
+              if (!packageJson.dependencies[dep]) {
+                packageJson.dependencies[dep] = 'latest';
+              }
+            });
+
+            packageJsonFile.content = JSON.stringify(packageJson, null, 2);
+          } catch (error) {
+            console.error('   Failed to add module dependencies to package.json:', error);
+          }
+        }
+      }
+
+      // Log setup instructions
+      const setupInstructions = DynamicModuleGenerator.getSetupInstructions(detectedModules);
+      if (setupInstructions) {
+        console.log(setupInstructions);
+      }
     }
 
     return result;
