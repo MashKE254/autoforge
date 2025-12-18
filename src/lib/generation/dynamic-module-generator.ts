@@ -28,6 +28,11 @@ export interface DynamicModule {
 export interface ModuleGenerationResult {
   modules: DynamicModule[];
   summary: string;
+  costEstimate?: {
+    inputTokens: number;
+    outputTokens: number;
+    estimatedCostUSD: number;
+  };
 }
 
 // ============================================================================
@@ -152,6 +157,8 @@ CODE QUALITY:
 
 export class DynamicModuleGenerator {
   private client: Anthropic;
+  private totalInputTokens = 0;
+  private totalOutputTokens = 0;
 
   constructor() {
     this.client = new Anthropic({
@@ -160,30 +167,52 @@ export class DynamicModuleGenerator {
   }
 
   /**
+   * Calculate cost based on token usage
+   * Sonnet 4: $3/M input, $15/M output
+   * Haiku: $0.25/M input, $1.25/M output
+   */
+  private calculateCost(inputTokens: number, outputTokens: number, model: 'sonnet' | 'haiku'): number {
+    if (model === 'haiku') {
+      return (inputTokens / 1_000_000 * 0.25) + (outputTokens / 1_000_000 * 1.25);
+    }
+    return (inputTokens / 1_000_000 * 3) + (outputTokens / 1_000_000 * 15);
+  }
+
+  /**
    * Analyze prompt and generate all required modules dynamically
    */
   async generateModules(userPrompt: string): Promise<ModuleGenerationResult> {
     console.log('\n🔍 Dynamic Module Analysis starting...');
+    this.totalInputTokens = 0;
+    this.totalOutputTokens = 0;
 
     try {
-      // Step 1: Analyze what modules are needed
-      const analysis = await this.analyzeRequiredModules(userPrompt);
+      // Step 1: Analyze what modules are needed (using Haiku for 5x cost savings)
+      const analysisResult = await this.analyzeRequiredModules(userPrompt);
 
-      if (analysis.modules.length === 0) {
+      if (analysisResult.modules.length === 0) {
         console.log('   No external integrations detected');
+        const cost = this.calculateCost(this.totalInputTokens, this.totalOutputTokens, 'haiku');
+        console.log(`   💰 Cost: $${cost.toFixed(4)} (${this.totalInputTokens} input, ${this.totalOutputTokens} output tokens)`);
+
         return {
           modules: [],
-          summary: 'No external integrations needed - basic Next.js app'
+          summary: 'No external integrations needed - basic Next.js app',
+          costEstimate: {
+            inputTokens: this.totalInputTokens,
+            outputTokens: this.totalOutputTokens,
+            estimatedCostUSD: cost,
+          },
         };
       }
 
-      console.log(`   Detected ${analysis.modules.length} integrations needed:`);
-      analysis.modules.forEach(m => console.log(`     - ${m.name}`));
+      console.log(`   Detected ${analysisResult.modules.length} integrations needed:`);
+      analysisResult.modules.forEach(m => console.log(`     - ${m.name}`));
 
       // Step 2: Generate code for each module in parallel
       console.log('\n⚙️  Generating integration code...');
 
-      const modulePromises = analysis.modules.map(spec =>
+      const modulePromises = analysisResult.modules.map(spec =>
         this.generateModuleCode(spec, userPrompt)
       );
 
@@ -191,9 +220,29 @@ export class DynamicModuleGenerator {
 
       console.log(`   Generated ${modules.length} modules successfully`);
 
+      // Calculate total cost (analysis used Haiku, generation uses Sonnet)
+      const analysisCost = this.calculateCost(analysisResult.tokensUsed.input, analysisResult.tokensUsed.output, 'haiku');
+      const generationCost = this.calculateCost(
+        this.totalInputTokens - analysisResult.tokensUsed.input,
+        this.totalOutputTokens - analysisResult.tokensUsed.output,
+        'sonnet'
+      );
+      const totalCost = analysisCost + generationCost;
+
+      console.log(`\n   💰 Module Generation Cost:`);
+      console.log(`      Analysis (Haiku): $${analysisCost.toFixed(4)}`);
+      console.log(`      Code Gen (Sonnet): $${generationCost.toFixed(4)}`);
+      console.log(`      Total: $${totalCost.toFixed(4)}`);
+      console.log(`      Tokens: ${this.totalInputTokens} input, ${this.totalOutputTokens} output`);
+
       return {
         modules,
-        summary: `Generated ${modules.length} integrations: ${modules.map(m => m.name).join(', ')}`
+        summary: `Generated ${modules.length} integrations: ${modules.map(m => m.name).join(', ')}`,
+        costEstimate: {
+          inputTokens: this.totalInputTokens,
+          outputTokens: this.totalOutputTokens,
+          estimatedCostUSD: totalCost,
+        },
       };
 
     } catch (error) {
@@ -203,7 +252,7 @@ export class DynamicModuleGenerator {
   }
 
   /**
-   * Step 1: Analyze what modules are needed
+   * Step 1: Analyze what modules are needed (using Haiku for 5x cost savings)
    */
   private async analyzeRequiredModules(userPrompt: string): Promise<{
     modules: Array<{
@@ -213,17 +262,28 @@ export class DynamicModuleGenerator {
       apis: string[];
       features: string[];
     }>;
+    tokensUsed: { input: number; output: number };
   }> {
     const response = await this.client.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 4000,
+      model: 'claude-haiku-4-20250514', // Use Haiku for analysis (5x cheaper than Sonnet)
+      max_tokens: 2000, // Reduced from 4000 (analysis needs less)
       temperature: 0.3,
-      system: MODULE_ANALYSIS_PROMPT,
+      system: [
+        {
+          type: 'text',
+          text: MODULE_ANALYSIS_PROMPT,
+          cache_control: { type: 'ephemeral' }, // Cache system prompt for 5min
+        },
+      ],
       messages: [{
         role: 'user',
         content: `Analyze this application request and identify what integrations/modules are needed:\n\n${userPrompt}`
       }]
     });
+
+    // Track token usage
+    this.totalInputTokens += response.usage.input_tokens;
+    this.totalOutputTokens += response.usage.output_tokens;
 
     const content = response.content[0];
     if (content.type !== 'text') {
@@ -234,11 +294,23 @@ export class DynamicModuleGenerator {
     const jsonMatch = content.text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
       console.log('   No modules detected from analysis');
-      return { modules: [] };
+      return {
+        modules: [],
+        tokensUsed: {
+          input: response.usage.input_tokens,
+          output: response.usage.output_tokens,
+        },
+      };
     }
 
     const analysis = JSON.parse(jsonMatch[0]);
-    return analysis;
+    return {
+      ...analysis,
+      tokensUsed: {
+        input: response.usage.input_tokens,
+        output: response.usage.output_tokens,
+      },
+    };
   }
 
   /**
@@ -271,14 +343,24 @@ Generate production-ready TypeScript code for this integration. Include all nece
 
     const response = await this.client.messages.create({
       model: 'claude-sonnet-4-20250514',
-      max_tokens: 8000,
+      max_tokens: 4000, // Reduced from 8000 (modules are focused, don't need huge outputs)
       temperature: 0.5,
-      system: MODULE_GENERATION_PROMPT,
+      system: [
+        {
+          type: 'text',
+          text: MODULE_GENERATION_PROMPT,
+          cache_control: { type: 'ephemeral' }, // Cache system prompt for 5min
+        },
+      ],
       messages: [{
         role: 'user',
         content: prompt
       }]
     });
+
+    // Track token usage
+    this.totalInputTokens += response.usage.input_tokens;
+    this.totalOutputTokens += response.usage.output_tokens;
 
     const content = response.content[0];
     if (content.type !== 'text') {
