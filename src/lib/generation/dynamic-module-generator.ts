@@ -317,14 +317,36 @@ export class DynamicModuleGenerator {
       };
     }
 
-    const analysis = JSON.parse(jsonMatch[0]);
-    return {
-      ...analysis,
-      tokensUsed: {
-        input: response.usage.input_tokens,
-        output: response.usage.output_tokens,
-      },
-    };
+    try {
+      const analysis = JSON.parse(jsonMatch[0]);
+
+      // Validate and normalize module specs
+      const normalizedModules = (analysis.modules || []).map((mod: any) => ({
+        name: mod.name || 'Unknown Module',
+        category: mod.category || 'general',
+        description: mod.description || '',
+        apis: Array.isArray(mod.apis) ? mod.apis : [],
+        features: Array.isArray(mod.features) ? mod.features : [],
+      }));
+
+      return {
+        modules: normalizedModules,
+        tokensUsed: {
+          input: response.usage.input_tokens,
+          output: response.usage.output_tokens,
+        },
+      };
+    } catch (parseError) {
+      console.error('   Failed to parse module analysis JSON:', parseError);
+      console.log('   Response text:', content.text);
+      return {
+        modules: [],
+        tokensUsed: {
+          input: response.usage.input_tokens,
+          output: response.usage.output_tokens,
+        },
+      };
+    }
   }
 
   /**
@@ -347,8 +369,8 @@ export class DynamicModuleGenerator {
 MODULE: ${spec.name}
 CATEGORY: ${spec.category}
 DESCRIPTION: ${spec.description}
-APIS/LIBRARIES: ${spec.apis.join(', ')}
-REQUIRED FEATURES: ${spec.features.join(', ')}
+APIS/LIBRARIES: ${spec.apis?.join(', ') || 'N/A'}
+REQUIRED FEATURES: ${spec.features?.join(', ') || 'N/A'}
 
 ORIGINAL USER REQUEST:
 ${originalPrompt}
