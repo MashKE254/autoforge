@@ -252,6 +252,19 @@ export const config = {
   // Remove Stripe imports
   sanitized = sanitized.replace(/import\s+.*from\s+['"]stripe['"];?\s*/g, '');
 
+  // Fix useState calls that should have array defaults
+  // Pattern: const [varName, setVarName] = useState(); where varName suggests it should be an array
+  sanitized = sanitized.replace(
+    /const\s+\[(\w*(?:s|List|Items|Data|Accounts|Users|Products|Orders|Trades))\s*,\s*(\w+)\]\s*=\s*useState\(\s*\);?/gi,
+    (match, varName, setterName) => `const [${varName}, ${setterName}] = useState([]);`
+  );
+
+  // Also fix useState with null/undefined that should be arrays
+  sanitized = sanitized.replace(
+    /const\s+\[(\w*(?:s|List|Items|Data|Accounts|Users|Products|Orders|Trades))\s*,\s*(\w+)\]\s*=\s*useState\((?:null|undefined)\);?/gi,
+    (match, varName, setterName) => `const [${varName}, ${setterName}] = useState([]);`
+  );
+
   // Fix Card component file itself - add missing subcomponent exports
   if (filePath.includes('components/ui/card.')) {
     // Check what's currently exported
