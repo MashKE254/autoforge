@@ -233,6 +233,45 @@ function sanitizeCodeFile(content: string, filePath: string): string {
   // Remove Stripe imports
   sanitized = sanitized.replace(/import\s+.*from\s+['"]stripe['"];?\s*/g, '');
 
+  // Fix Card component imports - add missing subcomponents
+  if (filePath.endsWith('.tsx') || filePath.endsWith('.jsx')) {
+    const cardImportMatch = sanitized.match(/import\s+\{([^}]+)\}\s+from\s+['"]@\/components\/ui\/card['"]/);
+    if (cardImportMatch) {
+      const imports = cardImportMatch[1].split(',').map(i => i.trim());
+      const missingComponents: string[] = [];
+
+      // Check for commonly missing Card subcomponents
+      const cardSubComponents = ['CardHeader', 'CardTitle', 'CardDescription', 'CardContent', 'CardFooter'];
+      for (const comp of cardSubComponents) {
+        if (sanitized.includes(`<${comp}`) && !imports.includes(comp)) {
+          missingComponents.push(comp);
+        }
+      }
+
+      // Add fallback component definitions if missing
+      if (missingComponents.length > 0) {
+        const fallbacks = missingComponents.map(comp => {
+          if (comp === 'CardHeader') return `const CardHeader = ({ children, className = "", ...props }: any) => <div className={\`p-6 \${className}\`} {...props}>{children}</div>;`;
+          if (comp === 'CardTitle') return `const CardTitle = ({ children, className = "", ...props }: any) => <h3 className={\`text-2xl font-semibold \${className}\`} {...props}>{children}</h3>;`;
+          if (comp === 'CardDescription') return `const CardDescription = ({ children, className = "", ...props }: any) => <p className={\`text-sm text-gray-500 \${className}\`} {...props}>{children}</p>;`;
+          if (comp === 'CardContent') return `const CardContent = ({ children, className = "", ...props }: any) => <div className={\`p-6 pt-0 \${className}\`} {...props}>{children}</div>;`;
+          if (comp === 'CardFooter') return `const CardFooter = ({ children, className = "", ...props }: any) => <div className={\`p-6 pt-0 flex items-center \${className}\`} {...props}>{children}</div>;`;
+          return '';
+        }).filter(Boolean).join('\n');
+
+        // Insert fallback components after imports
+        const lastImportIndex = sanitized.lastIndexOf('import ');
+        if (lastImportIndex !== -1) {
+          const endOfImport = sanitized.indexOf('\n', lastImportIndex);
+          sanitized = sanitized.slice(0, endOfImport + 1) +
+                     '\n// Fallback Card subcomponents for WebContainer\n' +
+                     fallbacks + '\n' +
+                     sanitized.slice(endOfImport + 1);
+        }
+      }
+    }
+  }
+
   return sanitized;
 }
 
