@@ -45,6 +45,11 @@ const INCOMPATIBLE_PACKAGES = [
   '@supabase/ssr', // Requires real database
   '@supabase/supabase-js', // Requires real database
   'stripe', // Requires API keys
+  // Non-existent @radix-ui packages (AI sometimes hallucinates these)
+  '@radix-ui/react-calendar', // Does not exist - use react-day-picker instead
+  '@radix-ui/react-datepicker', // Does not exist
+  '@radix-ui/react-date-picker', // Does not exist
+  '@radix-ui/react-form', // Does not exist
 ];
 
 /**
