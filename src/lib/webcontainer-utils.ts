@@ -31,6 +31,15 @@ const INCOMPATIBLE_PACKAGES = [
   'chromadb', // Requires native dependencies
   'puppeteer', // Requires Chrome binary
   'playwright', // Requires browser binaries
+  // Trading/specialized packages that don't exist on npm
+  'metatrader-api',
+  'mt4-api',
+  'mt5-api',
+  'forex-api',
+  'trading-api',
+  'metatrader',
+  'mql4',
+  'mql5',
 ];
 
 /**
