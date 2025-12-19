@@ -40,6 +40,11 @@ const INCOMPATIBLE_PACKAGES = [
   'metatrader',
   'mql4',
   'mql5',
+  // Auth packages that need server infrastructure
+  '@clerk/nextjs', // Requires server-side auth API
+  '@supabase/ssr', // Requires real database
+  '@supabase/supabase-js', // Requires real database
+  'stripe', // Requires API keys
 ];
 
 /**
@@ -183,10 +188,44 @@ export function sanitizePackageJsonForWebContainer(packageJsonContent: string): 
 }
 
 /**
+ * Sanitize TypeScript/JavaScript file to remove auth-related code for WebContainer
+ */
+function sanitizeCodeFile(content: string, filePath: string): string {
+  let sanitized = content;
+
+  // Remove Clerk imports and usage
+  sanitized = sanitized.replace(/import\s+.*from\s+['"]@clerk\/nextjs['"];?\s*/g, '');
+  sanitized = sanitized.replace(/import\s+\{[^}]*\}\s+from\s+['"]@clerk\/nextjs['"];?\s*/g, '');
+
+  // Remove ClerkProvider wrapping in layout files
+  if (filePath.includes('layout.tsx')) {
+    // Replace ClerkProvider with Fragment
+    sanitized = sanitized.replace(/<ClerkProvider[^>]*>/g, '<>');
+    sanitized = sanitized.replace(/<\/ClerkProvider>/g, '</>');
+  }
+
+  // Remove auth() and currentUser() calls
+  sanitized = sanitized.replace(/const\s+\{\s*userId\s*\}\s*=\s*await\s+auth\(\);?\s*/g, '');
+  sanitized = sanitized.replace(/const\s+user\s*=\s*await\s+currentUser\(\);?\s*/g, '');
+
+  // Remove Supabase imports
+  sanitized = sanitized.replace(/import\s+.*from\s+['"]@supabase\/[^'"]+['"];?\s*/g, '');
+
+  // Remove Stripe imports
+  sanitized = sanitized.replace(/import\s+.*from\s+['"]stripe['"];?\s*/g, '');
+
+  return sanitized;
+}
+
+/**
  * Check if a file should be modified for WebContainer
  */
 export function shouldModifyForWebContainer(filePath: string): boolean {
-  return filePath === 'package.json';
+  return filePath === 'package.json' ||
+         filePath.endsWith('.tsx') ||
+         filePath.endsWith('.ts') ||
+         filePath.endsWith('.jsx') ||
+         filePath.endsWith('.js');
 }
 
 /**
@@ -196,12 +235,22 @@ export function sanitizeFilesForWebContainer(
   files: Array<{ path: string; content: string }>
 ): Array<{ path: string; content: string }> {
   return files.map(file => {
-    if (shouldModifyForWebContainer(file.path)) {
+    if (file.path === 'package.json') {
       return {
         ...file,
         content: sanitizePackageJsonForWebContainer(file.content),
       };
     }
+
+    // Sanitize TypeScript/JavaScript files
+    if (file.path.endsWith('.tsx') || file.path.endsWith('.ts') ||
+        file.path.endsWith('.jsx') || file.path.endsWith('.js')) {
+      return {
+        ...file,
+        content: sanitizeCodeFile(file.content, file.path),
+      };
+    }
+
     return file;
   });
 }
