@@ -204,9 +204,28 @@ function sanitizeCodeFile(content: string, filePath: string): string {
     sanitized = sanitized.replace(/<\/ClerkProvider>/g, '</>');
   }
 
-  // Remove auth() and currentUser() calls
+  // Remove auth() and currentUser() server calls
   sanitized = sanitized.replace(/const\s+\{\s*userId\s*\}\s*=\s*await\s+auth\(\);?\s*/g, '');
   sanitized = sanitized.replace(/const\s+user\s*=\s*await\s+currentUser\(\);?\s*/g, '');
+
+  // Remove Clerk hook calls and replace with mock values
+  // useAuth() -> mock authenticated state
+  sanitized = sanitized.replace(
+    /const\s+\{\s*([^}]+)\}\s*=\s*useAuth\(\);?/g,
+    'const { $1 } = { isSignedIn: true, isLoaded: true, userId: "demo-user" };'
+  );
+
+  // useUser() -> mock user object
+  sanitized = sanitized.replace(
+    /const\s+\{\s*([^}]+)\}\s*=\s*useUser\(\);?/g,
+    'const { $1 } = { user: { id: "demo-user", fullName: "Demo User", emailAddress: "demo@example.com" }, isLoaded: true };'
+  );
+
+  // useClerk() -> mock clerk object
+  sanitized = sanitized.replace(
+    /const\s+\{\s*([^}]+)\}\s*=\s*useClerk\(\);?/g,
+    'const { $1 } = { signOut: async () => {}, openSignIn: () => {} };'
+  );
 
   // Remove Supabase imports
   sanitized = sanitized.replace(/import\s+.*from\s+['"]@supabase\/[^'"]+['"];?\s*/g, '');
