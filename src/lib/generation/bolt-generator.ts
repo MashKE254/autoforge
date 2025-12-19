@@ -51,15 +51,17 @@ AutoForge is NOT for MVPs. AutoForge builds PROFESSIONAL, INDUSTRY-GRADE systems
 ## CRITICAL REQUIREMENTS
 
 1. Generate 30-50+ files minimum for complex applications
-2. Complete, working implementations (NO TODOs, NO placeholders)
-3. Production-ready error handling, loading states, validation
-4. Proper architecture with separation of concerns
-5. Type-safe throughout (strict TypeScript)
-6. Real API integrations (not fake/mock implementations)
-7. Beautiful, professional UI with animations and polish
-8. Comprehensive database schemas
-9. Full authentication flows
-10. Complete CRUD operations
+2. **GENERATE ALL PAGES** - If the user asks for multiple pages/features, you MUST generate every single one
+3. Complete, working implementations (NO TODOs, NO placeholders)
+4. Production-ready error handling, loading states, validation
+5. Proper architecture with separation of concerns
+6. Type-safe throughout (strict TypeScript)
+7. Real API integrations (not fake/mock implementations)
+8. Beautiful, professional UI with animations and polish
+9. Comprehensive database schemas
+10. Full authentication flows
+11. Complete CRUD operations for ALL entities
+12. **DO NOT STOP** until all pages, components, and features are generated
 
 ## MANDATORY TECH STACK
 
@@ -1466,7 +1468,7 @@ export class BoltGenerator {
       // Use streaming for better timeout handling
       const stream = await this.client.messages.stream({
         model: 'claude-sonnet-4-20250514',
-        max_tokens: 16000,
+        max_tokens: 64000, // CRITICAL: High limit for complete multi-page applications (30-50+ files)
         temperature: 0.7,
         system: MANAGED_STACK_SYSTEM_PROMPT,
         messages: [{
@@ -1476,18 +1478,30 @@ export class BoltGenerator {
       });
       
       let responseText = '';
-      
+      let stopReason = '';
+
       for await (const event of stream) {
         if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
           responseText += event.delta.text;
         }
+        if (event.type === 'message_stop') {
+          // @ts-ignore - stopReason exists on final message
+          stopReason = event.message?.stop_reason || 'unknown';
+        }
       }
-      
+
+      // Check if generation was cut off due to token limit
+      if (stopReason === 'max_tokens') {
+        console.warn('⚠️  WARNING: Generation hit max_tokens limit! Output may be incomplete.');
+        console.warn('⚠️  Consider increasing max_tokens or breaking prompt into smaller parts.');
+        callbacks?.onProgress?.('⚠️ Generation may be incomplete (hit token limit)');
+      }
+
       callbacks?.onProgress?.('Parsing generated files...');
-      
+
       let files = parseFilesFromResponse(responseText);
-      
-      console.log(`   Parsed ${files.length} files from response`);
+
+      console.log(`   Parsed ${files.length} files from response (stop_reason: ${stopReason})`);
       
       // Sanitize all generated files (fix CSS issues, replace bad classes)
       files = sanitizeGeneratedFiles(files);
