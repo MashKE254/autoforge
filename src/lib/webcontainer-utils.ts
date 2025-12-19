@@ -266,6 +266,72 @@ export const config = {
     (match, varName, setterName) => `const [${varName}, ${setterName}] = useState([]);`
   );
 
+  // CRITICAL: Add defensive array operations wrappers
+  // This ensures .filter(), .map(), etc. never crash even if state isn't an array
+  // Pattern: variableName.filter(...) where variableName looks like an array
+  sanitized = sanitized.replace(
+    /(\w*(?:s|List|Items|Data|Accounts|Users|Products|Orders|Trades|Results))\.filter\(/gi,
+    (match, varName) => `(Array.isArray(${varName}) ? ${varName} : []).filter(`
+  );
+
+  sanitized = sanitized.replace(
+    /(\w*(?:s|List|Items|Data|Accounts|Users|Products|Orders|Trades|Results))\.map\(/gi,
+    (match, varName) => `(Array.isArray(${varName}) ? ${varName} : []).map(`
+  );
+
+  sanitized = sanitized.replace(
+    /(\w*(?:s|List|Items|Data|Accounts|Users|Products|Orders|Trades|Results))\.find\(/gi,
+    (match, varName) => `(Array.isArray(${varName}) ? ${varName} : []).find(`
+  );
+
+  sanitized = sanitized.replace(
+    /(\w*(?:s|List|Items|Data|Accounts|Users|Products|Orders|Trades|Results))\.some\(/gi,
+    (match, varName) => `(Array.isArray(${varName}) ? ${varName} : []).some(`
+  );
+
+  sanitized = sanitized.replace(
+    /(\w*(?:s|List|Items|Data|Accounts|Users|Products|Orders|Trades|Results))\.every\(/gi,
+    (match, varName) => `(Array.isArray(${varName}) ? ${varName} : []).every(`
+  );
+
+  sanitized = sanitized.replace(
+    /(\w*(?:s|List|Items|Data|Accounts|Users|Products|Orders|Trades|Results))\.reduce\(/gi,
+    (match, varName) => `(Array.isArray(${varName}) ? ${varName} : []).reduce(`
+  );
+
+  // Fix .length access on potential arrays
+  sanitized = sanitized.replace(
+    /(\w*(?:s|List|Items|Data|Accounts|Users|Products|Orders|Trades|Results))\.length(?!\s*[><=!])/gi,
+    (match, varName) => `(Array.isArray(${varName}) ? ${varName}.length : 0)`
+  );
+
+  // Mock API routes to return safe defaults (prevents crashes from DB errors)
+  if (filePath.startsWith('app/api/') && (filePath.endsWith('route.ts') || filePath.endsWith('route.js'))) {
+    // Wrap API route exports to catch errors and return safe defaults
+    sanitized = `// WebContainer-safe API route wrapper
+const safeApiHandler = (handler: Function) => async (req: Request, context?: any) => {
+  try {
+    return await handler(req, context);
+  } catch (error) {
+    console.warn('[WebContainer] API route error (returning safe default):', error);
+    // Return empty array for list endpoints, empty object for single items
+    const url = new URL(req.url);
+    const isList = !url.pathname.match(/\\/[^/]+\\/[^/]+$/); // No ID in path = list
+    return Response.json(isList ? [] : {}, { status: 200 });
+  }
+};
+
+${sanitized}
+
+// Wrap all exported handlers
+if (typeof GET !== 'undefined') { const _GET = GET; GET = safeApiHandler(_GET); }
+if (typeof POST !== 'undefined') { const _POST = POST; POST = safeApiHandler(_POST); }
+if (typeof PUT !== 'undefined') { const _PUT = PUT; PUT = safeApiHandler(_PUT); }
+if (typeof PATCH !== 'undefined') { const _PATCH = PATCH; PATCH = safeApiHandler(_PATCH); }
+if (typeof DELETE !== 'undefined') { const _DELETE = DELETE; DELETE = safeApiHandler(_DELETE); }
+`;
+  }
+
   // Fix Card component file itself - add missing subcomponent exports
   if (filePath.includes('components/ui/card.')) {
     // Check what's currently exported
