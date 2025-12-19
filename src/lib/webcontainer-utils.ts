@@ -193,8 +193,27 @@ export function sanitizePackageJsonForWebContainer(packageJsonContent: string): 
 function sanitizeCodeFile(content: string, filePath: string): string {
   let sanitized = content;
 
+  // Special handling for middleware.ts - replace with pass-through middleware
+  if (filePath === 'middleware.ts' || filePath.endsWith('/middleware.ts')) {
+    return `// WebContainer-compatible middleware (auth disabled for preview)
+import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
+
+export function middleware(request: NextRequest) {
+  // Pass through all requests in WebContainer preview mode
+  return NextResponse.next();
+}
+
+export const config = {
+  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
+};
+`;
+  }
+
   // Remove Clerk imports and usage
+  sanitized = sanitized.replace(/import\s+.*from\s+['"]@clerk\/nextjs\/server['"];?\s*/g, '');
   sanitized = sanitized.replace(/import\s+.*from\s+['"]@clerk\/nextjs['"];?\s*/g, '');
+  sanitized = sanitized.replace(/import\s+\{[^}]*\}\s+from\s+['"]@clerk\/nextjs\/server['"];?\s*/g, '');
   sanitized = sanitized.replace(/import\s+\{[^}]*\}\s+from\s+['"]@clerk\/nextjs['"];?\s*/g, '');
 
   // Remove ClerkProvider wrapping in layout files
