@@ -14,28 +14,44 @@ export const dynamic = 'force-dynamic';
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    
+
     // DEBUG LOG 1: Check Auth
     console.log("🔍 API /api/jobs called");
-    console.log("   User ID from session:", session?.user?.id);
-    
-    if (!session?.user?.id) {
-      console.log("❌ No user ID in session");
+    console.log("   Session user ID:", session?.user?.id);
+    console.log("   Session user email:", session?.user?.email);
+
+    if (!session?.user?.email) {
+      console.log("❌ No user email in session");
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
       );
     }
-    
+
+    // Get user from database by email (same logic as /api/generate)
+    const user = await prisma.user.findUnique({
+      where: { email: session.user.email },
+    });
+
+    if (!user) {
+      console.log("❌ User not found in database");
+      return NextResponse.json(
+        { error: 'User not found' },
+        { status: 404 }
+      );
+    }
+
+    console.log("   Database user ID:", user.id);
+
     const { searchParams } = new URL(request.url);
     const limit = Math.min(parseInt(searchParams.get('limit') || '50', 10), 100);
-    
+
     // DEBUG LOG 2: Querying DB
     console.log(`   Fetching last ${limit} jobs for user...`);
-    
+
     const jobs = await prisma.generationJob.findMany({
       where: {
-        userId: session.user.id,
+        userId: user.id, // Use database user ID instead of session user ID
       },
       orderBy: {
         createdAt: 'desc',
@@ -70,9 +86,9 @@ export async function GET(request: NextRequest) {
       fileCount: job._count.files,
       errorLog: job.errorLog,
     }));
-    
+
     return NextResponse.json({ jobs: formattedJobs });
-    
+
   } catch (error) {
     console.error('❌ Failed to fetch jobs:', error);
     return NextResponse.json(
