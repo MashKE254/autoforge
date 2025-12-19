@@ -313,12 +313,86 @@ export function shouldModifyForWebContainer(filePath: string): boolean {
 }
 
 /**
+ * Detect missing component imports and create stub files
+ */
+function detectMissingComponents(
+  files: Array<{ path: string; content: string }>
+): Array<{ path: string; content: string }> {
+  const filePathsSet = new Set(files.map(f => f.path));
+  const missingComponents: Map<string, string> = new Map();
+
+  // Pattern to match component imports like: import { Foo } from '@/components/bar'
+  const importRegex = /import\s+\{([^}]+)\}\s+from\s+['"]@\/components\/([^'"]+)['"]/g;
+
+  for (const file of files) {
+    if (!file.path.endsWith('.tsx') && !file.path.endsWith('.jsx')) continue;
+
+    let match;
+    while ((match = importRegex.exec(file.content)) !== null) {
+      const componentNames = match[1].split(',').map(n => n.trim());
+      const componentPath = match[2]; // e.g., "header" or "ui/card"
+
+      // Check if this component file exists
+      const possiblePaths = [
+        `components/${componentPath}.tsx`,
+        `components/${componentPath}.ts`,
+        `components/${componentPath}.jsx`,
+        `components/${componentPath}.js`,
+      ];
+
+      const exists = possiblePaths.some(p => filePathsSet.has(p));
+
+      if (!exists && !missingComponents.has(componentPath)) {
+        // Create a stub component file
+        const stubPath = `components/${componentPath}.tsx`;
+        const componentName = componentNames[0]; // Use first imported name as main component
+
+        const stubContent = `// Stub component created by WebContainer sanitization
+// Original file was missing from generation
+
+export const ${componentName} = ({ children, ...props }: any) => {
+  return (
+    <div className="p-4 border border-dashed border-gray-300 rounded" {...props}>
+      <p className="text-sm text-gray-500">Component: ${componentName}</p>
+      <p className="text-xs text-gray-400">This is a placeholder. Generate the full component for production.</p>
+      {children}
+    </div>
+  );
+};
+
+${componentNames.slice(1).map(name => `
+export const ${name} = ({ children, ...props }: any) => {
+  return <div {...props}>{children}</div>;
+};`).join('\n')}
+
+export default ${componentName};
+`;
+
+        missingComponents.set(stubPath, stubContent);
+      }
+    }
+  }
+
+  return Array.from(missingComponents.entries()).map(([path, content]) => ({
+    path,
+    content,
+  }));
+}
+
+/**
  * Sanitize all files for WebContainer compatibility
  */
 export function sanitizeFilesForWebContainer(
   files: Array<{ path: string; content: string }>
 ): Array<{ path: string; content: string }> {
-  return files.map(file => {
+  // First, detect and create stub files for missing components
+  const stubComponents = detectMissingComponents(files);
+
+  // Combine original files with stub components
+  const allFiles = [...files, ...stubComponents];
+
+  // Then sanitize all files
+  return allFiles.map(file => {
     if (file.path === 'package.json') {
       return {
         ...file,
