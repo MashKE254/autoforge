@@ -253,15 +253,16 @@ export const config = {
   sanitized = sanitized.replace(/import\s+.*from\s+['"]stripe['"];?\s*/g, '');
 
   // Fix useState calls that should have array defaults
-  // Pattern: const [varName, setVarName] = useState(); where varName suggests it should be an array
+  // Pattern: const [varName, setVarName] = useState<Type?>(); where varName suggests it should be an array
+  // Handles: useState(), useState<T>(), useState<T[]>(), React.useState(), etc.
   sanitized = sanitized.replace(
-    /const\s+\[(\w*(?:s|List|Items|Data|Accounts|Users|Products|Orders|Trades))\s*,\s*(\w+)\]\s*=\s*useState\(\s*\);?/gi,
+    /const\s+\[(\w*(?:s|List|Items|Data|Accounts|Users|Products|Orders|Trades))\s*,\s*(\w+)\]\s*=\s*(?:React\.)?useState(?:<[^>]+>)?\(\s*\);?/gi,
     (match, varName, setterName) => `const [${varName}, ${setterName}] = useState([]);`
   );
 
   // Also fix useState with null/undefined that should be arrays
   sanitized = sanitized.replace(
-    /const\s+\[(\w*(?:s|List|Items|Data|Accounts|Users|Products|Orders|Trades))\s*,\s*(\w+)\]\s*=\s*useState\((?:null|undefined)\);?/gi,
+    /const\s+\[(\w*(?:s|List|Items|Data|Accounts|Users|Products|Orders|Trades))\s*,\s*(\w+)\]\s*=\s*(?:React\.)?useState(?:<[^>]+>)?\((?:null|undefined)\);?/gi,
     (match, varName, setterName) => `const [${varName}, ${setterName}] = useState([]);`
   );
 
