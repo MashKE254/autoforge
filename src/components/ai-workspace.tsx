@@ -77,6 +77,7 @@ interface AIWorkspaceProps {
   projectName: string;
   jobId: string;
   initialFiles?: InitialFile[];
+  generationMode?: 'PERSONAL' | 'SAAS' | 'SAAS_UPGRADE';
 }
 
 interface Message {
@@ -137,6 +138,42 @@ function groupFilesByFolder(files: FileNode[]): Record<string, FileNode[]> {
   });
 
   return groups;
+}
+
+// Detect available routes from generated files
+function detectRoutes(files: FileNode[]): Array<{ path: string; label: string; icon: string }> {
+  const routes: Array<{ path: string; label: string; icon: string }> = [];
+
+  // Check for common route patterns
+  const routePatterns = [
+    { pattern: /^app\/dashboard\/page\.tsx?$/, path: '/dashboard', label: 'App', icon: '🎯' },
+    { pattern: /^app\/\(app\)\/dashboard\/page\.tsx?$/, path: '/dashboard', label: 'App', icon: '🎯' },
+    { pattern: /^app\/page\.tsx?$/, path: '/', label: 'Landing', icon: '🏠' },
+    { pattern: /^app\/\(marketing\)\/page\.tsx?$/, path: '/', label: 'Landing', icon: '🏠' },
+    { pattern: /^app\/pricing\/page\.tsx?$/, path: '/pricing', label: 'Pricing', icon: '💰' },
+    { pattern: /^app\/\(marketing\)\/pricing\/page\.tsx?$/, path: '/pricing', label: 'Pricing', icon: '💰' },
+    { pattern: /^app\/settings\/page\.tsx?$/, path: '/settings', label: 'Settings', icon: '⚙️' },
+    { pattern: /^app\/\(app\)\/settings\/page\.tsx?$/, path: '/settings', label: 'Settings', icon: '⚙️' },
+    { pattern: /^app\/billing\/page\.tsx?$/, path: '/billing', label: 'Billing', icon: '💳' },
+    { pattern: /^app\/\(app\)\/billing\/page\.tsx?$/, path: '/billing', label: 'Billing', icon: '💳' },
+  ];
+
+  const foundRoutes = new Set<string>();
+
+  files.forEach((file) => {
+    for (const { pattern, path, label, icon } of routePatterns) {
+      if (pattern.test(file.path) && !foundRoutes.has(path)) {
+        routes.push({ path, label, icon });
+        foundRoutes.add(path);
+      }
+    }
+  });
+
+  // Sort routes so App comes first, Landing second, then others
+  return routes.sort((a, b) => {
+    const order = ['/dashboard', '/', '/pricing', '/settings', '/billing'];
+    return order.indexOf(a.path) - order.indexOf(b.path);
+  });
 }
 
 // ============================================================================
@@ -589,6 +626,7 @@ export default function AIWorkspace({
   projectName,
   jobId,
   initialFiles,
+  generationMode = 'SAAS',
 }: AIWorkspaceProps) {
   // Parse initial files
   const initialFileNodes =
@@ -601,6 +639,18 @@ export default function AIWorkspace({
         }))
       : [];
 
+  // Detect available routes
+  const availableRoutes = detectRoutes(initialFileNodes);
+
+  // Determine default route based on generation mode
+  const getDefaultRoute = () => {
+    if (generationMode === 'PERSONAL') {
+      return '/'; // Personal tools are single-page
+    }
+    // For SAAS/SAAS_UPGRADE, prefer dashboard if available, otherwise landing
+    return availableRoutes.find(r => r.path === '/dashboard')?.path || '/';
+  };
+
   // =========================================================================
   // STATE
   // =========================================================================
@@ -611,6 +661,7 @@ export default function AIWorkspace({
     initialFileNodes.find((f) => f.path === 'app/page.tsx') || initialFileNodes[0] || null
   );
   const [sandboxUrl, setSandboxUrl] = useState('');
+  const [previewRoute, setPreviewRoute] = useState(getDefaultRoute());
   const [terminalOutput, setTerminalOutput] = useState<string[]>([]);
   const [isInstalling, setIsInstalling] = useState(false);
   const [isContainerReady, setIsContainerReady] = useState(false);
@@ -828,9 +879,10 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
   };
 
   const handleCopyUrl = () => {
-    const url = previewMode === 'live' && liveUrl ? liveUrl : sandboxUrl;
-    if (url) {
-      navigator.clipboard.writeText(url);
+    const baseUrl = previewMode === 'live' && liveUrl ? liveUrl : sandboxUrl;
+    if (baseUrl) {
+      const fullUrl = `${baseUrl}${previewRoute}`;
+      navigator.clipboard.writeText(fullUrl);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     }
@@ -1070,6 +1122,28 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
               )}
               {previewMode === 'live' && liveUrl && <LiveBanner url={liveUrl} />}
 
+              {/* Route Tabs (for SAAS apps with multiple routes) */}
+              {availableRoutes.length > 1 && (
+                <div className="border-b border-white/10 bg-[#111113]">
+                  <div className="flex items-center gap-1 px-4 py-2">
+                    {availableRoutes.map((route) => (
+                      <button
+                        key={route.path}
+                        onClick={() => setPreviewRoute(route.path)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 ${
+                          previewRoute === route.path
+                            ? 'bg-violet-500/20 text-violet-300 border border-violet-500/30'
+                            : 'text-gray-400 hover:text-white hover:bg-white/5'
+                        }`}
+                      >
+                        <span>{route.icon}</span>
+                        <span>{route.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* URL Bar */}
               {(sandboxUrl || liveUrl) && (
                 <div className="h-10 border-b border-white/10 flex items-center px-4 gap-2 bg-[#111113]">
@@ -1080,7 +1154,9 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
                       }`}
                     />
                     <span className="text-xs text-gray-400 truncate">
-                      {previewMode === 'live' && liveUrl ? liveUrl : sandboxUrl}
+                      {previewMode === 'live' && liveUrl
+                        ? `${liveUrl}${previewRoute}`
+                        : `${sandboxUrl}${previewRoute}`}
                     </span>
                   </div>
                   <button
@@ -1094,7 +1170,9 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
                     )}
                   </button>
                   <a
-                    href={previewMode === 'live' && liveUrl ? liveUrl : sandboxUrl}
+                    href={previewMode === 'live' && liveUrl
+                      ? `${liveUrl}${previewRoute}`
+                      : `${sandboxUrl}${previewRoute}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="p-1.5 text-gray-400 hover:text-white rounded hover:bg-white/10"
@@ -1114,13 +1192,15 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
                   </div>
                 ) : previewMode === 'live' && liveUrl ? (
                   <iframe
-                    src={liveUrl}
+                    key={`live-${previewRoute}`}
+                    src={`${liveUrl}${previewRoute}`}
                     className="w-full h-full border-0"
                     sandbox="allow-forms allow-modals allow-popups allow-presentation allow-same-origin allow-scripts"
                   />
                 ) : sandboxUrl ? (
                   <iframe
-                    src={sandboxUrl}
+                    key={`sandbox-${previewRoute}`}
+                    src={`${sandboxUrl}${previewRoute}`}
                     className="w-full h-full border-0"
                     sandbox="allow-forms allow-modals allow-popups allow-presentation allow-same-origin allow-scripts"
                     allow="cross-origin-isolated"

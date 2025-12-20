@@ -257,11 +257,12 @@ export default async function JobPage({
                 </TabsList>
                 
                 <TabsContent value="workspace" className="m-0 p-0">
-                  <AIWorkspace 
+                  <AIWorkspace
                     plan={parsedPlan}
                     projectName={initialJob.prompt.slice(0, 30).replace(/[^a-z0-9]/gi, '-').toLowerCase()}
                     jobId={initialJob.id}
                     initialFiles={initialFiles}
+                    generationMode={initialJob.generationMode as 'PERSONAL' | 'SAAS' | 'SAAS_UPGRADE'}
                   />
                 </TabsContent>
                 
