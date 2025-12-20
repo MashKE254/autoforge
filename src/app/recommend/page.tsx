@@ -231,9 +231,9 @@ export default function RecommenderPage() {
     rec => activeTypeFilter === 'all' || rec.solutionType === activeTypeFilter
   ) || [];
   
-  // Get available types from results
-  const availableTypes = results 
-    ? [...new Set(results.recommendations.map(r => r.solutionType))]
+  // Get available types from results (filter out any unknown types)
+  const availableTypes = results
+    ? [...new Set(results.recommendations.map(r => r.solutionType))].filter(type => type in solutionTypeConfig)
     : [];
   
   // Copy prompt
@@ -416,6 +416,7 @@ export default function RecommenderPage() {
           </button>
           {availableTypes.map(type => {
             const config = solutionTypeConfig[type];
+            if (!config) return null; // Safety check
             const count = results.byType[type]?.length || 0;
             return (
               <button
@@ -440,8 +441,9 @@ export default function RecommenderPage() {
           <div className="lg:col-span-1 space-y-3">
             {filteredRecommendations.map((rec, index) => {
               const typeConfig = solutionTypeConfig[rec.solutionType];
+              if (!typeConfig) return null; // Safety check
               const isTopPick = rec.id === results.topPick.id;
-              
+
               return (
                 <button
                   key={rec.id}
@@ -498,21 +500,20 @@ export default function RecommenderPage() {
           
           {/* Selected Detail */}
           <div className="lg:col-span-2">
-            {selectedRec && (
-              <div className="bg-zinc-900/50 border border-white/10 rounded-2xl overflow-hidden">
-                {/* Header */}
-                <div className="p-6 border-b border-white/10">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex flex-wrap items-center gap-2">
-                      {(() => {
-                        const config = solutionTypeConfig[selectedRec.solutionType];
-                        return (
-                          <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-sm font-medium ${config.bgColor} ${config.color}`}>
-                            <config.icon className="w-4 h-4" />
-                            {config.label}
-                          </span>
-                        );
-                      })()}
+            {selectedRec && (() => {
+              const selectedTypeConfig = solutionTypeConfig[selectedRec.solutionType];
+              if (!selectedTypeConfig) return null; // Safety check
+
+              return (
+                <div className="bg-zinc-900/50 border border-white/10 rounded-2xl overflow-hidden">
+                  {/* Header */}
+                  <div className="p-6 border-b border-white/10">
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-sm font-medium ${selectedTypeConfig.bgColor} ${selectedTypeConfig.color}`}>
+                          <selectedTypeConfig.icon className="w-4 h-4" />
+                          {selectedTypeConfig.label}
+                        </span>
                       <span className={`px-2 py-1 rounded text-xs font-medium ${
                         selectedRec.complexity === 'simple' ? 'bg-emerald-500/20 text-emerald-400' :
                         selectedRec.complexity === 'moderate' ? 'bg-amber-500/20 text-amber-400' :
@@ -745,7 +746,8 @@ export default function RecommenderPage() {
                   </div>
                 </div>
               </div>
-            )}
+              );
+            })()}
           </div>
         </div>
       </div>
