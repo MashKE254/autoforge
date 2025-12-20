@@ -13,6 +13,7 @@
 
 import { BoltGenerator, boltGenerator } from './bolt-generator';
 import { OrchestratedGenerator, orchestratedGenerator } from './orchestrated-generator';
+import { PersonalToolGenerator, personalToolGenerator } from './personal-tool-generator';
 import { GeneratedFile, GenerationResult, StreamCallbacks } from './bolt-generator';
 import { prisma } from '../prisma';
 import { dynamicModuleGenerator, DynamicModule, DynamicModuleGenerator } from './dynamic-module-generator';
@@ -118,24 +119,61 @@ function analyzePromptComplexity(prompt: string): ComplexityAnalysis {
 export class UnifiedGenerator {
   private boltGenerator: BoltGenerator;
   private orchestratedGenerator: OrchestratedGenerator;
-  
+  private personalToolGenerator: PersonalToolGenerator;
+
   constructor() {
     this.boltGenerator = boltGenerator;
     this.orchestratedGenerator = orchestratedGenerator;
+    this.personalToolGenerator = personalToolGenerator;
   }
-  
+
   /**
    * Generate an application - automatically chooses the right strategy
+   *
+   * @param prompt - User's description of what to build
+   * @param mode - Generation mode: 'PERSONAL' (default) | 'SAAS' | 'AUTO'
+   * @param jobId - Optional job ID for tracking
+   * @param callbacks - Progress callbacks
    */
   async generate(
     prompt: string,
+    mode: 'PERSONAL' | 'SAAS' | 'AUTO' = 'AUTO',
     jobId?: string,
     callbacks?: StreamCallbacks & {
       onComplexityAnalysis?: (analysis: ComplexityAnalysis) => void;
-      onStrategySelected?: (strategy: 'simple' | 'orchestrated') => void;
+      onStrategySelected?: (strategy: 'simple' | 'orchestrated' | 'personal') => void;
       onModulesDetected?: (modules: DynamicModule[]) => void;
+      onModeSelected?: (mode: 'PERSONAL' | 'SAAS') => void;
     }
   ): Promise<GenerationResult> {
+    // ========================================================================
+    // STEP 1: MODE SELECTION
+    // ========================================================================
+
+    // Determine final mode
+    let finalMode: 'PERSONAL' | 'SAAS' = mode === 'AUTO'
+      ? this.shouldGenerateAsSaaS(prompt) ? 'SAAS' : 'PERSONAL'
+      : mode;
+
+    console.log(`\n🎯 GENERATION MODE: ${finalMode}`);
+    console.log(`   Prompt: "${prompt.slice(0, 100)}..."`);
+    callbacks?.onModeSelected?.(finalMode);
+
+    // If PERSONAL mode, use PersonalToolGenerator (skip complexity analysis and modules)
+    if (finalMode === 'PERSONAL') {
+      console.log(`\n🛠️  Using PERSONAL TOOL generator`);
+      callbacks?.onStrategySelected?.('personal');
+      callbacks?.onProgress?.('Generating personal tool...');
+
+      return await this.personalToolGenerator.generate(prompt, jobId, callbacks);
+    }
+
+    // ========================================================================
+    // STEP 2: SAAS MODE - Dynamic Modules & Complexity Analysis
+    // ========================================================================
+
+    console.log(`\n🏢 Using SAAS generator`);
+
     // Generate required modules dynamically using Claude API
     callbacks?.onProgress?.('Analyzing required integrations...');
     const moduleResult = await dynamicModuleGenerator.generateModules(prompt);
@@ -254,8 +292,55 @@ export class UnifiedGenerator {
   ): Promise<GenerationResult> {
     console.log(`\n⚡ Forcing SIMPLE generation`);
     callbacks?.onProgress?.('Using single-pass generation...');
-    
+
     return this.boltGenerator.generate(prompt, jobId, callbacks);
+  }
+
+  /**
+   * Determine if a prompt should generate a SaaS application or a personal tool
+   *
+   * SaaS indicators:
+   * - Explicit keywords: "saas", "subscription", "multi-user", "multi-tenant"
+   * - Authentication needs: "sign up", "login", "user accounts"
+   * - Payment needs: "billing", "payments", "stripe", "checkout"
+   * - Marketing needs: "landing page", "pricing page"
+   *
+   * Default to PERSONAL for simplicity
+   */
+  private shouldGenerateAsSaaS(prompt: string): boolean {
+    const lower = prompt.toLowerCase();
+
+    // Explicit SaaS indicators
+    const saasKeywords = [
+      'saas',
+      'subscription',
+      'multi-user',
+      'multi-tenant',
+      'multi user',
+      'sign up',
+      'signup',
+      'user accounts',
+      'user registration',
+      'billing',
+      'payments',
+      'stripe',
+      'landing page',
+      'pricing page',
+      'monetize',
+      'pay',
+      'checkout',
+    ];
+
+    const hasSaaSKeyword = saasKeywords.some(keyword => lower.includes(keyword));
+
+    if (hasSaaSKeyword) {
+      console.log(`   ✓ SaaS keyword detected - generating full SaaS`);
+      return true;
+    }
+
+    // Default to personal tool
+    console.log(`   ✓ No SaaS indicators - generating personal tool`);
+    return false;
   }
 }
 

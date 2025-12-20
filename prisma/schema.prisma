@@ -569,7 +569,11 @@ model GenerationJob {
   generationCompletedAt DateTime?
   generationStartedAt   DateTime?
   totalModules          Int                   @default(0)
-  
+
+  // NEW: Generation mode (Personal Tool vs SaaS)
+  generationMode        GenerationMode        @default(PERSONAL)
+  parentJobId           String?               // For SaaS upgrades, points to original personal tool
+
   // Relations
   files                 GeneratedFile[]
   user                  User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -577,16 +581,22 @@ model GenerationJob {
   telemetry             GenerationTelemetry[]
   previewSessions       PreviewSession[]
   deployments           Deployment[]
-  
+
   // Monetization relation
   publishedApps         PublishedApp[]
-  
+
   // NEW: Managed Infrastructure relation
   managedProject        ManagedProject?
+
+  // NEW: SaaS upgrade tracking
+  parentJob             GenerationJob?        @relation("SaaSUpgrade", fields: [parentJobId], references: [id])
+  upgradedJobs          GenerationJob[]       @relation("SaaSUpgrade")
 
   @@index([userId])
   @@index([status])
   @@index([createdAt])
+  @@index([generationMode])
+  @@index([parentJobId])
 }
 
 model GeneratedFile {
@@ -772,6 +782,12 @@ enum JobStatus {
   TESTING
   DEPLOYING
   CANCELLED
+}
+
+enum GenerationMode {
+  PERSONAL      // Simple, single-user tool (localStorage, no auth)
+  SAAS          // Full SaaS with auth, payments, multi-tenant DB
+  SAAS_UPGRADE  // Personal tool upgraded to SaaS
 }
 
 // =============================================================================

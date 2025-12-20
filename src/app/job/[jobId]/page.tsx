@@ -15,6 +15,7 @@ import { Sparkles, FileCode } from "lucide-react";
 import JobPlan from "@/components/job-plan";
 import AIWorkspace from "@/components/ai-workspace";
 import JobStatusPoller from "@/components/job-status-poller";
+import { MonetizeButton } from "@/components/monetize-button";
 import type { PlanStep } from "@/components/job-plan";
 
 // Define the file type
@@ -183,6 +184,11 @@ export default async function JobPage({
             </p>
           </div>
         </div>
+
+        {/* ✨ Monetize Button - For completed personal tools */}
+        {initialJob.generationMode === 'PERSONAL' && initialJob.status === 'COMPLETED' && (
+          <MonetizeButton jobId={initialJob.id} className="mb-6" />
+        )}
 
         {/* Show different content based on status */}
         {initialJob.status === 'RUNNING' || initialJob.status === 'PENDING' ? (

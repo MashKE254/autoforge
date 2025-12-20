@@ -16,12 +16,18 @@
 // Bolt Generator - Single-pass for simple apps
 export { BoltGenerator, boltGenerator } from './bolt-generator';
 
-// Orchestrated Generator - Multi-pass for complex apps  
+// Orchestrated Generator - Multi-pass for complex apps
 export { OrchestratedGenerator, orchestratedGenerator } from './orchestrated-generator';
 
+// Personal Tool Generator - Simple, single-user tools with localStorage
+export { PersonalToolGenerator, personalToolGenerator } from './personal-tool-generator';
+
+// SaaS Upgrade Generator - Transform personal tools → full SaaS
+export { SaaSUpgradeGenerator, saasUpgradeGenerator } from './saas-upgrade-generator';
+
 // Unified Generator - Auto-detects complexity and chooses strategy
-export { 
-  UnifiedGenerator, 
+export {
+  UnifiedGenerator,
   unifiedGenerator,
   generateFromPrompt,
 } from './unified-generator';
