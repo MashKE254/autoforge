@@ -193,11 +193,50 @@ export function sanitizePackageJsonForWebContainer(packageJsonContent: string): 
 }
 
 /**
+ * Detect if this is a personal tool (localStorage-based, no auth/DB)
+ */
+function isPersonalTool(files: Array<{ path: string; content: string }>): boolean {
+  // Check for indicators of personal tool:
+  // 1. Has lib/storage.ts (localStorage helper)
+  // 2. No Clerk imports
+  // 3. No Supabase imports
+  // 4. No middleware.ts with auth
+
+  const hasStorageHelper = files.some(f => f.path === 'lib/storage.ts');
+  const hasClerk = files.some(f => f.content.includes('@clerk/nextjs'));
+  const hasSupabase = files.some(f => f.content.includes('@supabase/'));
+
+  return hasStorageHelper && !hasClerk && !hasSupabase;
+}
+
+/**
  * Sanitize TypeScript/JavaScript file to remove auth-related code for WebContainer
  */
-function sanitizeCodeFile(content: string, filePath: string): string {
+function sanitizeCodeFile(content: string, filePath: string, isPersonal: boolean = false): string {
   let sanitized = content;
 
+  // Personal tools are simpler - they don't have auth/DB to remove
+  if (isPersonal) {
+    // Just ensure localStorage is used safely with window checks
+    sanitized = sanitized.replace(
+      /(?<![.])(localStorage\.(getItem|setItem|removeItem|clear))/g,
+      (match, fullMatch, method) => {
+        // If already wrapped in typeof check, don't wrap again
+        if (content.includes('typeof window')) {
+          return fullMatch;
+        }
+        return `(typeof window !== 'undefined' ? ${fullMatch} : ${
+          method === 'getItem' ? 'null' :
+          method === 'setItem' || method === 'removeItem' ? 'undefined' :
+          '(()=>{})'
+        })`;
+      }
+    );
+
+    return sanitized;
+  }
+
+  // SaaS tools need heavy sanitization
   // Special handling for middleware.ts - replace with pass-through middleware
   if (filePath === 'middleware.ts' || filePath.endsWith('/middleware.ts')) {
     return `// WebContainer-compatible middleware (auth disabled for preview)
@@ -470,8 +509,18 @@ export default ${componentName};
 export function sanitizeFilesForWebContainer(
   files: Array<{ path: string; content: string }>
 ): Array<{ path: string; content: string }> {
-  // First, detect and create stub files for missing components
-  const stubComponents = detectMissingComponents(files);
+  // Detect if this is a personal tool (lighter sanitization needed)
+  const isPersonal = isPersonalTool(files);
+
+  console.log(`\n🔍 WebContainer Sanitization:`);
+  console.log(`   Tool Type: ${isPersonal ? 'PERSONAL (localStorage)' : 'SAAS (auth/DB)'}`);
+  console.log(`   Files: ${files.length}`);
+
+  // First, detect and create stub files for missing components (only for SaaS)
+  const stubComponents = isPersonal ? [] : detectMissingComponents(files);
+  if (stubComponents.length > 0) {
+    console.log(`   Created ${stubComponents.length} stub components`);
+  }
 
   // Combine original files with stub components
   const allFiles = [...files, ...stubComponents];
@@ -490,7 +539,7 @@ export function sanitizeFilesForWebContainer(
         file.path.endsWith('.jsx') || file.path.endsWith('.js')) {
       return {
         ...file,
-        content: sanitizeCodeFile(file.content, file.path),
+        content: sanitizeCodeFile(file.content, file.path, isPersonal),
       };
     }
 
