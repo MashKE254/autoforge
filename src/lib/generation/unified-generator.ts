@@ -304,6 +304,7 @@ export class UnifiedGenerator {
    * - Authentication needs: "sign up", "login", "user accounts"
    * - Payment needs: "billing", "payments", "stripe", "checkout"
    * - Marketing needs: "landing page", "pricing page"
+   * - Multi-account patterns: "multiple accounts", "follower accounts", etc.
    *
    * Default to PERSONAL for simplicity
    */
@@ -331,10 +332,45 @@ export class UnifiedGenerator {
       'checkout',
     ];
 
-    const hasSaaSKeyword = saasKeywords.some(keyword => lower.includes(keyword));
+    // Multi-account/multi-user patterns (catches trading systems, collaboration tools, etc.)
+    const multiUserPatterns = [
+      'multiple accounts',
+      'follower account',
+      'master account',
+      'master and follower',
+      'replicate to multiple',
+      'multiple users',
+      'each user',
+      'per user',
+      'user-specific',
+      'account-specific',
+      'role-based',
+      'admin panel',
+      'user management',
+      'team member',
+      'workspace',
+      'organization',
+      'tenant',
+    ];
 
-    if (hasSaaSKeyword) {
-      console.log(`   ✓ SaaS keyword detected - generating full SaaS`);
+    // Check explicit SaaS keywords
+    const matchedKeyword = saasKeywords.find(keyword => lower.includes(keyword));
+    if (matchedKeyword) {
+      console.log(`   ✓ SaaS keyword detected: "${matchedKeyword}" - generating full SaaS`);
+      return true;
+    }
+
+    // Check multi-user patterns
+    const matchedPattern = multiUserPatterns.find(pattern => lower.includes(pattern));
+    if (matchedPattern) {
+      console.log(`   ✓ Multi-user pattern detected: "${matchedPattern}" - generating full SaaS`);
+      return true;
+    }
+
+    // Count references to "account" or "user" (strong signal for multi-user needs)
+    const accountRefs = (lower.match(/\b(account|user)s?\b/g) || []).length;
+    if (accountRefs >= 4) {
+      console.log(`   ✓ Multiple account/user references (${accountRefs}) - generating full SaaS`);
       return true;
     }
 
