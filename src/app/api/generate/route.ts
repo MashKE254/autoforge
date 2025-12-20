@@ -76,7 +76,7 @@ export async function POST(request: NextRequest) {
 
     // 3. Parse request
     const body = await request.json();
-    const { prompt } = body;
+    const { prompt, mode = 'AUTO' } = body;
 
     if (!prompt || typeof prompt !== 'string' || prompt.trim().length < 3) {
       return NextResponse.json(
@@ -85,19 +85,29 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Validate mode
+    if (!['PERSONAL', 'SAAS', 'AUTO'].includes(mode)) {
+      return NextResponse.json(
+        { error: 'Invalid mode. Must be PERSONAL, SAAS, or AUTO' },
+        { status: 400 }
+      );
+    }
+
     const trimmedPrompt = prompt.trim();
     console.log(`\n${'='.repeat(80)}`);
-    console.log(`🚀 AUTOFORGE PRODUCTION-GRADE GENERATION`);
+    console.log(`🚀 AUTOFORGE GENERATION`);
     console.log(`${'='.repeat(80)}`);
     console.log(`   User: ${user.email} (${user.id})`);
+    console.log(`   Mode: ${mode}`);
     console.log(`   Prompt: "${trimmedPrompt.slice(0, 100)}..."`);
 
-    // 4. Create job record
+    // 4. Create job record with generation mode
     const job = await prisma.generationJob.create({
       data: {
         userId: user.id,
         prompt: trimmedPrompt,
         status: 'RUNNING',
+        generationMode: mode === 'AUTO' ? 'PERSONAL' : mode, // Default to PERSONAL for AUTO
         generationStartedAt: new Date(),
       },
     });
@@ -106,13 +116,25 @@ export async function POST(request: NextRequest) {
     console.log(`   Job ID: ${job.id}`);
     console.log(`${'='.repeat(80)}\n`);
 
-    // 5. Generate using UnifiedGenerator (with complexity analysis + dynamic modules)
+    // 5. Generate using UnifiedGenerator (with mode, complexity analysis + dynamic modules)
     const result = await unifiedGenerator.generate(
       trimmedPrompt,
+      mode as 'PERSONAL' | 'SAAS' | 'AUTO',
       job.id,
       {
         onProgress: (message) => {
           console.log(`   📝 ${message}`);
+        },
+        onModeSelected: (selectedMode) => {
+          console.log(`\n🎯 Final Mode: ${selectedMode}`);
+
+          // Update job with actual mode if AUTO was used
+          if (mode === 'AUTO') {
+            prisma.generationJob.update({
+              where: { id: job.id },
+              data: { generationMode: selectedMode },
+            }).catch(err => console.error('Failed to update job mode:', err));
+          }
         },
         onComplexityAnalysis: (analysis) => {
           console.log(`\n📊 Complexity Analysis:`);
@@ -121,7 +143,12 @@ export async function POST(request: NextRequest) {
           console.log(`   Reasons: ${analysis.reasons.join(', ')}`);
         },
         onStrategySelected: (strategy) => {
-          console.log(`\n🎯 Strategy: ${strategy === 'simple' ? 'SINGLE-PASS' : 'MULTI-PASS ORCHESTRATED'}`);
+          const strategyName = strategy === 'personal'
+            ? 'PERSONAL TOOL'
+            : strategy === 'simple'
+            ? 'SINGLE-PASS SAAS'
+            : 'MULTI-PASS ORCHESTRATED SAAS';
+          console.log(`\n🎯 Strategy: ${strategyName}`);
         },
         onModulesDetected: (modules) => {
           if (modules.length > 0) {
