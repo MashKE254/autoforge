@@ -17,6 +17,7 @@ import { PersonalToolGenerator, personalToolGenerator } from './personal-tool-ge
 import { GeneratedFile, GenerationResult, StreamCallbacks } from './bolt-generator';
 import { prisma } from '../prisma';
 import { dynamicModuleGenerator, DynamicModule, DynamicModuleGenerator } from './dynamic-module-generator';
+import { multiAgentOrchestrator, MultiAgentResult } from './orchestrator/multi-agent-orchestrator';
 
 // ============================================================================
 // COMPLEXITY DETECTION
@@ -141,11 +142,14 @@ export class UnifiedGenerator {
     jobId?: string,
     callbacks?: StreamCallbacks & {
       onComplexityAnalysis?: (analysis: ComplexityAnalysis) => void;
-      onStrategySelected?: (strategy: 'simple' | 'orchestrated' | 'personal') => void;
+      onStrategySelected?: (strategy: 'simple' | 'orchestrated' | 'personal' | 'multi-agent') => void;
       onModulesDetected?: (modules: DynamicModule[]) => void;
       onModeSelected?: (mode: 'PERSONAL' | 'SAAS') => void;
+      onPhaseStart?: (phase: string, agent: string) => void;
+      onPhaseComplete?: (phase: string, duration: number) => void;
+      onQualityMetrics?: (metrics: any) => void;
     }
-  ): Promise<GenerationResult> {
+  ): Promise<GenerationResult | MultiAgentResult> {
     // ========================================================================
     // STEP 1: MODE SELECTION
     // ========================================================================
@@ -206,14 +210,30 @@ export class UnifiedGenerator {
     console.log(`   Reasons: ${complexity.reasons.join(', ')}`);
 
     // Choose strategy
-    let result: GenerationResult;
+    let result: GenerationResult | MultiAgentResult;
 
     if (complexity.isComplex) {
-      console.log(`\n🔧 Using ORCHESTRATED generation (multi-pass)`);
-      callbacks?.onStrategySelected?.('orchestrated');
-      callbacks?.onProgress?.(`Complex application detected (score: ${complexity.score}). Using multi-pass generation...`);
+      console.log(`\n🚀 Using REVOLUTIONARY MULTI-AGENT ORCHESTRATOR`);
+      callbacks?.onStrategySelected?.('multi-agent');
+      callbacks?.onProgress?.(`Complex application detected (score: ${complexity.score}). Activating 9 specialized AI agents...`);
 
-      result = await this.orchestratedGenerator.generate(enhancedPrompt, jobId, callbacks);
+      result = await multiAgentOrchestrator.generate(enhancedPrompt, jobId, {
+        ...callbacks,
+        onPhaseStart: callbacks?.onPhaseStart,
+        onPhaseComplete: callbacks?.onPhaseComplete,
+        onQualityMetrics: callbacks?.onQualityMetrics,
+      });
+
+      // Log quality metrics
+      if ('qualityMetrics' in result) {
+        console.log(`\n📊 QUALITY METRICS:`);
+        console.log(`   Overall Score: ${result.qualityMetrics.overallScore}/100 (${result.qualityMetrics.grade})`);
+        console.log(`   Test Coverage: ${result.qualityMetrics.testCoverage}%`);
+        console.log(`   Accessibility: ${result.qualityMetrics.accessibilityScore}/100`);
+        console.log(`   Type Safety: ${result.qualityMetrics.typeSafetyScore}/100`);
+        console.log(`   Security: ${result.qualityMetrics.securityScore}/100`);
+        console.log(`   Performance: ${result.qualityMetrics.performanceScore}/100`);
+      }
     } else {
       console.log(`\n⚡ Using SIMPLE generation (single-pass)`);
       callbacks?.onStrategySelected?.('simple');
@@ -395,3 +415,4 @@ export async function generateFromPrompt(
 // Re-export types
 export type { GeneratedFile, GenerationResult, StreamCallbacks };
 export type { ComplexityAnalysis };
+export type { MultiAgentResult };

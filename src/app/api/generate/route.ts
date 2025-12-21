@@ -170,7 +170,19 @@ export async function POST(request: NextRequest) {
     console.log(`✅ GENERATION COMPLETE`);
     console.log(`${'='.repeat(80)}`);
     console.log(`   Total Files: ${result.files.length}`);
-    console.log(`   File List:`);
+
+    // Log quality metrics if available (from Multi-Agent Orchestrator)
+    if ('qualityMetrics' in result) {
+      console.log(`\n   🎯 QUALITY METRICS:`);
+      console.log(`      Overall: ${result.qualityMetrics.overallScore}/100 (${result.qualityMetrics.grade})`);
+      console.log(`      Tests: ${result.qualityMetrics.testCoverage}%`);
+      console.log(`      Accessibility: ${result.qualityMetrics.accessibilityScore}/100`);
+      console.log(`      Type Safety: ${result.qualityMetrics.typeSafetyScore}/100`);
+      console.log(`      Security: ${result.qualityMetrics.securityScore}/100`);
+      console.log(`      Performance: ${result.qualityMetrics.performanceScore}/100`);
+    }
+
+    console.log(`\n   File List:`);
     result.files.forEach(f => console.log(`     - ${f.path}`));
     console.log(`${'='.repeat(80)}\n`);
 
@@ -204,14 +216,22 @@ export async function POST(request: NextRequest) {
     });
 
     // 8. Return success response
-    return NextResponse.json({
+    const response: any = {
       success: true,
       jobId: job.id,
       files: result.files,
       fileCount: result.files.length,
       message: `Generated ${result.files.length} production-grade files`,
       tokensUsed: result.tokensUsed,
-    });
+    };
+
+    // Include quality metrics if available (from Multi-Agent Orchestrator)
+    if ('qualityMetrics' in result) {
+      response.qualityMetrics = result.qualityMetrics;
+      response.message = `Generated ${result.files.length} production-grade files with ${result.qualityMetrics.grade} quality (${result.qualityMetrics.overallScore}/100)`;
+    }
+
+    return NextResponse.json(response);
 
   } catch (error) {
     console.error('\n❌ GENERATION ERROR:', error);
