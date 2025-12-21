@@ -79,3 +79,49 @@ export type {
 // ============================================================================
 
 export { classifyPrompt } from './prompt-classifier';
+
+// ============================================================================
+// REVOLUTIONARY MULTI-AGENT SYSTEM 🚀
+// ============================================================================
+
+// Multi-Agent Orchestrator - 9 specialized AI agents working together
+export {
+  multiAgentOrchestrator,
+  type MultiAgentResult,
+  type OrchestrationPhase
+} from './orchestrator/multi-agent-orchestrator';
+
+// ============================================================================
+// SPECIALIZED AGENTS
+// ============================================================================
+
+export { architectAgent, type ArchitectureDesign } from './agents/architect-agent';
+export { testAgent, type TestGenerationResult } from './agents/test-agent';
+export { accessibilityAgent, type AccessibilityResult, type AccessibilityReport } from './agents/accessibility-agent';
+export { typeSafetyAgent, type TypeSafetyResult } from './agents/type-safety-agent';
+export { securityAgent, type SecurityReport, type SecurityIssue } from './agents/security-agent';
+export { performanceAgent, type PerformanceReport } from './agents/performance-agent';
+export { codeReviewAgent, type CodeReviewReport } from './agents/code-review-agent';
+export { documentationAgent, type DocumentationResult } from './agents/documentation-agent';
+
+// ============================================================================
+// AI DEBUGGER (Revolutionary Feature) 🔧
+// ============================================================================
+
+export {
+  aiDebugger,
+  type DebugError,
+  type DebugFix,
+  type DebugSession
+} from './debugging/ai-debugger';
+
+// ============================================================================
+// ITERATION ENGINE (Revolutionary Feature) ⚡
+// ============================================================================
+
+export {
+  iterationEngine,
+  type IterationRequest,
+  type IterationPlan,
+  type IterationResult
+} from './iteration/iteration-engine';
