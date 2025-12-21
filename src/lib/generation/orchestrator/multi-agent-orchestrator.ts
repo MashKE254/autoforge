@@ -24,6 +24,7 @@ import { securityAgent } from '../agents/security-agent';
 import { performanceAgent } from '../agents/performance-agent';
 import { codeReviewAgent } from '../agents/code-review-agent';
 import { documentationAgent } from '../agents/documentation-agent';
+import { completenessAgent } from '../agents/completeness-agent';
 import { boltGenerator } from '../bolt-generator';
 
 // ============================================================================
@@ -39,8 +40,10 @@ export interface MultiAgentResult extends GenerationResult {
     securityScore: number;
     performanceScore: number;
     codeQualityScore: number;
+    completenessScore: number;
     overallScore: number;
     grade: 'A+' | 'A' | 'B' | 'C' | 'D' | 'F';
+    productionReady: boolean;
   };
   agentReports: {
     architecture?: string;
@@ -51,6 +54,7 @@ export interface MultiAgentResult extends GenerationResult {
     performance?: string;
     codeReview?: string;
     documentation?: string;
+    completeness?: string;
   };
 }
 
@@ -253,6 +257,45 @@ export class MultiAgentOrchestrator {
       callbacks?.onProgress?.(`✅ Generated ${docs.files.length} documentation files`);
 
       // ====================================================================
+      // PHASE 6: PRODUCTION COMPLETENESS VALIDATION (THE AUTOFORGE DIFFERENCE!)
+      // ====================================================================
+      const completenessReport = await this.executePhase(
+        'Completeness Validation',
+        'CompletenessAgent',
+        async () => {
+          callbacks?.onProgress?.('🔍 CompletenessAgent validating production completeness...');
+          callbacks?.onProgress?.('   → Scanning for TODOs, placeholders, and mock data...');
+          return await completenessAgent.validate(enhancedFiles, {
+            onProgress: (msg) => callbacks?.onProgress?.(`   ${msg}`),
+            onFileAnalyzed: (file, issues) => {
+              if (issues > 0) {
+                callbacks?.onProgress?.(`   ⚠️  ${file}: ${issues} issue(s) found`);
+              }
+            },
+          });
+        },
+        callbacks
+      );
+
+      callbacks?.onProgress?.(`✅ Completeness: ${completenessReport.score}/100 (${completenessReport.grade})`);
+
+      if (!completenessReport.passesProductionStandard) {
+        callbacks?.onProgress?.(`⚠️  WARNING: Code does NOT meet production standards!`);
+        callbacks?.onProgress?.(`   Found ${completenessReport.issues.length} issues that need fixing`);
+
+        // Log critical issues
+        const criticalIssues = completenessReport.issues.filter(i => i.severity === 'critical');
+        if (criticalIssues.length > 0) {
+          callbacks?.onProgress?.(`\n   CRITICAL ISSUES:`);
+          criticalIssues.slice(0, 5).forEach(issue => {
+            callbacks?.onProgress?.(`   - ${issue.file}: ${issue.description}`);
+          });
+        }
+      } else {
+        callbacks?.onProgress?.(`✅ Code is PRODUCTION-READY with minimal issues`);
+      }
+
+      // ====================================================================
       // CALCULATE QUALITY METRICS
       // ====================================================================
       const qualityMetrics = this.calculateQualityMetrics({
@@ -262,6 +305,8 @@ export class MultiAgentOrchestrator {
         securityScore: securityResult.score,
         performanceScore: performanceResult.estimatedLighthouseScore,
         codeQualityScore: codeReview.score,
+        completenessScore: completenessReport.score,
+        productionReady: completenessReport.passesProductionStandard,
       });
 
       callbacks?.onQualityMetrics?.(qualityMetrics);
@@ -272,12 +317,15 @@ export class MultiAgentOrchestrator {
       callbacks?.onProgress?.('\n🎉 Multi-Agent Generation Complete!\n');
       callbacks?.onProgress?.(`📊 Quality Metrics:`);
       callbacks?.onProgress?.(`   Overall Score: ${qualityMetrics.overallScore}/100 (${qualityMetrics.grade})`);
-      callbacks?.onProgress?.(`   Test Coverage: ${qualityMetrics.testCoverage}%`);
-      callbacks?.onProgress?.(`   Accessibility: ${qualityMetrics.accessibilityScore}/100`);
-      callbacks?.onProgress?.(`   Type Safety: ${qualityMetrics.typeSafetyScore}/100`);
-      callbacks?.onProgress?.(`   Security: ${qualityMetrics.securityScore}/100`);
-      callbacks?.onProgress?.(`   Performance: ${qualityMetrics.performanceScore}/100`);
-      callbacks?.onProgress?.(`   Code Quality: ${qualityMetrics.codeQualityScore}/100`);
+      callbacks?.onProgress?.(`   ${qualityMetrics.productionReady ? '✅ PRODUCTION-READY' : '⚠️  NEEDS WORK BEFORE PRODUCTION'}`);
+      callbacks?.onProgress?.(`\n   Individual Scores:`);
+      callbacks?.onProgress?.(`   ✓ Completeness: ${qualityMetrics.completenessScore}/100 ${qualityMetrics.completenessScore >= 90 ? '✅' : '⚠️'}`);
+      callbacks?.onProgress?.(`   ✓ Test Coverage: ${qualityMetrics.testCoverage}%`);
+      callbacks?.onProgress?.(`   ✓ Security: ${qualityMetrics.securityScore}/100`);
+      callbacks?.onProgress?.(`   ✓ Accessibility: ${qualityMetrics.accessibilityScore}/100`);
+      callbacks?.onProgress?.(`   ✓ Type Safety: ${qualityMetrics.typeSafetyScore}/100`);
+      callbacks?.onProgress?.(`   ✓ Performance: ${qualityMetrics.performanceScore}/100`);
+      callbacks?.onProgress?.(`   ✓ Code Quality: ${qualityMetrics.codeQualityScore}/100`);
       callbacks?.onProgress?.(`\n📁 Total Files: ${enhancedFiles.length}`);
 
       return {
@@ -295,6 +343,7 @@ export class MultiAgentOrchestrator {
           performance: performanceResult.summary,
           codeReview: codeReview.summary,
           documentation: docs.summary,
+          completeness: completenessReport.summary,
         },
       };
     } catch (error) {
@@ -312,8 +361,10 @@ export class MultiAgentOrchestrator {
           securityScore: 0,
           performanceScore: 0,
           codeQualityScore: 0,
+          completenessScore: 0,
           overallScore: 0,
           grade: 'F',
+          productionReady: false,
         },
         agentReports: {},
       };
@@ -408,15 +459,18 @@ export class MultiAgentOrchestrator {
     securityScore: number;
     performanceScore: number;
     codeQualityScore: number;
+    completenessScore: number;
+    productionReady: boolean;
   }): MultiAgentResult['qualityMetrics'] {
-    // Weighted average
+    // Weighted average (completeness gets highest weight - it's the most critical!)
     const overallScore = Math.round(
-      scores.testCoverage * 0.20 +
-      scores.accessibilityScore * 0.15 +
-      scores.typeSafetyScore * 0.15 +
-      scores.securityScore * 0.20 +
-      scores.performanceScore * 0.15 +
-      scores.codeQualityScore * 0.15
+      scores.completenessScore * 0.25 +  // HIGHEST WEIGHT - Completeness is critical!
+      scores.testCoverage * 0.15 +
+      scores.securityScore * 0.15 +
+      scores.accessibilityScore * 0.12 +
+      scores.typeSafetyScore * 0.12 +
+      scores.performanceScore * 0.11 +
+      scores.codeQualityScore * 0.10
     );
 
     let grade: 'A+' | 'A' | 'B' | 'C' | 'D' | 'F';

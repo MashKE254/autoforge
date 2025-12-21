@@ -20,7 +20,7 @@ import { GeneratedFile } from '../bolt-generator';
 // TYPES
 // ============================================================================
 
-export interface Iteration Request {
+export interface IterationRequest {
   feedback: string;
   currentFiles: GeneratedFile[];
   context?: string;
