@@ -1100,6 +1100,3 @@ export const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, m
 
 // Export singleton
 export const testAgent = new TestAgent();
-`,
-      },
-</invoke>
