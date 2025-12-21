@@ -145,6 +145,7 @@ export default function Dashboard() {
   
   // Core State
   const [prompt, setPrompt] = useState(searchParams.get('prompt') || '');
+  const [generatorType, setGeneratorType] = useState(searchParams.get('generator') || undefined);
   const [isGenerating, setIsGenerating] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
   const [recentGenerations, setRecentGenerations] = useState<RecentGeneration[]>([]);
@@ -278,11 +279,20 @@ export default function Dashboard() {
     setStatusMessage('Starting generation...');
 
     try {
+      // Build request body
+      const requestBody: any = { prompt: finalPrompt };
+
+      // Include generator type if specified (from recommender)
+      if (generatorType) {
+        requestBody.generatorType = generatorType;
+        setStatusMessage(`Starting generation with ${generatorType} generator...`);
+      }
+
       // Call the main /api/generate endpoint
       const response = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: finalPrompt }),
+        body: JSON.stringify(requestBody),
       });
 
       const data = await response.json();

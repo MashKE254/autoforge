@@ -245,9 +245,15 @@ export default function RecommenderPage() {
   
   // Start building
   const startBuilding = (rec: SoftwareRecommendation) => {
-    const url = session 
-      ? `/dashboard?prompt=${encodeURIComponent(rec.prompt)}`
-      : `/login?redirect=/dashboard&prompt=${encodeURIComponent(rec.prompt)}`;
+    // Include generator type in URL to ensure correct routing
+    const params = new URLSearchParams({
+      prompt: rec.prompt,
+      generator: rec.generator, // Pass generator type (bolt, saas, workflow, agent, api, orchestrated)
+    });
+
+    const url = session
+      ? `/dashboard?${params.toString()}`
+      : `/login?redirect=/dashboard&${params.toString()}`;
     router.push(url);
   };
   

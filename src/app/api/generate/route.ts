@@ -1,12 +1,20 @@
 /**
- * Base Generation API Route - UPGRADED TO USE UNIFIED GENERATOR
+ * Base Generation API Route - UPGRADED TO USE ENHANCED UNIFIED GENERATOR
  *
  * File: src/app/api/generate/route.ts
  *
  * Now uses:
- * - UnifiedGenerator (complexity analysis + smart routing)
+ * - EnhancedUnifiedGenerator (supports all 6 generator types)
+ * - UnifiedGenerator (fallback for PERSONAL/SAAS mode)
  * - DynamicModuleGenerator (AI-powered integration generation)
  * - Production-grade prompts (30-50+ files)
+ *
+ * IMPORTANT: Now respects recommender's generator type!
+ * - UI Apps → BoltGenerator
+ * - SaaS Products → SaaSGenerator
+ * - Workflow Automation → WorkflowGenerator
+ * - AI Assistants → AgentGenerator
+ * - API Backends → APIGenerator
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -14,6 +22,11 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '../auth/[...nextauth]/route';
 import { prisma } from '@/lib/prisma';
 import { unifiedGenerator } from '@/lib/generation/unified-generator';
+import { EnhancedUnifiedGenerator } from '@/lib/generation/enhanced-unified-generator';
+import type { EnhancedGenerationType } from '@/lib/generation/enhanced-prompt-classifier';
+
+// Create enhanced generator instance
+const enhancedGenerator = new EnhancedUnifiedGenerator();
 
 // ============================================================================
 // GET: Info about generation endpoints
@@ -22,22 +35,34 @@ import { unifiedGenerator } from '@/lib/generation/unified-generator';
 export async function GET() {
   return NextResponse.json({
     endpoints: {
-      '/api/generate': 'POST - Production-grade generation with UnifiedGenerator',
+      '/api/generate': 'POST - Production-grade generation with EnhancedUnifiedGenerator',
       '/api/generate/stream': 'POST - Streaming generation with SSE',
     },
     usage: {
       method: 'POST',
       body: {
         prompt: 'string (required) - Description of what to build',
+        mode: 'string (optional) - PERSONAL | SAAS | AUTO (default: AUTO)',
+        generatorType: 'string (optional) - bolt | saas | workflow | agent | api | orchestrated',
       },
     },
     features: [
+      'Supports all 6 generator types (UI, SaaS, Workflow, AI Agent, API, Orchestrated)',
       'Automatic complexity analysis',
       'Dynamic module generation (any API/integration)',
-      'Smart routing (simple vs orchestrated)',
+      'Smart routing based on generator type',
       '30-50+ files for complex apps',
       'Production-grade code quality',
+      'Respects recommender generator type',
     ],
+    generatorTypes: {
+      'bolt': 'UI Applications (dashboards, CRMs, tools)',
+      'saas': 'SaaS Products (Stripe billing, multi-tenant)',
+      'workflow': 'Workflow Automation (Inngest, triggers, actions)',
+      'agent': 'AI Assistants (LangGraph agents, tool calling)',
+      'api': 'API Backends (REST, webhooks, API-only)',
+      'orchestrated': 'Complex Apps (multi-pass orchestration)',
+    },
   });
 }
 
@@ -76,7 +101,7 @@ export async function POST(request: NextRequest) {
 
     // 3. Parse request
     const body = await request.json();
-    const { prompt, mode = 'AUTO' } = body;
+    const { prompt, mode = 'AUTO', generatorType } = body;
 
     if (!prompt || typeof prompt !== 'string' || prompt.trim().length < 3) {
       return NextResponse.json(
@@ -93,12 +118,37 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Validate generator type if provided
+    const validGeneratorTypes = ['bolt', 'saas', 'workflow', 'agent', 'api', 'orchestrated'];
+    if (generatorType && !validGeneratorTypes.includes(generatorType)) {
+      return NextResponse.json(
+        { error: `Invalid generator type. Must be one of: ${validGeneratorTypes.join(', ')}` },
+        { status: 400 }
+      );
+    }
+
+    // Map recommender generator type to EnhancedGenerationType
+    const generatorTypeMap: Record<string, EnhancedGenerationType> = {
+      'bolt': 'ui-application',
+      'saas': 'full-saas',
+      'workflow': 'workflow-automation',
+      'agent': 'ai-agent-network',
+      'api': 'api-backend',
+      'orchestrated': 'ui-application', // Use Bolt's ui-application for now
+    };
+
+    const forceType = generatorType ? generatorTypeMap[generatorType] : undefined;
+
     const trimmedPrompt = prompt.trim();
     console.log(`\n${'='.repeat(80)}`);
     console.log(`🚀 AUTOFORGE GENERATION`);
     console.log(`${'='.repeat(80)}`);
     console.log(`   User: ${user.email} (${user.id})`);
     console.log(`   Mode: ${mode}`);
+    console.log(`   Generator Type: ${generatorType || 'AUTO'}`);
+    if (forceType) {
+      console.log(`   → Forcing: ${forceType}`);
+    }
     console.log(`   Prompt: "${trimmedPrompt.slice(0, 100)}..."`);
 
     // 4. Create job record with generation mode
@@ -116,51 +166,71 @@ export async function POST(request: NextRequest) {
     console.log(`   Job ID: ${job.id}`);
     console.log(`${'='.repeat(80)}\n`);
 
-    // 5. Generate using UnifiedGenerator (with mode, complexity analysis + dynamic modules)
-    const result = await unifiedGenerator.generate(
-      trimmedPrompt,
-      mode as 'PERSONAL' | 'SAAS' | 'AUTO',
-      job.id,
-      {
-        onProgress: (message) => {
-          console.log(`   📝 ${message}`);
-        },
-        onModeSelected: (selectedMode) => {
-          console.log(`\n🎯 Final Mode: ${selectedMode}`);
+    // 5. Choose generator and generate
+    let result: any;
 
-          // Update job with actual mode if AUTO was used
-          if (mode === 'AUTO') {
-            prisma.generationJob.update({
-              where: { id: job.id },
-              data: { generationMode: selectedMode },
-            }).catch(err => console.error('Failed to update job mode:', err));
-          }
+    if (forceType) {
+      // Use EnhancedUnifiedGenerator when generator type is specified (from recommender)
+      console.log(`\n🎯 Using ENHANCED UNIFIED GENERATOR with forced type: ${forceType}`);
+
+      result = await enhancedGenerator.generate(trimmedPrompt, {
+        jobId: job.id,
+        forceType,
+        callbacks: {
+          onProgress: (message) => {
+            console.log(`   📝 ${message}`);
+          },
         },
-        onComplexityAnalysis: (analysis) => {
-          console.log(`\n📊 Complexity Analysis:`);
-          console.log(`   Score: ${analysis.score}/100`);
-          console.log(`   Is Complex: ${analysis.isComplex}`);
-          console.log(`   Reasons: ${analysis.reasons.join(', ')}`);
-        },
-        onStrategySelected: (strategy) => {
-          const strategyName = strategy === 'personal'
-            ? 'PERSONAL TOOL'
-            : strategy === 'simple'
-            ? 'SINGLE-PASS SAAS'
-            : 'MULTI-PASS ORCHESTRATED SAAS';
-          console.log(`\n🎯 Strategy: ${strategyName}`);
-        },
-        onModulesDetected: (modules) => {
-          if (modules.length > 0) {
-            console.log(`\n🔌 Dynamic Modules Generated:`);
-            modules.forEach(m => {
-              console.log(`   - ${m.name}: ${m.description}`);
-              console.log(`     Files: ${m.files.length}, Deps: ${m.dependencies.length}`);
-            });
-          }
-        },
-      }
-    );
+      });
+    } else {
+      // Use UnifiedGenerator for legacy PERSONAL/SAAS mode flow
+      console.log(`\n🎯 Using UNIFIED GENERATOR with mode: ${mode}`);
+
+      result = await unifiedGenerator.generate(
+        trimmedPrompt,
+        mode as 'PERSONAL' | 'SAAS' | 'AUTO',
+        job.id,
+        {
+          onProgress: (message) => {
+            console.log(`   📝 ${message}`);
+          },
+          onModeSelected: (selectedMode) => {
+            console.log(`\n🎯 Final Mode: ${selectedMode}`);
+
+            // Update job with actual mode if AUTO was used
+            if (mode === 'AUTO') {
+              prisma.generationJob.update({
+                where: { id: job.id },
+                data: { generationMode: selectedMode },
+              }).catch(err => console.error('Failed to update job mode:', err));
+            }
+          },
+          onComplexityAnalysis: (analysis) => {
+            console.log(`\n📊 Complexity Analysis:`);
+            console.log(`   Score: ${analysis.score}/100`);
+            console.log(`   Is Complex: ${analysis.isComplex}`);
+            console.log(`   Reasons: ${analysis.reasons.join(', ')}`);
+          },
+          onStrategySelected: (strategy) => {
+            const strategyName = strategy === 'personal'
+              ? 'PERSONAL TOOL'
+              : strategy === 'simple'
+              ? 'SINGLE-PASS SAAS'
+              : 'MULTI-PASS ORCHESTRATED SAAS';
+            console.log(`\n🎯 Strategy: ${strategyName}`);
+          },
+          onModulesDetected: (modules) => {
+            if (modules.length > 0) {
+              console.log(`\n🔌 Dynamic Modules Generated:`);
+              modules.forEach(m => {
+                console.log(`   - ${m.name}: ${m.description}`);
+                console.log(`     Files: ${m.files.length}, Deps: ${m.dependencies.length}`);
+              });
+            }
+          },
+        }
+      );
+    }
 
     if (!result.success || !result.files || result.files.length === 0) {
       throw new Error(result.error || 'No files were generated');
@@ -223,6 +293,8 @@ export async function POST(request: NextRequest) {
       fileCount: result.files.length,
       message: `Generated ${result.files.length} production-grade files`,
       tokensUsed: result.tokensUsed,
+      generatorUsed: forceType || (result.classificationType || 'auto'),
+      generatorsUsed: result.generatorsUsed || [],
     };
 
     // Include quality metrics if available (from Multi-Agent Orchestrator)
