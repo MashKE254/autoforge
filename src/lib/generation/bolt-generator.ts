@@ -16,6 +16,7 @@
 
 import Anthropic from '@anthropic-ai/sdk';
 import { prisma } from '../prisma';
+import { PRODUCTION_PATTERNS } from './production-patterns';
 
 // ============================================================================
 // TYPES
@@ -1470,7 +1471,7 @@ export class BoltGenerator {
         model: 'claude-sonnet-4-20250514',
         max_tokens: 64000, // CRITICAL: High limit for complete multi-page applications (30-50+ files)
         temperature: 0.7,
-        system: MANAGED_STACK_SYSTEM_PROMPT,
+        system: MANAGED_STACK_SYSTEM_PROMPT + '\n\n' + PRODUCTION_PATTERNS,
         messages: [{
           role: 'user',
           content: buildUserPrompt(prompt)

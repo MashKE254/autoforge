@@ -103,6 +103,7 @@ export { securityAgent, type SecurityReport, type SecurityIssue } from './agents
 export { performanceAgent, type PerformanceReport } from './agents/performance-agent';
 export { codeReviewAgent, type CodeReviewReport } from './agents/code-review-agent';
 export { documentationAgent, type DocumentationResult } from './agents/documentation-agent';
+export { completenessAgent, type CompletenessReport, type CompletenessIssue } from './agents/completeness-agent';
 
 // ============================================================================
 // AI DEBUGGER (Revolutionary Feature) 🔧
