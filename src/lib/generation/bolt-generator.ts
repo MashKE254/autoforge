@@ -17,6 +17,12 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { prisma } from '../prisma';
 import { PRODUCTION_PATTERNS } from './production-patterns';
+import {
+  AI_ASSISTANT_PATTERNS,
+  WORKFLOW_AUTOMATION_PATTERNS,
+  BOT_PATTERNS,
+  AI_AGENT_PATTERNS,
+} from './ai-systems-patterns';
 
 // ============================================================================
 // TYPES
@@ -655,7 +661,13 @@ Use @tanstack/react-table with:
 // ============================================================================
 
 function buildUserPrompt(userRequest: string): string {
-  const isAIRequest = /\b(ai agent|chatbot|llm|gpt|claude|openai|langchain|langgraph|ai assistant|chat with ai|ai-powered|machine learning|neural)\b/i.test(userRequest);
+  // AI Systems Detection
+  const isAIAssistant = /\b(ai assistant|chatbot|chat|llm|gpt|claude|openai|ai-powered chat|conversational ai|cybersecurity education|educational assistant)\b/i.test(userRequest);
+  const isWorkflow = /\b(workflow|automation|zapier|trigger|action|n8n|make|integromat|automate)\b/i.test(userRequest);
+  const isBot = /\b(bot|discord bot|slack bot|telegram bot|whatsapp bot)\b/i.test(userRequest);
+  const isAIAgent = /\b(ai agent|autonomous agent|agentic|langchain|langgraph|tool calling|autonomous)\b/i.test(userRequest);
+
+  // App Types Detection
   const isDashboard = /\b(dashboard|analytics|admin|panel|metrics|monitoring|reporting)\b/i.test(userRequest);
   const isKanban = /\b(kanban|board|trello|task|project management|todo)\b/i.test(userRequest);
   const isCRM = /\b(crm|customer|contacts|leads|sales|pipeline)\b/i.test(userRequest);
@@ -664,6 +676,7 @@ function buildUserPrompt(userRequest: string): string {
   const needsPayments = /\b(payment|stripe|subscription|billing|checkout|pricing)\b/i.test(userRequest);
 
   let appHint = '';
+  let aiSystemsPatterns = '';
   
   if (isDashboard) {
     appHint = `
@@ -701,19 +714,74 @@ APPLICATION TYPE: Inventory/Catalog
 - Add/Edit product modal
 - Search functionality
 - Include UserButton from Clerk in header`;
-  } else if (isAIRequest) {
-    appHint = `
-APPLICATION TYPE: AI Agent Interface
-- Chat interface with message history
-- User and AI message bubbles
-- Loading state with typing indicator
-- Input field with send button
-- Use MOCK RESPONSES (no real AI API calls)
-- Include UserButton from Clerk in header
+  }
 
-⚠️ CRITICAL: This runs in WebContainer with NO API access.
-Create a working SIMULATION with mock responses.
-NO LangChain, NO OpenAI SDK, NO Anthropic SDK.`;
+  // AI Systems - Inject Real Patterns
+  if (isAIAssistant) {
+    aiSystemsPatterns += AI_ASSISTANT_PATTERNS;
+    appHint = `
+APPLICATION TYPE: AI Assistant / Chatbot
+
+✅ GENERATE A REAL, WORKING AI ASSISTANT:
+- Full Anthropic API integration (streaming + non-streaming)
+- Database-backed conversation history
+- Server actions for message handling
+- Beautiful chat UI with typing indicators
+- Support for specialized assistants (cybersecurity, education, etc.)
+- Optional: RAG for knowledge-base powered responses
+- Optional: Multi-modal support (images, files)
+
+NO MOCKS! Generate production-ready AI chat with real API calls.`;
+  }
+
+  if (isWorkflow) {
+    aiSystemsPatterns += WORKFLOW_AUTOMATION_PATTERNS;
+    appHint += `
+
+APPLICATION TYPE: Workflow Automation
+
+✅ GENERATE A REAL WORKFLOW ENGINE (BETTER THAN ZAPIER):
+- Complete workflow executor with database storage
+- Visual workflow builder (drag-and-drop)
+- Triggers: webhook, schedule, manual, events
+- Actions: HTTP, email, database, AI tasks, transformations
+- Conditions and loops
+- Detailed execution history
+- Better than Zapier (self-hosted, unlimited, AI-native)
+
+Generate production-ready workflow automation system.`;
+  }
+
+  if (isBot) {
+    aiSystemsPatterns += BOT_PATTERNS;
+    appHint += `
+
+APPLICATION TYPE: Bot (Discord/Slack/Telegram)
+
+✅ GENERATE A REAL BOT:
+- Full platform integration (Discord.js, Slack Bolt, Telegraf)
+- AI-powered responses with conversation memory
+- Proper event handling and commands
+- Error handling and retries
+- Production-ready deployment scripts
+
+Generate working bots with real platform SDKs.`;
+  }
+
+  if (isAIAgent) {
+    aiSystemsPatterns += AI_AGENT_PATTERNS;
+    appHint += `
+
+APPLICATION TYPE: Autonomous AI Agent
+
+✅ GENERATE A REAL AUTONOMOUS AGENT:
+- Tool-calling AI agent with Claude
+- Extensible tool system (web search, calculator, database, email, etc.)
+- Multi-step task execution
+- Self-correction and retries
+- Task automation and research capabilities
+
+Generate production-ready autonomous agents.`;
   }
 
   // Add auth/payment hints
@@ -741,6 +809,7 @@ PAYMENTS:
 "${userRequest}"
 ${appHint}
 ${featureHints}
+${aiSystemsPatterns ? '\n\n## AI SYSTEMS IMPLEMENTATION PATTERNS\n\n' + aiSystemsPatterns : ''}
 
 ## CRITICAL: THIS MUST BE INDUSTRY-GRADE
 
