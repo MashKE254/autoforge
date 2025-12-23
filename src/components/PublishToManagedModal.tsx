@@ -125,7 +125,7 @@ export default function PublishToManagedModal({
               <Input
                 id="app-name"
                 value={appName}
-                onChange={(e) => setAppName(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAppName(e.target.value)}
                 placeholder="My Awesome App"
               />
             </div>
@@ -136,7 +136,7 @@ export default function PublishToManagedModal({
                 <Input
                   id="subdomain"
                   value={subdomain}
-                  onChange={(e) => setSubdomain(e.target.value.toLowerCase())}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSubdomain(e.target.value.toLowerCase())}
                   placeholder="my-app"
                   pattern="[a-z0-9-]+"
                   className="flex-1"
@@ -262,7 +262,7 @@ export default function PublishToManagedModal({
                 <div className="flex items-start gap-2 text-gray-600">
                   <Zap className="w-4 h-4 mt-0.5 text-yellow-600" />
                   <div>
-                    <strong>What's included:</strong>
+                    <strong>What&apos;s included:</strong>
                     <ul className="mt-1 space-y-1 text-xs">
                       <li>• Database with isolated schema</li>
                       <li>• AI API access (no keys needed)</li>
