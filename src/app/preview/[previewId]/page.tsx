@@ -71,6 +71,8 @@ export default async function PreviewPage({ params }: PageProps) {
       projectName={session.generationJob.prompt.slice(0, 50)}
       expiresAt={session.expiresAt}
       viewCount={session.accessCount}
+      generationJobId={session.generationJobId}
+      showPublishButton={true}
     />
   );
 }

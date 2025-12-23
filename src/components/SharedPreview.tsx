@@ -6,14 +6,17 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { WebContainerProcess, FileSystemTree, DirectoryNode } from '@webcontainer/api';
 import webContainerManager from '../lib/webcontainer-manager';
-import { Loader2, ExternalLink, Clock, Eye, AlertCircle } from 'lucide-react';
+import { Loader2, ExternalLink, Clock, Eye, AlertCircle, Rocket } from 'lucide-react';
 import { Button } from './ui/button';
+import PublishToManagedModal from './PublishToManagedModal';
 
 interface SharedPreviewProps {
   files: Array<{ path: string; content: string; language: string }>;
   projectName: string;
   expiresAt: Date;
   viewCount?: number;
+  generationJobId?: string;
+  showPublishButton?: boolean;
 }
 
 export default function SharedPreview({
@@ -21,12 +24,15 @@ export default function SharedPreview({
   projectName,
   expiresAt,
   viewCount = 0,
+  generationJobId,
+  showPublishButton = false,
 }: SharedPreviewProps) {
   const [previewUrl, setPreviewUrl] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [loadingStep, setLoadingStep] = useState('Initializing...');
   const [error, setError] = useState<string | null>(null);
   const [terminalOutput, setTerminalOutput] = useState<string[]>([]);
+  const [isPublishModalOpen, setIsPublishModalOpen] = useState(false);
   const terminalRef = useRef<HTMLDivElement>(null);
 
   const addTerminalOutput = (line: string) => {
@@ -215,16 +221,29 @@ export default function SharedPreview({
           </p>
         </div>
 
-        {previewUrl && (
-          <Button
-            onClick={() => window.open(previewUrl, '_blank')}
-            variant="outline"
-            size="sm"
-          >
-            <ExternalLink className="w-4 h-4 mr-2" />
-            Open in New Tab
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {showPublishButton && generationJobId && previewUrl && (
+            <Button
+              onClick={() => setIsPublishModalOpen(true)}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+              size="sm"
+            >
+              <Rocket className="w-4 h-4 mr-2" />
+              Publish to AutoForge
+            </Button>
+          )}
+
+          {previewUrl && (
+            <Button
+              onClick={() => window.open(previewUrl, '_blank')}
+              variant="outline"
+              size="sm"
+            >
+              <ExternalLink className="w-4 h-4 mr-2" />
+              Open in New Tab
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Content Area */}
@@ -319,6 +338,16 @@ export default function SharedPreview({
           </div>
         </div>
       </div>
+
+      {/* Publish to Managed Platform Modal */}
+      {generationJobId && (
+        <PublishToManagedModal
+          isOpen={isPublishModalOpen}
+          onClose={() => setIsPublishModalOpen(false)}
+          generationJobId={generationJobId}
+          projectName={projectName}
+        />
+      )}
     </div>
   );
 }
