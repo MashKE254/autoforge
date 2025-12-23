@@ -32,7 +32,7 @@ export interface TypeSafetyResult {
   prismaTypes: GeneratedFile[];
   configFiles: GeneratedFile[];
   summary: string;
-  typeSafety Score: number; // 0-100
+  typeSafetyScore: number; // 0-100
 }
 
 export interface DatabaseSchema {
