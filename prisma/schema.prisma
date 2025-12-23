@@ -873,3 +873,155 @@ enum UsageType {
   AI_TOKENS           // Claude API tokens used
   BANDWIDTH           // Data transfer
 }
+
+// =============================================================================
+// END-TO-END MANAGED PLATFORM (NEW)
+// =============================================================================
+// AutoForge hosts EVERYTHING - database, AI proxy, auth, deployment
+// User never sees API keys - just works!
+// =============================================================================
+
+model ManagedApp {
+  id                    String               @id @default(cuid())
+  userId                String
+  generationJobId       String               @unique
+
+  // App identification
+  name                  String
+  subdomain             String               @unique  // my-app.autoforge.app
+  customDomain          String?              @unique
+
+  // Credentials (for app to call AutoForge APIs)
+  apiKey                String               @unique  // Secret key app uses to auth
+  appSecret             String               // For signing requests
+
+  // Database (multi-tenant schema on shared DB)
+  schemaName            String               @unique  // app_abc123_schema
+  databaseConnectionString String           // Connection string for this schema
+
+  // Deployment
+  vercelProjectId       String?
+  vercelDeploymentId    String?
+  deploymentUrl         String?
+
+  // Status
+  status                ManagedAppStatus     @default(PROVISIONING)
+
+  // Lifecycle
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+  publishedAt           DateTime?
+
+  // Relations
+  user                  User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  generationJob         GenerationJob        @relation(fields: [generationJobId], references: [id], onDelete: Cascade)
+  usageRecords          AppUsageRecord[]
+
+  @@index([userId])
+  @@index([subdomain])
+  @@index([status])
+  @@index([apiKey])
+}
+
+enum ManagedAppStatus {
+  PROVISIONING       // Setting up infrastructure
+  ACTIVE             // Live and working
+  SUSPENDED          // Exceeded limits, suspended
+  DELETED            // User deleted
+}
+
+// Track AI operations, database usage, bandwidth per app
+model AppUsageRecord {
+  id              String      @id @default(cuid())
+  managedAppId    String
+
+  // What happened
+  eventType       AppUsageEvent
+
+  // AI usage
+  aiOps           Int         @default(0)   // Number of AI operations
+  tokensUsed      Int         @default(0)   // Tokens consumed
+
+  // Database usage
+  dbQueries       Int         @default(0)   // Number of queries
+  dbStorage       Int         @default(0)   // Bytes stored
+
+  // Bandwidth
+  bandwidthBytes  Int         @default(0)
+
+  // Timestamp
+  createdAt       DateTime    @default(now())
+
+  // Relations
+  managedApp      ManagedApp  @relation(fields: [managedAppId], references: [id], onDelete: Cascade)
+
+  @@index([managedAppId])
+  @@index([eventType])
+  @@index([createdAt])
+}
+
+enum AppUsageEvent {
+  AI_CHAT_COMPLETION
+  AI_STREAMING
+  DATABASE_QUERY
+  DATABASE_WRITE
+  BANDWIDTH_OUT
+  FILE_UPLOAD
+}
+
+// Monthly aggregate usage per user (for billing)
+model MonthlyUsage {
+  id              String    @id @default(cuid())
+  userId          String
+
+  // Billing period
+  month           Int       // 0-11
+  year            Int       // 2025
+
+  // Totals
+  totalAiOps      Int       @default(0)
+  totalTokens     Int       @default(0)
+  totalDbStorage  Int       @default(0)  // Bytes
+  totalBandwidth  Int       @default(0)  // Bytes
+  totalApps       Int       @default(0)
+
+  // Costs (in cents)
+  aiCost          Int       @default(0)
+  storageCost     Int       @default(0)
+  bandwidthCost   Int       @default(0)
+  totalCost       Int       @default(0)
+
+  // Overage charges
+  overageCost     Int       @default(0)
+
+  // Last updated
+  updatedAt       DateTime  @updatedAt
+
+  @@unique([userId, month, year])
+  @@index([userId])
+  @@index([year, month])
+}
+
+// Subscription limits by plan tier
+model PlanLimits {
+  id            String    @id @default(cuid())
+  plan          PlanTier  @unique
+
+  // Limits
+  maxApps       Int       // Max number of apps
+  maxAiOps      Int       // AI operations per month
+  maxDbStorage  Int       // Database storage in MB
+  maxBandwidth  Int       // Bandwidth in GB
+
+  // Overage pricing (in cents)
+  overageAiOps       Float  // Cost per 1000 extra AI ops
+  overageStorage     Float  // Cost per GB extra storage
+  overageBandwidth   Float  // Cost per GB extra bandwidth
+
+  // Features
+  customDomain       Boolean
+  prioritySupport    Boolean
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
