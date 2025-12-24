@@ -578,7 +578,6 @@ model GenerationJob {
   // Relations
   files                 GeneratedFile[]
   user                  User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  modules               GenerationModule[]
   telemetry             GenerationTelemetry[]
   previewSessions       PreviewSession[]
   deployments           Deployment[]
@@ -615,118 +614,19 @@ model GeneratedFile {
   @@index([generationJobId])
 }
 
-model GenerationModule {
-  id              String        @id @default(cuid())
-  createdAt       DateTime      @default(now())
-  generationJobId String
-  moduleId        String
-  status          String        @default("pending")
-  generatedCode   String?
-  error           String?
-  generationJob   GenerationJob @relation(fields: [generationJobId], references: [id], onDelete: Cascade)
-  module          Module        @relation(fields: [moduleId], references: [id])
-
-  @@unique([generationJobId, moduleId])
-  @@index([generationJobId])
-  @@index([status])
-}
-
 model GenerationTelemetry {
   id              String        @id @default(cuid())
   createdAt       DateTime      @default(now())
   generationJobId String
-  moduleId        String?
   eventType       String
   errorMessage    String?
   stackTrace      String?
   metadata        Json?
   generationJob   GenerationJob @relation(fields: [generationJobId], references: [id], onDelete: Cascade)
-  module          Module?       @relation(fields: [moduleId], references: [id])
 
   @@index([generationJobId])
-  @@index([moduleId])
   @@index([eventType])
   @@index([createdAt])
-}
-
-// =============================================================================
-// MODULE SYSTEM
-// =============================================================================
-
-model Module {
-  id           String                @id @default(cuid())
-  createdAt    DateTime              @default(now())
-  updatedAt    DateTime              @updatedAt
-  name         String                @unique
-  description  String
-  code         String
-  category     ModuleCategory
-  framework    String                @default("nextjs")
-  language     String                @default("typescript")
-  testCoverage Float                 @default(0)
-  successRate  Float                 @default(1.0)
-  usageCount   Int                   @default(0)
-  tags         String[]              @default([])
-  generations  GenerationModule[]
-  telemetry    GenerationTelemetry[]
-  dependents   ModuleDependency[]    @relation("ModuleUsedBy")
-  dependencies ModuleDependency[]    @relation("ModuleDepends")
-
-  @@index([category])
-  @@index([successRate])
-  @@index([usageCount])
-}
-
-model ModuleDependency {
-  id          String @id @default(cuid())
-  moduleId    String
-  dependsOnId String
-  dependsOn   Module @relation("ModuleUsedBy", fields: [dependsOnId], references: [id], onDelete: Cascade)
-  module      Module @relation("ModuleDepends", fields: [moduleId], references: [id], onDelete: Cascade)
-
-  @@unique([moduleId, dependsOnId])
-  @@index([moduleId])
-  @@index([dependsOnId])
-}
-
-model ModuleImprovement {
-  id              String   @id @default(cuid())
-  createdAt       DateTime @default(now())
-  moduleId        String
-  oldVersion      String
-  newVersion      String
-  improvementType String
-  description     String
-  oldSuccessRate  Float
-  newSuccessRate  Float
-
-  @@index([moduleId])
-  @@index([createdAt])
-}
-
-enum ModuleCategory {
-  AUTH
-  PAYMENT
-  DATABASE
-  UI
-  API
-  WORKFLOW
-  AGENT
-  INFRASTRUCTURE
-  UTILITY
-  TESTING
-  GITHUB          // GitHub integration (OAuth, webhooks, PR automation)
-  STORAGE         // File storage (S3, Supabase Storage, uploads)
-  VECTOR_DB       // Vector databases (Pinecone, pgvector, Chroma)
-  REALTIME        // Real-time/WebSocket (Socket.io, Supabase Realtime)
-  PDF             // PDF generation (invoices, reports)
-  PACKAGE_MANAGER // Package manager integration (npm, pip, composer)
-  MARKETPLACE     // Marketplace & revenue split logic
-  BOT             // Chat bots (Discord, Slack, Telegram, WhatsApp, Twitter)
-  SCRAPING        // Web scraping & browser automation (Puppeteer, Playwright)
-  ECOMMERCE       // E-commerce (cart, checkout, inventory, shipping, tax)
-  MESSAGING       // Messaging (SMS, push notifications, email templates)
-  CMS             // Content management (rich text, media, versioning, SEO)
 }
 
 // =============================================================================
@@ -787,9 +687,10 @@ enum JobStatus {
 }
 
 enum GenerationMode {
-  PERSONAL      // Simple, single-user tool (localStorage, no auth)
+  PERSONAL      // Simple, single-user tool (localStorage, no auth, basic code)
+  SINGLE_USER   // Production-grade app for one user (real backend/DB, no auth, industry-level code)
   SAAS          // Full SaaS with auth, payments, multi-tenant DB
-  SAAS_UPGRADE  // Personal tool upgraded to SaaS
+  SAAS_UPGRADE  // Personal/Single-user tool upgraded to SaaS
 }
 
 // =============================================================================

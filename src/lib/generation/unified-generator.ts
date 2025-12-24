@@ -138,13 +138,13 @@ export class UnifiedGenerator {
    */
   async generate(
     prompt: string,
-    mode: 'PERSONAL' | 'SAAS' | 'AUTO' = 'AUTO',
+    mode: 'PERSONAL' | 'SINGLE_USER' | 'SAAS' | 'AUTO' = 'AUTO',
     jobId?: string,
     callbacks?: StreamCallbacks & {
       onComplexityAnalysis?: (analysis: ComplexityAnalysis) => void;
-      onStrategySelected?: (strategy: 'simple' | 'orchestrated' | 'personal' | 'multi-agent') => void;
+      onStrategySelected?: (strategy: 'simple' | 'orchestrated' | 'personal' | 'single-user' | 'multi-agent') => void;
       onModulesDetected?: (modules: DynamicModule[]) => void;
-      onModeSelected?: (mode: 'PERSONAL' | 'SAAS') => void;
+      onModeSelected?: (mode: 'PERSONAL' | 'SINGLE_USER' | 'SAAS') => void;
       onPhaseStart?: (phase: string, agent: string) => void;
       onPhaseComplete?: (phase: string, duration: number) => void;
       onQualityMetrics?: (metrics: any) => void;
@@ -155,8 +155,8 @@ export class UnifiedGenerator {
     // ========================================================================
 
     // Determine final mode
-    let finalMode: 'PERSONAL' | 'SAAS' = mode === 'AUTO'
-      ? this.shouldGenerateAsSaaS(prompt) ? 'SAAS' : 'PERSONAL'
+    let finalMode: 'PERSONAL' | 'SINGLE_USER' | 'SAAS' = mode === 'AUTO'
+      ? this.determineMode(prompt)
       : mode;
 
     console.log(`\n🎯 GENERATION MODE: ${finalMode}`);
@@ -166,6 +166,7 @@ export class UnifiedGenerator {
     // If PERSONAL mode, use PersonalToolGenerator (skip complexity analysis and modules)
     if (finalMode === 'PERSONAL') {
       console.log(`\n🛠️  Using PERSONAL TOOL generator`);
+      console.log(`   Simple browser tool - localStorage, basic code`);
       callbacks?.onStrategySelected?.('personal');
       callbacks?.onProgress?.('Generating personal tool...');
 
@@ -173,10 +174,16 @@ export class UnifiedGenerator {
     }
 
     // ========================================================================
-    // STEP 2: SAAS MODE - Dynamic Modules & Complexity Analysis
+    // STEP 2: SINGLE_USER or SAAS MODE - Dynamic Modules & Complexity Analysis
     // ========================================================================
 
-    console.log(`\n🏢 Using SAAS generator`);
+    const isSingleUser = finalMode === 'SINGLE_USER';
+    console.log(`\n${isSingleUser ? '👤' : '🏢'} Using ${finalMode} generator`);
+    if (isSingleUser) {
+      console.log(`   Production-grade app for one user - real backend/DB, no auth`);
+    } else {
+      console.log(`   Full multi-tenant SaaS - auth, billing, user management`);
+    }
 
     // Generate required modules dynamically using Claude API
     callbacks?.onProgress?.('Analyzing required integrations...');
@@ -239,7 +246,7 @@ export class UnifiedGenerator {
       callbacks?.onStrategySelected?.('simple');
       callbacks?.onProgress?.('Starting single-pass generation...');
 
-      result = await this.boltGenerator.generate(enhancedPrompt, jobId, callbacks);
+      result = await this.boltGenerator.generate(enhancedPrompt, jobId, callbacks, isSingleUser);
     }
 
     // Append dynamically generated module files to result
@@ -317,86 +324,106 @@ export class UnifiedGenerator {
   }
 
   /**
-   * Determine if a prompt should generate a SaaS application or a personal tool
+   * Determine the generation mode based on prompt analysis
    *
-   * SaaS indicators:
-   * - Explicit keywords: "saas", "subscription", "multi-user", "multi-tenant"
-   * - Authentication needs: "sign up", "login", "user accounts"
-   * - Payment needs: "billing", "payments", "stripe", "checkout"
-   * - Marketing needs: "landing page", "pricing page"
-   * - Multi-account patterns: "multiple accounts", "follower accounts", etc.
+   * PERSONAL: Simple browser tools (calculator, timer, todo)
+   * - No backend needed
+   * - localStorage only
+   * - Basic code quality
    *
-   * Default to PERSONAL for simplicity
+   * SINGLE_USER: Production-grade app for one user
+   * - Needs backend/database (API integrations, real-time, complex logic)
+   * - No multi-tenant features
+   * - Industry-level code quality (tests, security, type-safety)
+   *
+   * SAAS: Multi-tenant platform
+   * - Explicit monetization intent ("subscription", "billing", "sell")
+   * - User management needs ("sign up", "user registration")
+   * - Multi-user references
+   *
+   * Returns 'PERSONAL' | 'SINGLE_USER' | 'SAAS'
    */
-  private shouldGenerateAsSaaS(prompt: string): boolean {
+  private determineMode(prompt: string): 'PERSONAL' | 'SINGLE_USER' | 'SAAS' {
     const lower = prompt.toLowerCase();
 
-    // Explicit SaaS indicators
+    // ========================================================================
+    // STEP 1: Check for explicit SAAS indicators (monetization intent)
+    // ========================================================================
     const saasKeywords = [
       'saas',
       'subscription',
       'multi-user',
       'multi-tenant',
-      'multi user',
       'sign up',
       'signup',
-      'user accounts',
       'user registration',
+      'user accounts',
       'billing',
       'payments',
       'stripe',
       'landing page',
       'pricing page',
       'monetize',
-      'pay',
+      'sell access',
+      'sell to',
       'checkout',
     ];
 
-    // Multi-account/multi-user patterns (catches trading systems, collaboration tools, etc.)
-    const multiUserPatterns = [
-      'multiple accounts',
-      'follower account',
-      'master account',
-      'master and follower',
-      'replicate to multiple',
-      'multiple users',
-      'each user',
-      'per user',
-      'user-specific',
-      'account-specific',
-      'role-based',
-      'admin panel',
-      'user management',
-      'team member',
-      'workspace',
-      'organization',
-      'tenant',
+    const matchedSaasKeyword = saasKeywords.find(keyword => lower.includes(keyword));
+    if (matchedSaasKeyword) {
+      console.log(`   ✓ SAAS keyword detected: "${matchedSaasKeyword}" → Multi-tenant platform`);
+      return 'SAAS';
+    }
+
+    // ========================================================================
+    // STEP 2: Check if backend/database is needed (SINGLE_USER indicators)
+    // ========================================================================
+    const backendIndicators = [
+      // API integrations (need server-side keys)
+      'api', 'integration', 'webhook', 'connect to', 'sync with',
+
+      // Real-time features (need WebSocket server)
+      'real-time', 'realtime', 'live', 'websocket', 'streaming',
+
+      // Database requirements
+      'database', 'postgres', 'supabase', 'store data', 'persist',
+
+      // Trading/financial (needs backend)
+      'trading', 'trades', 'broker', 'mt4', 'mt5', 'forex',
+      'master account', 'follower account', 'copy trad',
+
+      // Complex domains (usually need backend)
+      'crm', 'erp', 'inventory', 'booking', 'scheduling',
+      'automation', 'workflow', 'pipeline',
+
+      // File processing (needs server)
+      'pdf generation', 'generate pdf', 'report generation',
+      'email send', 'notification', 'sms',
+
+      // AI/ML (needs backend)
+      'ai assistant', 'chatbot', 'gpt', 'claude', 'llm',
+      'machine learning', 'vector database', 'embeddings',
     ];
 
-    // Check explicit SaaS keywords
-    const matchedKeyword = saasKeywords.find(keyword => lower.includes(keyword));
-    if (matchedKeyword) {
-      console.log(`   ✓ SaaS keyword detected: "${matchedKeyword}" - generating full SaaS`);
-      return true;
+    const matchedBackendIndicator = backendIndicators.find(indicator => lower.includes(indicator));
+    if (matchedBackendIndicator) {
+      console.log(`   ✓ Backend indicator detected: "${matchedBackendIndicator}" → Production-grade single-user`);
+      return 'SINGLE_USER';
     }
 
-    // Check multi-user patterns
-    const matchedPattern = multiUserPatterns.find(pattern => lower.includes(pattern));
-    if (matchedPattern) {
-      console.log(`   ✓ Multi-user pattern detected: "${matchedPattern}" - generating full SaaS`);
-      return true;
-    }
-
-    // Count references to "account" or "user" (strong signal for multi-user needs)
+    // Check for "account" or "user" references (even for own accounts)
+    // This catches "my master account", "my follower accounts" etc.
     const accountRefs = (lower.match(/\b(account|user)s?\b/g) || []).length;
-    if (accountRefs >= 4) {
-      console.log(`   ✓ Multiple account/user references (${accountRefs}) - generating full SaaS`);
-      return true;
+    if (accountRefs >= 3) {
+      console.log(`   ✓ Multiple account references (${accountRefs}) → Production-grade single-user`);
+      return 'SINGLE_USER';
     }
 
-    // Default to personal tool
-    console.log(`   ✓ No SaaS indicators - generating personal tool`);
-    return false;
+    // ========================================================================
+    // STEP 3: Default to PERSONAL for simple tools
+    // ========================================================================
+    console.log(`   ✓ Simple browser tool detected → localStorage personal tool`);
+    return 'PERSONAL';
   }
 }
 
