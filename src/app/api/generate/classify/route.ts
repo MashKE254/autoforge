@@ -37,7 +37,7 @@ export interface ClassificationResult {
 // CLASSIFICATION PROMPT
 // ============================================================================
 
-const CLASSIFICATION_SYSTEM_PROMPT = \`You are an expert software architect analyzing user prompts to classify application types.
+const CLASSIFICATION_SYSTEM_PROMPT = `You are an expert software architect analyzing user prompts to classify application types.
 
 Your task: Determine the GENERATION MODE and PROMPT QUALITY.
 
@@ -112,7 +112,7 @@ For MINIMAL quality prompts, suggest 3-4 specific features to add.
 - Too many (>4)
 - Generic ("add dark mode")
 
-CRITICAL: Return ONLY valid JSON, no markdown, no explanation.\`;
+CRITICAL: Return ONLY valid JSON, no markdown, no explanation.`;
 
 // ============================================================================
 // CLASSIFICATION FUNCTION
@@ -130,7 +130,7 @@ async function classifyPrompt(prompt: string): Promise<ClassificationResult> {
     system: CLASSIFICATION_SYSTEM_PROMPT,
     messages: [{
       role: 'user',
-      content: \`Classify this prompt:\\n\\n"\${prompt}"\\n\\nReturn JSON only.\`
+      content: `Classify this prompt:\n\n"${prompt}"\n\nReturn JSON only.`
     }]
   });
 
