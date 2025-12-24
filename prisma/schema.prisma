@@ -687,9 +687,10 @@ enum JobStatus {
 }
 
 enum GenerationMode {
-  PERSONAL      // Simple, single-user tool (localStorage, no auth)
+  PERSONAL      // Simple, single-user tool (localStorage, no auth, basic code)
+  SINGLE_USER   // Production-grade app for one user (real backend/DB, no auth, industry-level code)
   SAAS          // Full SaaS with auth, payments, multi-tenant DB
-  SAAS_UPGRADE  // Personal tool upgraded to SaaS
+  SAAS_UPGRADE  // Personal/Single-user tool upgraded to SaaS
 }
 
 // =============================================================================

@@ -660,7 +660,7 @@ Use @tanstack/react-table with:
 // PREMIUM UI PROMPT BUILDER
 // ============================================================================
 
-function buildUserPrompt(userRequest: string): string {
+function buildUserPrompt(userRequest: string, singleUser: boolean = false): string {
   // AI Systems Detection
   const isAIAssistant = /\b(ai assistant|chatbot|chat|llm|gpt|claude|openai|ai-powered chat|conversational ai|cybersecurity education|educational assistant)\b/i.test(userRequest);
   const isWorkflow = /\b(workflow|automation|zapier|trigger|action|n8n|make|integromat|automate)\b/i.test(userRequest);
@@ -1172,7 +1172,7 @@ export function cn(...inputs: ClassValue[]) {
 }
 `;
 
-function addMissingEssentialFiles(files: GeneratedFile[], prompt: string): GeneratedFile[] {
+function addMissingEssentialFiles(files: GeneratedFile[], prompt: string, singleUser: boolean = false): GeneratedFile[] {
   const fileMap = new Map(files.map(f => [f.path, f]));
   const safeTitle = prompt.slice(0, 50).replace(/[^a-zA-Z0-9\s]/g, '').trim() || 'AutoForge App';
   
@@ -1230,12 +1230,12 @@ function addMissingEssentialFiles(files: GeneratedFile[], prompt: string): Gener
         pkg.engines = { node: '18.x' };
       }
       
-      // Ensure Clerk
+      // Ensure Clerk (SKIP for single-user apps)
       pkg.dependencies = pkg.dependencies || {};
-      if (!pkg.dependencies['@clerk/nextjs']) {
+      if (!singleUser && !pkg.dependencies['@clerk/nextjs']) {
         pkg.dependencies['@clerk/nextjs'] = '^5.0.0';
       }
-      
+
       // Ensure Supabase
       if (!pkg.dependencies['@supabase/ssr']) {
         pkg.dependencies['@supabase/ssr'] = '^0.4.0';
@@ -1263,26 +1263,26 @@ function addMissingEssentialFiles(files: GeneratedFile[], prompt: string): Gener
     }
   }
   
-  // Ensure Clerk middleware
-  if (!fileMap.has('middleware.ts')) {
+  // Ensure Clerk middleware (SKIP for single-user apps)
+  if (!singleUser && !fileMap.has('middleware.ts')) {
     fileMap.set('middleware.ts', {
       path: 'middleware.ts',
       content: CLERK_MIDDLEWARE,
       language: 'typescript',
     });
   }
-  
-  // Ensure Clerk sign-in page
-  if (!fileMap.has('app/sign-in/[[...sign-in]]/page.tsx')) {
+
+  // Ensure Clerk sign-in page (SKIP for single-user apps)
+  if (!singleUser && !fileMap.has('app/sign-in/[[...sign-in]]/page.tsx')) {
     fileMap.set('app/sign-in/[[...sign-in]]/page.tsx', {
       path: 'app/sign-in/[[...sign-in]]/page.tsx',
       content: CLERK_SIGN_IN_PAGE,
       language: 'typescript',
     });
   }
-  
-  // Ensure Clerk sign-up page
-  if (!fileMap.has('app/sign-up/[[...sign-up]]/page.tsx')) {
+
+  // Ensure Clerk sign-up page (SKIP for single-user apps)
+  if (!singleUser && !fileMap.has('app/sign-up/[[...sign-up]]/page.tsx')) {
     fileMap.set('app/sign-up/[[...sign-up]]/page.tsx', {
       path: 'app/sign-up/[[...sign-up]]/page.tsx',
       content: CLERK_SIGN_UP_PAGE,
@@ -1512,15 +1512,18 @@ export class BoltGenerator {
   
   /**
    * Generate a complete application from a user prompt
+   *
+   * @param singleUser - If true, generates production-grade code WITHOUT Clerk auth (for single-user apps)
    */
   async generate(
-    prompt: string, 
+    prompt: string,
     jobId?: string,
-    callbacks?: StreamCallbacks
+    callbacks?: StreamCallbacks,
+    singleUser: boolean = false
   ): Promise<GenerationResult> {
     console.log('🚀 AutoForge 2.0 Generation starting...');
     console.log(`   Prompt: "${prompt.slice(0, 100)}..."`);
-    console.log('   Stack: Clerk + Supabase + Stripe');
+    console.log(`   Stack: ${singleUser ? 'Supabase (single-user)' : 'Clerk + Supabase + Stripe'}`);
     
     try {
       if (jobId) {
@@ -1534,16 +1537,21 @@ export class BoltGenerator {
       }
       
       callbacks?.onProgress?.('Starting AI generation with managed stack...');
-      
+
+      // Build system prompt based on mode
+      const systemPrompt = singleUser
+        ? MANAGED_STACK_SYSTEM_PROMPT.replace(/## AUTHENTICATION WITH CLERK[\s\S]*?(?=##|$)/g, '## AUTHENTICATION\n\nNO AUTHENTICATION - This is a single-user application. Do not generate any auth pages or Clerk integration.\n\n') + '\n\n' + PRODUCTION_PATTERNS
+        : MANAGED_STACK_SYSTEM_PROMPT + '\n\n' + PRODUCTION_PATTERNS;
+
       // Use streaming for better timeout handling
       const stream = await this.client.messages.stream({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 64000, // CRITICAL: High limit for complete multi-page applications (30-50+ files)
         temperature: 0.7,
-        system: MANAGED_STACK_SYSTEM_PROMPT + '\n\n' + PRODUCTION_PATTERNS,
+        system: systemPrompt,
         messages: [{
           role: 'user',
-          content: buildUserPrompt(prompt)
+          content: buildUserPrompt(prompt, singleUser)
         }]
       });
       
@@ -1575,9 +1583,9 @@ export class BoltGenerator {
       
       // Sanitize all generated files (fix CSS issues, replace bad classes)
       files = sanitizeGeneratedFiles(files);
-      
+
       // Add any missing essential files (Clerk, Supabase, etc.)
-      files = addMissingEssentialFiles(files, prompt);
+      files = addMissingEssentialFiles(files, prompt, singleUser);
       
       console.log('   Generated files:');
       files.forEach((f: GeneratedFile) => {
