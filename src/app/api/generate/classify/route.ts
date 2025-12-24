@@ -1,123 +1,219 @@
 /**
  * Prompt Classification API
- * 
+ *
  * File: src/app/api/generate/classify/route.ts
- * 
- * Analyzes a prompt and returns what type of application will be generated.
- * Useful for showing users what to expect before they generate.
+ *
+ * Uses Claude AI to intelligently classify user prompts into:
+ * - PERSONAL: Simple browser tools (calculator, timer)
+ * - SINGLE_USER: Production-grade apps for one user (trading system)
+ * - SAAS: Multi-tenant platforms to sell (CRM with billing)
+ *
+ * Also detects prompt quality and suggests enhancements for simple prompts.
  */
 
-import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "../../auth/[...nextauth]/route";
-import { classifyUserPrompt } from "@/lib/generation/unified-generator";
+import { NextRequest, NextResponse } from 'next/server';
+import Anthropic from '@anthropic-ai/sdk';
 
-export async function POST(request: Request) {
+// ============================================================================
+// TYPES
+// ============================================================================
+
+export interface ClassificationResult {
+  mode: 'PERSONAL' | 'SINGLE_USER' | 'SAAS';
+  confidence: number; // 0-1 (0.95 = 95% confident)
+  reasoning: string;
+  promptQuality: 'EXCELLENT' | 'GOOD' | 'MINIMAL';
+  suggestedEnhancements?: string[]; // 3-4 feature suggestions for simple prompts
+  detectedFeatures: {
+    needsBackend: boolean;
+    needsDatabase: boolean;
+    needsAuth: boolean;
+    needsPayments: boolean;
+    isMultiTenant: boolean;
+  };
+}
+
+// ============================================================================
+// CLASSIFICATION PROMPT
+// ============================================================================
+
+const CLASSIFICATION_SYSTEM_PROMPT = \`You are an expert software architect analyzing user prompts to classify application types.
+
+Your task: Determine the GENERATION MODE and PROMPT QUALITY.
+
+## GENERATION MODES:
+
+1. **PERSONAL** - Simple browser tools
+   - No backend needed (pure client-side)
+   - localStorage for data
+   - Examples: calculator, timer, todo list, color picker
+
+2. **SINGLE_USER** - Production-grade app for ONE user
+   - Needs backend/database (API integrations, real-time, complex logic)
+   - For the user's own use (NOT to sell to others)
+   - Examples: "my trading system", "CRM for my business", "dashboard for my data"
+
+3. **SAAS** - Multi-tenant platform
+   - Explicit monetization intent (sell, subscription, billing)
+   - User registration/authentication needed
+   - Multiple users/organizations
+   - Examples: "CRM to sell to companies", "SaaS with billing", "multi-tenant app"
+
+## PROMPT QUALITY:
+
+- **EXCELLENT**: Detailed (20+ words), specific features listed
+- **GOOD**: Clear intent (10-20 words), some details
+- **MINIMAL**: Too simple (< 10 words), vague
+
+## OUTPUT FORMAT (JSON):
+
+{
+  "mode": "SINGLE_USER",
+  "confidence": 0.95,
+  "reasoning": "Prompt mentions 'my accounts' and 'trading' which needs backend for API integrations but no multi-user intent.",
+  "promptQuality": "EXCELLENT",
+  "suggestedEnhancements": ["Add emergency stop button", "Include P&L tracking", "Support multiple brokers"],
+  "detectedFeatures": {
+    "needsBackend": true,
+    "needsDatabase": true,
+    "needsAuth": false,
+    "needsPayments": false,
+    "isMultiTenant": false
+  }
+}
+
+## DECISION RULES:
+
+**SAAS if:**
+- Contains: "subscription", "billing", "monetize", "sell to", "user registration", "sign up page", "multi-tenant"
+- Confidence: 0.95+ (very confident)
+
+**SINGLE_USER if:**
+- Contains: "api", "real-time", "database", "trading", "crm", "dashboard", "my account"
+- AND no SAAS keywords
+- Confidence: 0.85-0.95
+
+**PERSONAL if:**
+- Simple tool: "calculator", "timer", "converter", "todo"
+- No backend indicators
+- Confidence: 0.90+
+
+## PROMPT ENHANCEMENT:
+
+For MINIMAL quality prompts, suggest 3-4 specific features to add.
+
+**Good suggestions:**
+- Specific, actionable features
+- Relevant to the app type
+- Short (3-5 words each)
+
+**Bad suggestions:**
+- Vague ("make it better")
+- Too many (>4)
+- Generic ("add dark mode")
+
+CRITICAL: Return ONLY valid JSON, no markdown, no explanation.\`;
+
+// ============================================================================
+// CLASSIFICATION FUNCTION
+// ============================================================================
+
+async function classifyPrompt(prompt: string): Promise<ClassificationResult> {
+  const client = new Anthropic({
+    apiKey: process.env.ANTHROPIC_API_KEY!,
+  });
+
+  const response = await client.messages.create({
+    model: 'claude-3-5-haiku-20241022', // Use Haiku for cost efficiency
+    max_tokens: 1000,
+    temperature: 0.3,
+    system: CLASSIFICATION_SYSTEM_PROMPT,
+    messages: [{
+      role: 'user',
+      content: \`Classify this prompt:\\n\\n"\${prompt}"\\n\\nReturn JSON only.\`
+    }]
+  });
+
+  const content = response.content[0];
+  if (content.type !== 'text') {
+    throw new Error('Unexpected response type from Claude');
+  }
+
+  // Extract JSON from response
+  const jsonMatch = content.text.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) {
+    throw new Error('No JSON found in classification response');
+  }
+
+  const result = JSON.parse(jsonMatch[0]) as ClassificationResult;
+
+  // Validate and normalize
+  if (!['PERSONAL', 'SINGLE_USER', 'SAAS'].includes(result.mode)) {
+    result.mode = 'SINGLE_USER'; // Safe default
+  }
+
+  result.confidence = Math.max(0, Math.min(1, result.confidence));
+
+  return result;
+}
+
+// ============================================================================
+// API ROUTE HANDLERS
+// ============================================================================
+
+export async function POST(request: NextRequest) {
   try {
-    // 1. Check authentication (optional - could make this public)
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    // 2. Parse request
     const body = await request.json();
     const { prompt } = body;
 
-    if (!prompt || typeof prompt !== "string") {
+    if (!prompt || typeof prompt !== 'string') {
       return NextResponse.json(
-        { error: "Prompt is required" },
+        { error: 'Prompt is required' },
         { status: 400 }
       );
     }
 
-    // 3. Classify the prompt
-    const classification = classifyUserPrompt(prompt);
+    if (prompt.length < 3) {
+      return NextResponse.json(
+        { error: 'Prompt too short (minimum 3 characters)' },
+        { status: 400 }
+      );
+    }
 
-    // 4. Return classification with user-friendly descriptions
-    const typeDescriptions: Record<string, string> = {
-      'ui-application': '🎨 UI Application - A React/Next.js web application with interactive interface',
-      'workflow-automation': '🔄 Workflow Automation - An event-driven automation system with triggers and actions',
-      'ai-agent-network': '🤖 AI Agent Network - Multi-agent AI system that can reason and take actions',
-      'hybrid-workflow-ui': '🔄🎨 Workflow + UI - Automation system with a dashboard interface',
-      'hybrid-agent-ui': '🤖🎨 Agent + UI - AI agents with a chat/control interface',
-    };
-
-    const typeExamples: Record<string, string[]> = {
-      'ui-application': [
-        'Calculator with dark mode',
-        'Todo list with categories',
-        'Dashboard with charts',
-      ],
-      'workflow-automation': [
-        'Send Slack message when form submitted',
-        'Daily email report at 9 AM',
-        'Sync data between services',
-      ],
-      'ai-agent-network': [
-        'Research agent that finds and summarizes info',
-        'Team of agents for content creation',
-        'Autonomous customer support bot',
-      ],
-      'hybrid-workflow-ui': [
-        'Automation dashboard with manual triggers',
-        'Workflow builder with visual editor',
-      ],
-      'hybrid-agent-ui': [
-        'Chat interface for AI research assistant',
-        'Agent control panel with history',
-      ],
-    };
+    const classification = await classifyPrompt(prompt);
 
     return NextResponse.json({
       success: true,
-      classification: {
-        type: classification.primaryType,
-        confidence: classification.confidence,
-        confidencePercent: `${(classification.confidence * 100).toFixed(0)}%`,
-        description: typeDescriptions[classification.primaryType],
-        reasoning: classification.reasoning,
-        features: classification.detectedFeatures,
-        techStack: classification.suggestedTechStack,
-        examples: typeExamples[classification.primaryType] || [],
-      },
-      // Suggestions based on features
-      suggestions: getSuggestions(classification),
+      classification,
     });
 
   } catch (error) {
-    console.error("Classification error:", error);
+    console.error('Classification error:', error);
+
     return NextResponse.json(
-      { error: "Classification failed" },
+      {
+        error: 'Classification failed',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      },
       { status: 500 }
     );
   }
 }
 
-function getSuggestions(classification: ReturnType<typeof classifyUserPrompt>): string[] {
-  const suggestions: string[] = [];
-  
-  const { primaryType, detectedFeatures, confidence } = classification;
-  
-  if (confidence < 0.7) {
-    suggestions.push("💡 Your prompt is ambiguous. Consider being more specific about what you want.");
-  }
-  
-  if (primaryType === 'ui-application' && detectedFeatures.hasIntegrations) {
-    suggestions.push("🔌 You mentioned integrations - consider if you need a workflow automation instead.");
-  }
-  
-  if (primaryType === 'workflow-automation' && !detectedFeatures.hasTriggers) {
-    suggestions.push("⚡ Add trigger words like 'when', 'every day', or 'on new' for clearer workflows.");
-  }
-  
-  if (primaryType === 'ai-agent-network' && !detectedFeatures.hasAutonomy) {
-    suggestions.push("🤖 Specify autonomous behaviors like 'automatically research' or 'decide on its own'.");
-  }
-  
-  if (detectedFeatures.hasIntegrations) {
-    suggestions.push("🔗 Detected integrations - make sure to set up API keys after generation.");
-  }
-  
-  return suggestions;
+export async function GET() {
+  return NextResponse.json({
+    endpoint: '/api/generate/classify',
+    method: 'POST',
+    description: 'Classifies user prompts using AI',
+    usage: {
+      body: { prompt: 'string' },
+      response: {
+        mode: 'PERSONAL | SINGLE_USER | SAAS',
+        confidence: 'number (0-1)',
+        reasoning: 'string',
+        promptQuality: 'EXCELLENT | GOOD | MINIMAL',
+        suggestedEnhancements: 'string[]'
+      }
+    }
+  });
 }

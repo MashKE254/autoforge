@@ -18,6 +18,7 @@ import { GeneratedFile, GenerationResult, StreamCallbacks } from './bolt-generat
 import { prisma } from '../prisma';
 import { dynamicModuleGenerator, DynamicModule, DynamicModuleGenerator } from './dynamic-module-generator';
 import { multiAgentOrchestrator, MultiAgentResult } from './orchestrator/multi-agent-orchestrator';
+import { ClassificationResult } from '@/app/api/generate/classify/route';
 
 // ============================================================================
 // COMPLEXITY DETECTION
@@ -114,6 +115,40 @@ function analyzePromptComplexity(prompt: string): ComplexityAnalysis {
 }
 
 // ============================================================================
+// AI-POWERED CLASSIFICATION
+// ============================================================================
+
+/**
+ * Call the AI classifier to determine generation mode
+ * Returns classification result with confidence score
+ */
+async function callAIClassifier(prompt: string): Promise<ClassificationResult | null> {
+  try {
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    const response = await fetch(`${baseUrl}/api/generate/classify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt }),
+    });
+
+    if (!response.ok) {
+      console.warn(`   ⚠️  AI classifier failed (${response.status}), falling back to keyword-based`);
+      return null;
+    }
+
+    const data = await response.json();
+    if (data.success && data.classification) {
+      return data.classification;
+    }
+
+    return null;
+  } catch (error) {
+    console.warn('   ⚠️  AI classifier error, falling back to keyword-based:', error);
+    return null;
+  }
+}
+
+// ============================================================================
 // UNIFIED GENERATOR
 // ============================================================================
 
@@ -145,19 +180,45 @@ export class UnifiedGenerator {
       onStrategySelected?: (strategy: 'simple' | 'orchestrated' | 'personal' | 'single-user' | 'multi-agent') => void;
       onModulesDetected?: (modules: DynamicModule[]) => void;
       onModeSelected?: (mode: 'PERSONAL' | 'SINGLE_USER' | 'SAAS') => void;
+      onClassificationResult?: (result: ClassificationResult) => void;
       onPhaseStart?: (phase: string, agent: string) => void;
       onPhaseComplete?: (phase: string, duration: number) => void;
       onQualityMetrics?: (metrics: any) => void;
     }
   ): Promise<GenerationResult | MultiAgentResult> {
     // ========================================================================
-    // STEP 1: MODE SELECTION
+    // STEP 1: MODE SELECTION (AI-Powered with Fallback)
     // ========================================================================
 
-    // Determine final mode
-    let finalMode: 'PERSONAL' | 'SINGLE_USER' | 'SAAS' = mode === 'AUTO'
-      ? this.determineMode(prompt)
-      : mode;
+    let finalMode: 'PERSONAL' | 'SINGLE_USER' | 'SAAS';
+    let classificationResult: ClassificationResult | null = null;
+
+    if (mode === 'AUTO') {
+      console.log(`\n🤖 AI-Powered Classification...`);
+      callbacks?.onProgress?.('Analyzing prompt with AI classifier...');
+
+      // Try AI classifier first
+      classificationResult = await callAIClassifier(prompt);
+
+      if (classificationResult) {
+        finalMode = classificationResult.mode;
+        console.log(`   ✓ AI Classification: ${finalMode} (${(classificationResult.confidence * 100).toFixed(0)}% confident)`);
+        console.log(`   Reasoning: ${classificationResult.reasoning}`);
+
+        if (classificationResult.promptQuality === 'MINIMAL' && classificationResult.suggestedEnhancements) {
+          console.log(`   💡 Suggested Enhancements:`);
+          classificationResult.suggestedEnhancements.forEach(e => console.log(`      - ${e}`));
+        }
+
+        callbacks?.onClassificationResult?.(classificationResult);
+      } else {
+        // Fallback to keyword-based classification
+        console.log(`   ⚠️  AI classifier unavailable, using keyword-based fallback`);
+        finalMode = this.determineMode(prompt);
+      }
+    } else {
+      finalMode = mode;
+    }
 
     console.log(`\n🎯 GENERATION MODE: ${finalMode}`);
     console.log(`   Prompt: "${prompt.slice(0, 100)}..."`);
