@@ -91,6 +91,7 @@ model User {
   
   // NEW: Managed Infrastructure
   managedProjects  ManagedProject[]
+  managedApps      ManagedApp[]
 
   @@index([email])
   @@index([stripeCustomerId])
@@ -587,6 +588,7 @@ model GenerationJob {
 
   // NEW: Managed Infrastructure relation
   managedProject        ManagedProject?
+  managedApp            ManagedApp?
 
   // NEW: SaaS upgrade tracking
   parentJob             GenerationJob?        @relation("SaaSUpgrade", fields: [parentJobId], references: [id])
