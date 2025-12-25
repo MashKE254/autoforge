@@ -277,10 +277,16 @@ export class UnifiedGenerator {
     console.log(`   Complex: ${complexity.isComplex}`);
     console.log(`   Reasons: ${complexity.reasons.join(', ')}`);
 
+    // Check if development mode (skip expensive quality checks)
+    const isDevelopmentMode = process.env.SKIP_QUALITY_CHECKS === 'true';
+    if (isDevelopmentMode) {
+      console.log(`\n🔧 DEVELOPMENT MODE: Skipping quality checks to save API costs`);
+    }
+
     // Choose strategy
     let result: GenerationResult | MultiAgentResult;
 
-    if (complexity.isComplex) {
+    if (complexity.isComplex && !isDevelopmentMode) {
       console.log(`\n🚀 Using REVOLUTIONARY MULTI-AGENT ORCHESTRATOR`);
       callbacks?.onStrategySelected?.('multi-agent');
       callbacks?.onProgress?.(`Complex application detected (score: ${complexity.score}). Activating 9 specialized AI agents...`);
