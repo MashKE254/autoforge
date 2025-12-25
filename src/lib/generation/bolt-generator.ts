@@ -660,7 +660,7 @@ Use @tanstack/react-table with:
 // PREMIUM UI PROMPT BUILDER
 // ============================================================================
 
-function buildUserPrompt(userRequest: string, singleUser: boolean = false): string {
+function buildUserPrompt(userRequest: string, singleUser: boolean = false, preview: boolean = false): string {
   // AI Systems Detection
   const isAIAssistant = /\b(ai assistant|chatbot|chat|llm|gpt|claude|openai|ai-powered chat|conversational ai|cybersecurity education|educational assistant)\b/i.test(userRequest);
   const isWorkflow = /\b(workflow|automation|zapier|trigger|action|n8n|make|integromat|automate)\b/i.test(userRequest);
@@ -889,6 +889,49 @@ Generate AT LEAST 30-50 files including:
 - Toast notifications for actions
 - Hover effects on interactive elements
 - Focus states for accessibility
+
+${preview ? `
+## ⚠️ PREVIEW MODE - SPECIAL INSTRUCTIONS
+
+This is a FREE PREVIEW with MOCK DATA. Generate a WebContainer-compatible app with:
+
+### MOCK DATA REQUIREMENTS:
+1. **NO External Integrations**: Skip Supabase, Clerk, Stripe, external APIs
+2. **Hardcoded Data Arrays**: Generate realistic mock data directly in components
+3. **localStorage ONLY**: Use localStorage for any data persistence
+4. **No Auth**: Skip all authentication (no sign-in/sign-up pages, no middleware)
+5. **No API Routes**: Skip all /api routes - use mock data in components instead
+
+### EXAMPLE MOCK DATA PATTERN:
+\`\`\`typescript
+// Instead of fetching from Supabase:
+const mockProjects = [
+  { id: '1', title: 'Project Alpha', status: 'active', createdAt: '2024-01-15' },
+  { id: '2', title: 'Project Beta', status: 'completed', createdAt: '2024-01-10' },
+  // ... 5-10 realistic items
+];
+\`\`\`
+
+### FILES TO GENERATE:
+- package.json (only: react, next, tailwindcss, lucide-react, recharts, date-fns)
+- App pages with mock data
+- UI components (fully functional)
+- NO Supabase files
+- NO Clerk files
+- NO API routes
+- NO middleware.ts
+- NO .env.example
+
+### WHAT TO KEEP:
+- ✅ Full UI implementation
+- ✅ All interactions and animations
+- ✅ Charts and visualizations (with mock data)
+- ✅ Forms and validation (save to localStorage)
+- ✅ Navigation and routing
+- ✅ Responsive design
+
+The preview should look and feel EXACTLY like the real app, just with fake data.
+` : ''}
 
 Generate ALL files immediately. Make this BETTER than what bolt.new or lovable.dev would create.`;
 }
@@ -1519,12 +1562,18 @@ export class BoltGenerator {
     prompt: string,
     jobId?: string,
     callbacks?: StreamCallbacks,
-    singleUser: boolean = false
+    singleUser: boolean = false,
+    preview: boolean = false
   ): Promise<GenerationResult> {
     console.log('🚀 AutoForge 2.0 Generation starting...');
     console.log(`   Prompt: "${prompt.slice(0, 100)}..."`);
-    console.log(`   Stack: ${singleUser ? 'Supabase (single-user)' : 'Clerk + Supabase + Stripe'}`);
-    
+
+    if (preview) {
+      console.log(`   Mode: PREVIEW (free, mock data, no integrations)`);
+    } else {
+      console.log(`   Stack: ${singleUser ? 'Supabase (single-user)' : 'Clerk + Supabase + Stripe'}`);
+    }
+
     try {
       if (jobId) {
         await prisma.generationJob.update({
@@ -1551,7 +1600,7 @@ export class BoltGenerator {
         system: systemPrompt,
         messages: [{
           role: 'user',
-          content: buildUserPrompt(prompt, singleUser)
+          content: buildUserPrompt(prompt, singleUser, preview)
         }]
       });
       

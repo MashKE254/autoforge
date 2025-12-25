@@ -687,6 +687,7 @@ enum JobStatus {
 }
 
 enum GenerationMode {
+  PREVIEW       // Free preview with mock data (no integrations, no quality checks, WebContainer-compatible)
   PERSONAL      // Simple, single-user tool (localStorage, no auth, basic code)
   SINGLE_USER   // Production-grade app for one user (real backend/DB, no auth, industry-level code)
   SAAS          // Full SaaS with auth, payments, multi-tenant DB
