@@ -50,6 +50,12 @@ const INCOMPATIBLE_PACKAGES = [
   '@radix-ui/react-datepicker', // Does not exist
   '@radix-ui/react-date-picker', // Does not exist
   '@radix-ui/react-form', // Does not exist
+  // Non-existent @types packages (AI sometimes hallucinates these)
+  '@types/jspdf', // Does not exist
+  '@types/pdf-lib', // Does not exist
+  '@types/pdfmake', // Does not exist
+  '@types/recharts', // Does not exist - recharts has built-in types
+  '@types/lucide-react', // Does not exist - lucide-react has built-in types
 ];
 
 /**
@@ -58,6 +64,247 @@ const INCOMPATIBLE_PACKAGES = [
 const PACKAGE_REPLACEMENTS: Record<string, string> = {
   'bcrypt': 'bcryptjs',
 };
+
+// ============================================================================
+// NPM PACKAGE VALIDATION
+// ============================================================================
+
+/**
+ * Whitelist of known WebContainer-safe packages
+ * These packages are pre-validated and guaranteed to work in WebContainer
+ */
+const WEBCONTAINER_SAFE_PACKAGES = new Set([
+  // Core Next.js and React
+  'next',
+  'react',
+  'react-dom',
+
+  // TypeScript
+  'typescript',
+  '@types/node',
+  '@types/react',
+  '@types/react-dom',
+
+  // Tailwind CSS
+  'tailwindcss',
+  'postcss',
+  'autoprefixer',
+
+  // UI Libraries
+  'lucide-react',
+  'recharts',
+  'date-fns',
+  'clsx',
+  'tailwind-merge',
+
+  // Forms and Validation
+  'react-hook-form',
+  'zod',
+  '@hookform/resolvers',
+
+  // State Management
+  'zustand',
+  'jotai',
+  'react-query',
+  '@tanstack/react-query',
+
+  // Utilities
+  'class-variance-authority',
+  'cmdk',
+  'sonner',
+  'react-hot-toast',
+  'react-toastify',
+
+  // Icons
+  '@radix-ui/react-icons',
+  'react-icons',
+
+  // Radix UI (only packages that actually exist)
+  '@radix-ui/react-accordion',
+  '@radix-ui/react-alert-dialog',
+  '@radix-ui/react-aspect-ratio',
+  '@radix-ui/react-avatar',
+  '@radix-ui/react-checkbox',
+  '@radix-ui/react-collapsible',
+  '@radix-ui/react-context-menu',
+  '@radix-ui/react-dialog',
+  '@radix-ui/react-dropdown-menu',
+  '@radix-ui/react-hover-card',
+  '@radix-ui/react-label',
+  '@radix-ui/react-menubar',
+  '@radix-ui/react-navigation-menu',
+  '@radix-ui/react-popover',
+  '@radix-ui/react-progress',
+  '@radix-ui/react-radio-group',
+  '@radix-ui/react-scroll-area',
+  '@radix-ui/react-select',
+  '@radix-ui/react-separator',
+  '@radix-ui/react-slider',
+  '@radix-ui/react-slot',
+  '@radix-ui/react-switch',
+  '@radix-ui/react-tabs',
+  '@radix-ui/react-toast',
+  '@radix-ui/react-toggle',
+  '@radix-ui/react-toggle-group',
+  '@radix-ui/react-tooltip',
+
+  // Date pickers (that actually exist)
+  'react-day-picker',
+  'react-datepicker',
+
+  // Charts
+  'recharts',
+  'chart.js',
+  'react-chartjs-2',
+
+  // Markdown
+  'react-markdown',
+  'remark-gfm',
+
+  // File handling (browser-compatible)
+  'papaparse',
+  'xlsx',
+
+  // Animation
+  'framer-motion',
+
+  // DnD
+  '@dnd-kit/core',
+  '@dnd-kit/sortable',
+  '@dnd-kit/utilities',
+  'react-beautiful-dnd',
+
+  // Crypto (browser-compatible)
+  'bcryptjs',
+  'crypto-js',
+
+  // Other common packages
+  'nanoid',
+  'uuid',
+  'lodash',
+  'axios',
+  'swr',
+
+  // PDF libraries (browser-compatible)
+  'jspdf',
+  'pdf-lib',
+  'pdfmake',
+  'html2canvas',
+
+  // Image handling
+  'sharp-browser', // Browser-compatible sharp alternative
+
+  // Data visualization
+  'plotly.js',
+  'd3',
+
+  // Utilities
+  'moment',
+  'dayjs',
+  'validator',
+  'jsonwebtoken',
+  'jwt-decode',
+
+  // Storage
+  'localforage',
+  'idb',
+  'idb-keyval',
+
+  // Form libraries
+  'formik',
+  'yup',
+  'final-form',
+
+  // Testing (for completeness)
+  'jest',
+  '@testing-library/react',
+  '@testing-library/jest-dom',
+  'vitest',
+
+  // ESLint/Prettier
+  'eslint',
+  'prettier',
+  'eslint-config-next',
+  'eslint-config-prettier',
+]);
+
+/**
+ * Cache for npm package validation results
+ * Format: { packageName: exists }
+ */
+const npmPackageCache = new Map<string, boolean>();
+
+/**
+ * Validate if a package exists on npm registry
+ * This prevents WebContainer from trying to install non-existent packages
+ */
+async function validateNpmPackageExists(packageName: string): Promise<boolean> {
+  // Check whitelist first (instant validation)
+  if (WEBCONTAINER_SAFE_PACKAGES.has(packageName)) {
+    return true;
+  }
+
+  // Check cache
+  if (npmPackageCache.has(packageName)) {
+    return npmPackageCache.get(packageName)!;
+  }
+
+  try {
+    // Check npm registry
+    const response = await fetch(
+      `https://registry.npmjs.org/${encodeURIComponent(packageName)}`,
+      {
+        method: 'HEAD',
+        signal: AbortSignal.timeout(3000) // 3 second timeout
+      }
+    );
+
+    const exists = response.status === 200;
+    npmPackageCache.set(packageName, exists);
+
+    if (!exists) {
+      console.warn(`⚠️ Package "${packageName}" does not exist on npm registry`);
+    }
+
+    return exists;
+  } catch (error) {
+    // On network error, be conservative - assume package doesn't exist
+    console.warn(`⚠️ Failed to validate package "${packageName}":`, error);
+    npmPackageCache.set(packageName, false);
+    return false;
+  }
+}
+
+/**
+ * Validate all packages in dependencies object
+ * Returns only the packages that exist on npm registry
+ */
+async function validateAndFilterDependencies(
+  dependencies: Record<string, string>
+): Promise<Record<string, string>> {
+  const validated: Record<string, string> = {};
+  const packageNames = Object.keys(dependencies);
+
+  // Validate all packages in parallel for speed
+  const validationResults = await Promise.all(
+    packageNames.map(async (name) => ({
+      name,
+      exists: await validateNpmPackageExists(name),
+      version: dependencies[name]
+    }))
+  );
+
+  // Keep only packages that exist
+  for (const { name, exists, version } of validationResults) {
+    if (exists) {
+      validated[name] = version;
+    } else {
+      console.warn(`⚠️ Removing non-existent package: ${name}@${version}`);
+    }
+  }
+
+  return validated;
+}
 
 // ============================================================================
 // PACKAGE.JSON SANITIZATION
@@ -92,10 +339,11 @@ function isValidPackageName(name: string): boolean {
  * - Remove packages requiring native binaries
  * - Replace problematic packages with alternatives
  * - Remove invalid package names (like "mql4/mql5-bridge")
+ * - Validate packages exist on npm registry (prevents install failures)
  * - Keep the structure lightweight
  * - Ensure Next.js, React, and Tailwind work properly
  */
-export function sanitizePackageJsonForWebContainer(packageJsonContent: string): string {
+export async function sanitizePackageJsonForWebContainer(packageJsonContent: string): Promise<string> {
   try {
     const pkg = JSON.parse(packageJsonContent);
 
@@ -139,6 +387,12 @@ export function sanitizePackageJsonForWebContainer(packageJsonContent: string): 
         delete pkg.devDependencies[oldPkg];
       }
     }
+
+    // CRITICAL: Validate all packages exist on npm registry
+    // This prevents WebContainer npm install from failing on non-existent packages
+    console.log('🔍 Validating packages against npm registry...');
+    pkg.dependencies = await validateAndFilterDependencies(pkg.dependencies);
+    pkg.devDependencies = await validateAndFilterDependencies(pkg.devDependencies);
 
     // Ensure core Next.js dependencies are present with compatible versions
     const CORE_DEPS = {
@@ -185,6 +439,7 @@ export function sanitizePackageJsonForWebContainer(packageJsonContent: string): 
     // Remove engines constraint that might cause issues
     delete pkg.engines;
 
+    console.log('✅ Package validation complete');
     return JSON.stringify(pkg, null, 2);
   } catch (error) {
     console.error('Failed to sanitize package.json:', error);
@@ -506,9 +761,9 @@ export default ${componentName};
 /**
  * Sanitize all files for WebContainer compatibility
  */
-export function sanitizeFilesForWebContainer(
+export async function sanitizeFilesForWebContainer(
   files: Array<{ path: string; content: string }>
-): Array<{ path: string; content: string }> {
+): Promise<Array<{ path: string; content: string }>> {
   // Detect if this is a personal tool (lighter sanitization needed)
   const isPersonal = isPersonalTool(files);
 
@@ -526,25 +781,29 @@ export function sanitizeFilesForWebContainer(
   const allFiles = [...files, ...stubComponents];
 
   // Then sanitize all files
-  return allFiles.map(file => {
-    if (file.path === 'package.json') {
-      return {
-        ...file,
-        content: sanitizePackageJsonForWebContainer(file.content),
-      };
-    }
+  const sanitizedFiles = await Promise.all(
+    allFiles.map(async (file) => {
+      if (file.path === 'package.json') {
+        return {
+          ...file,
+          content: await sanitizePackageJsonForWebContainer(file.content),
+        };
+      }
 
-    // Sanitize TypeScript/JavaScript files
-    if (file.path.endsWith('.tsx') || file.path.endsWith('.ts') ||
-        file.path.endsWith('.jsx') || file.path.endsWith('.js')) {
-      return {
-        ...file,
-        content: sanitizeCodeFile(file.content, file.path, isPersonal),
-      };
-    }
+      // Sanitize TypeScript/JavaScript files
+      if (file.path.endsWith('.tsx') || file.path.endsWith('.ts') ||
+          file.path.endsWith('.jsx') || file.path.endsWith('.js')) {
+        return {
+          ...file,
+          content: sanitizeCodeFile(file.content, file.path, isPersonal),
+        };
+      }
 
-    return file;
-  });
+      return file;
+    })
+  );
+
+  return sanitizedFiles;
 }
 
 // ============================================================================

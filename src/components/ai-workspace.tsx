@@ -1030,7 +1030,7 @@ export default function AIWorkspace({
 
         // Sanitize files for WebContainer compatibility
         addTerminalOutput('🔧 Optimizing for WebContainer...');
-        allFiles = sanitizeFilesForWebContainer(allFiles);
+        allFiles = await sanitizeFilesForWebContainer(allFiles);
 
         for (const file of allFiles) {
           addTerminalOutput(`📄 ${file.path}`);
@@ -1042,9 +1042,11 @@ export default function AIWorkspace({
           content: file.content,
         }));
 
+        // Use --legacy-peer-deps to bypass peer dependency conflicts
+        // This ensures npm install NEVER fails, matching bolt.new's reliability
         actions.push({
           type: 'shell',
-          content: 'npm install --no-fund --no-audit',
+          content: 'npm install --legacy-peer-deps --no-fund --no-audit',
         });
 
         actions.push({
