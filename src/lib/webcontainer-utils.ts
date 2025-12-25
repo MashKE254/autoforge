@@ -235,6 +235,116 @@ const WEBCONTAINER_SAFE_PACKAGES = new Set([
 const npmPackageCache = new Map<string, boolean>();
 
 /**
+ * Extract package name from an import statement
+ * Examples:
+ *   'react' -> 'react'
+ *   'react-dom' -> 'react-dom'
+ *   '@radix-ui/react-dialog' -> '@radix-ui/react-dialog'
+ *   '@/lib/utils' -> null (local import)
+ *   './components/Button' -> null (local import)
+ */
+function extractPackageNameFromImport(importPath: string): string | null {
+  // Skip local imports (start with . or @/)
+  if (importPath.startsWith('.') || importPath.startsWith('@/')) {
+    return null;
+  }
+
+  // Scoped package: @scope/package or @scope/package/subpath
+  if (importPath.startsWith('@')) {
+    const parts = importPath.split('/');
+    if (parts.length >= 2) {
+      return `${parts[0]}/${parts[1]}`;
+    }
+    return null;
+  }
+
+  // Regular package: package-name or package-name/subpath
+  const firstPart = importPath.split('/')[0];
+  return firstPart || null;
+}
+
+/**
+ * Scan TypeScript/JavaScript file content for all imported packages
+ */
+function scanFileForImports(content: string): Set<string> {
+  const packages = new Set<string>();
+
+  // Match various import styles:
+  // import foo from 'package'
+  // import { foo } from 'package'
+  // import * as foo from 'package'
+  // const foo = require('package')
+  // import('package')
+  const importRegex = /(?:import\s+(?:{[^}]*}|[\w*,\s]+)\s+from\s+['"]([^'"]+)['"]|require\s*\(\s*['"]([^'"]+)['"]\s*\)|import\s*\(\s*['"]([^'"]+)['"]\s*\))/g;
+
+  let match;
+  while ((match = importRegex.exec(content)) !== null) {
+    // match[1] is for 'import ... from', match[2] for 'require', match[3] for 'import()'
+    const importPath = match[1] || match[2] || match[3];
+    if (importPath) {
+      const packageName = extractPackageNameFromImport(importPath);
+      if (packageName) {
+        packages.add(packageName);
+      }
+    }
+  }
+
+  return packages;
+}
+
+/**
+ * Scan all files and collect required npm packages
+ */
+function collectRequiredPackages(files: Array<{ path: string; content: string }>): Set<string> {
+  const allPackages = new Set<string>();
+
+  for (const file of files) {
+    // Only scan code files
+    if (file.path.endsWith('.tsx') || file.path.endsWith('.ts') ||
+        file.path.endsWith('.jsx') || file.path.endsWith('.js')) {
+      const packages = scanFileForImports(file.content);
+      packages.forEach(pkg => allPackages.add(pkg));
+    }
+  }
+
+  return allPackages;
+}
+
+/**
+ * Package version defaults for commonly imported packages
+ */
+const PACKAGE_VERSION_DEFAULTS: Record<string, string> = {
+  'class-variance-authority': '^0.7.0',
+  'clsx': '^2.1.0',
+  'tailwind-merge': '^2.2.0',
+  'lucide-react': '^0.263.1',
+  'recharts': '^2.10.0',
+  'date-fns': '^3.0.0',
+  'react-hook-form': '^7.49.0',
+  'zod': '^3.22.0',
+  '@hookform/resolvers': '^3.3.0',
+  'zustand': '^4.4.0',
+  '@radix-ui/react-dialog': '^1.0.5',
+  '@radix-ui/react-dropdown-menu': '^2.0.6',
+  '@radix-ui/react-select': '^2.0.0',
+  '@radix-ui/react-checkbox': '^1.0.4',
+  '@radix-ui/react-label': '^2.0.2',
+  '@radix-ui/react-slot': '^1.0.2',
+  '@radix-ui/react-separator': '^1.0.3',
+  '@radix-ui/react-avatar': '^1.0.4',
+  '@radix-ui/react-toast': '^1.1.5',
+  '@radix-ui/react-tooltip': '^1.0.7',
+  '@radix-ui/react-popover': '^1.0.7',
+  '@radix-ui/react-tabs': '^1.0.4',
+  'sonner': '^1.3.0',
+  'react-day-picker': '^8.10.0',
+  'jspdf': '^2.5.1',
+  'html2canvas': '^1.4.1',
+  'nanoid': '^5.0.0',
+  'uuid': '^9.0.0',
+};
+
+/**
  * Validate if a package exists on npm registry
  * This prevents WebContainer from trying to install non-existent packages
  */
@@ -343,7 +453,10 @@ function isValidPackageName(name: string): boolean {
  * - Keep the structure lightweight
  * - Ensure Next.js, React, and Tailwind work properly
  */
-export async function sanitizePackageJsonForWebContainer(packageJsonContent: string): Promise<string> {
+export async function sanitizePackageJsonForWebContainer(
+  packageJsonContent: string,
+  requiredPackages?: Set<string>
+): Promise<string> {
   try {
     const pkg = JSON.parse(packageJsonContent);
 
@@ -385,6 +498,36 @@ export async function sanitizePackageJsonForWebContainer(packageJsonContent: str
       if (pkg.devDependencies[oldPkg]) {
         pkg.devDependencies[newPkg] = pkg.devDependencies[oldPkg];
         delete pkg.devDependencies[oldPkg];
+      }
+    }
+
+    // CRITICAL: Auto-add missing packages detected from code imports
+    // This ensures all imported packages are installed, preventing build errors
+    if (requiredPackages && requiredPackages.size > 0) {
+      console.log(`📦 Auto-adding ${requiredPackages.size} packages detected from imports...`);
+
+      for (const packageName of requiredPackages) {
+        // Skip packages already in dependencies or devDependencies
+        if (pkg.dependencies[packageName] || pkg.devDependencies[packageName]) {
+          continue;
+        }
+
+        // Skip core packages (handled separately below)
+        if (['next', 'react', 'react-dom', 'typescript', '@types/node', '@types/react', '@types/react-dom',
+             'tailwindcss', 'postcss', 'autoprefixer'].includes(packageName)) {
+          continue;
+        }
+
+        // Skip incompatible packages
+        if (INCOMPATIBLE_PACKAGES.includes(packageName)) {
+          console.warn(`⚠️ Skipping incompatible package from imports: ${packageName}`);
+          continue;
+        }
+
+        // Add package with default version or latest
+        const version = PACKAGE_VERSION_DEFAULTS[packageName] || 'latest';
+        pkg.dependencies[packageName] = version;
+        console.log(`   ✅ Added ${packageName}@${version}`);
       }
     }
 
@@ -780,13 +923,19 @@ export async function sanitizeFilesForWebContainer(
   // Combine original files with stub components
   const allFiles = [...files, ...stubComponents];
 
+  // CRITICAL: Scan all files for imported packages
+  // This ensures packages used in code are added to package.json
+  console.log('🔎 Scanning files for package imports...');
+  const requiredPackages = collectRequiredPackages(allFiles);
+  console.log(`   Found ${requiredPackages.size} imported packages`);
+
   // Then sanitize all files
   const sanitizedFiles = await Promise.all(
     allFiles.map(async (file) => {
       if (file.path === 'package.json') {
         return {
           ...file,
-          content: await sanitizePackageJsonForWebContainer(file.content),
+          content: await sanitizePackageJsonForWebContainer(file.content, requiredPackages),
         };
       }
 
