@@ -504,7 +504,7 @@ export async function sanitizePackageJsonForWebContainer(
     // CRITICAL: Auto-add missing packages detected from code imports
     // This ensures all imported packages are installed, preventing build errors
     if (requiredPackages && requiredPackages.size > 0) {
-      console.log(`📦 Auto-adding ${requiredPackages.size} packages detected from imports...`);
+      console.log(`📦 Scanning ${requiredPackages.size} imported packages...`);
 
       for (const packageName of requiredPackages) {
         // Skip packages already in dependencies or devDependencies
@@ -524,10 +524,22 @@ export async function sanitizePackageJsonForWebContainer(
           continue;
         }
 
-        // Add package with default version or latest
-        const version = PACKAGE_VERSION_DEFAULTS[packageName] || 'latest';
-        pkg.dependencies[packageName] = version;
-        console.log(`   ✅ Added ${packageName}@${version}`);
+        // CRITICAL: Only add packages we KNOW exist (in whitelist or have default version)
+        // Don't add unknown packages with 'latest' - they might not exist!
+        if (WEBCONTAINER_SAFE_PACKAGES.has(packageName)) {
+          // Package is in whitelist - safe to add with default version
+          const version = PACKAGE_VERSION_DEFAULTS[packageName] || 'latest';
+          pkg.dependencies[packageName] = version;
+          console.log(`   ✅ Added whitelisted: ${packageName}@${version}`);
+        } else if (PACKAGE_VERSION_DEFAULTS[packageName]) {
+          // Package has a default version - safe to add
+          const version = PACKAGE_VERSION_DEFAULTS[packageName];
+          pkg.dependencies[packageName] = version;
+          console.log(`   ✅ Added with default: ${packageName}@${version}`);
+        } else {
+          // Unknown package - skip it to prevent npm install failures
+          console.warn(`   ⚠️ Skipping unknown package: ${packageName} (not in whitelist)`);
+        }
       }
     }
 
