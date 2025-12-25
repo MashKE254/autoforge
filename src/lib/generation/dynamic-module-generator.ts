@@ -117,14 +117,28 @@ Return a JSON object with this EXACT structure. CRITICAL: All code content must 
   "instructions": ["Step 1", "Step 2"]
 }
 
-CRITICAL: Dependencies must be REAL, VALID npm package names:
-- ✅ VALID: "axios", "stripe", "@sendgrid/mail", "linkedin-api-client"
-- ❌ INVALID: "mql4/mql5-bridge" (slashes not allowed except @scope/name)
+CRITICAL: Dependencies must be REAL, VALID npm packages that ACTUALLY EXIST on npm registry:
+- ✅ VALID: "axios", "stripe", "@sendgrid/mail" (verified to exist on npm)
+- ❌ INVALID: "mql4/mql5-bridge" (does not exist on npm)
+- ❌ INVALID: "node-mt4" (does not exist on npm)
+- ❌ INVALID: "metatrader-api" (does not exist on npm)
+- ❌ INVALID: "linkedin-api-client" (does not exist on npm)
 - ❌ INVALID: "API Bridge" (spaces not allowed)
-- ❌ INVALID: "custom_package" (if it doesn't exist on npm)
-- Only use packages that actually exist on npm registry
-- Use kebab-case for package names (not underscores or camelCase)
-- If no real npm package exists for the integration, return empty dependencies array
+
+**CRITICAL RULE:** If you are not 100% certain a package exists on npm, return EMPTY dependencies array []
+
+**Known integrations WITHOUT npm packages:**
+- MetaTrader (MT4/MT5): NO npm package exists - return []
+- Most trading platforms: NO npm packages - return []
+- Many specialized APIs: NO npm packages - return []
+
+**What to do when no npm package exists:**
+1. Return "dependencies": []
+2. Generate the integration code from scratch using fetch/axios
+3. Add clear comments explaining how to set up the API connection
+4. Include the API endpoint URLs and authentication methods in comments
+
+Only add dependencies if you've personally used them or are absolutely certain they exist
 
 ESCAPING RULES FOR JSON:
 - Replace all double quotes with escaped quotes

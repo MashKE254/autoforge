@@ -332,18 +332,40 @@ export class UnifiedGenerator {
       if (packageJsonFile) {
         const moduleDeps = DynamicModuleGenerator.getAllDependencies(detectedModules);
         if (moduleDeps.length > 0) {
-          console.log(`   Adding ${moduleDeps.length} dependencies: ${moduleDeps.join(', ')}`);
+          console.log(`   Validating ${moduleDeps.length} dependencies: ${moduleDeps.join(', ')}`);
 
           try {
             const packageJson = JSON.parse(packageJsonFile.content);
             packageJson.dependencies = packageJson.dependencies || {};
 
-            // Add module dependencies with latest version
-            moduleDeps.forEach(dep => {
-              if (!packageJson.dependencies[dep]) {
-                packageJson.dependencies[dep] = 'latest';
+            // Validate and add module dependencies
+            const validDeps: string[] = [];
+            const invalidDeps: string[] = [];
+
+            for (const dep of moduleDeps) {
+              // Skip if already in package.json
+              if (packageJson.dependencies[dep]) {
+                validDeps.push(dep);
+                continue;
               }
-            });
+
+              // Validate package exists on npm
+              const isValid = await this.validateNpmPackage(dep);
+              if (isValid) {
+                packageJson.dependencies[dep] = 'latest';
+                validDeps.push(dep);
+              } else {
+                invalidDeps.push(dep);
+                console.warn(`   ⚠️  Skipping non-existent package: ${dep}`);
+              }
+            }
+
+            if (validDeps.length > 0) {
+              console.log(`   ✓ Added ${validDeps.length} valid dependencies: ${validDeps.join(', ')}`);
+            }
+            if (invalidDeps.length > 0) {
+              console.warn(`   ⚠️  Skipped ${invalidDeps.length} invalid dependencies: ${invalidDeps.join(', ')}`);
+            }
 
             packageJsonFile.content = JSON.stringify(packageJson, null, 2);
           } catch (error) {
@@ -388,6 +410,42 @@ export class UnifiedGenerator {
     callbacks?.onProgress?.('Using single-pass generation...');
 
     return this.boltGenerator.generate(prompt, jobId, callbacks);
+  }
+
+  /**
+   * Validate if an npm package actually exists
+   * Checks npm registry to prevent adding fake/hallucinated packages
+   */
+  private async validateNpmPackage(packageName: string): Promise<boolean> {
+    try {
+      // Basic validation: check format
+      if (!packageName || typeof packageName !== 'string') {
+        return false;
+      }
+
+      // Reject packages with invalid characters (except @scope/name format)
+      if (!/^(@[a-z0-9-~][a-z0-9-._~]*\/)?[a-z0-9-~][a-z0-9-._~]*$/.test(packageName)) {
+        console.warn(`   Invalid package name format: ${packageName}`);
+        return false;
+      }
+
+      // Check npm registry
+      const response = await fetch(`https://registry.npmjs.org/${encodeURIComponent(packageName)}`);
+
+      if (response.status === 200) {
+        return true; // Package exists
+      } else if (response.status === 404) {
+        console.warn(`   Package not found on npm: ${packageName}`);
+        return false;
+      } else {
+        // If npm is down or we get an error, log but don't fail
+        console.warn(`   Could not verify package ${packageName} (status ${response.status}), skipping`);
+        return false;
+      }
+    } catch (error) {
+      console.warn(`   Error validating package ${packageName}:`, error);
+      return false; // Fail safe - don't add unverified packages
+    }
   }
 
   /**
