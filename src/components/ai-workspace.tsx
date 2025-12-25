@@ -77,7 +77,7 @@ interface AIWorkspaceProps {
   projectName: string;
   jobId: string;
   initialFiles?: InitialFile[];
-  generationMode?: 'PERSONAL' | 'SAAS' | 'SAAS_UPGRADE';
+  generationMode?: 'PREVIEW' | 'PERSONAL' | 'SAAS' | 'SAAS_UPGRADE';
 }
 
 interface Message {
@@ -619,6 +619,243 @@ function LiveBanner({ url }: { url: string }) {
 }
 
 // ============================================================================
+// PREVIEW BANNER COMPONENT
+// ============================================================================
+
+function PreviewBanner({ onUpgrade }: { onUpgrade: () => void }) {
+  return (
+    <div className="bg-violet-500/10 border-b border-violet-500/20 px-4 py-2 flex items-center justify-between">
+      <div className="flex items-center gap-2 text-violet-400 text-sm">
+        <Sparkles className="w-4 h-4" />
+        <span>
+          <strong>FREE Preview:</strong> This is a mock preview with hardcoded data. Upgrade to production for real functionality.
+        </span>
+      </div>
+      <button
+        onClick={onUpgrade}
+        className="px-3 py-1 text-xs font-medium bg-gradient-to-r from-violet-600 to-purple-600 text-white rounded hover:from-violet-500 hover:to-purple-500 transition-all flex items-center gap-1"
+      >
+        <Rocket className="w-3 h-3" />
+        Upgrade to Production
+      </button>
+    </div>
+  );
+}
+
+// ============================================================================
+// PRICING MODAL COMPONENT
+// ============================================================================
+
+function PricingModal({
+  isOpen,
+  onClose,
+  jobId,
+  appName,
+  originalPrompt,
+  onUpgrade,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  jobId: string;
+  appName: string;
+  originalPrompt: string;
+  onUpgrade: (mode: 'PERSONAL' | 'SINGLE_USER' | 'SAAS') => void;
+}) {
+  const [selectedTier, setSelectedTier] = useState<'PERSONAL' | 'SINGLE_USER' | 'SAAS' | null>(null);
+  const [isUpgrading, setIsUpgrading] = useState(false);
+
+  const tiers = [
+    {
+      id: 'PERSONAL' as const,
+      name: 'Personal',
+      price: '$9',
+      description: 'Simple tools for personal use',
+      features: [
+        'localStorage data persistence',
+        'No authentication required',
+        'Single-page application',
+        'Perfect for personal productivity tools',
+        'Download full source code',
+      ],
+      icon: '🛠️',
+      color: 'from-blue-600 to-cyan-600',
+      borderColor: 'border-blue-500/20',
+      bgColor: 'bg-blue-500/10',
+    },
+    {
+      id: 'SINGLE_USER' as const,
+      name: 'Single User',
+      price: '$29',
+      description: 'Production-grade app for one user',
+      features: [
+        'Real PostgreSQL database (Supabase)',
+        'No authentication (single user)',
+        'Server actions & API routes',
+        'Production-ready code quality',
+        'Download full source code',
+      ],
+      icon: '🚀',
+      color: 'from-violet-600 to-purple-600',
+      borderColor: 'border-violet-500/20',
+      bgColor: 'bg-violet-500/10',
+      recommended: true,
+    },
+    {
+      id: 'SAAS' as const,
+      name: 'SaaS',
+      price: '$99',
+      description: 'Full SaaS with auth & payments',
+      features: [
+        'PostgreSQL database (Supabase)',
+        'Clerk authentication (multi-user)',
+        'Stripe payments integration',
+        'Multi-tenant architecture',
+        'Enterprise-grade code quality',
+      ],
+      icon: '💎',
+      color: 'from-emerald-600 to-teal-600',
+      borderColor: 'border-emerald-500/20',
+      bgColor: 'bg-emerald-500/10',
+    },
+  ];
+
+  const handleUpgrade = async () => {
+    if (!selectedTier) return;
+
+    setIsUpgrading(true);
+    try {
+      onUpgrade(selectedTier);
+    } finally {
+      setIsUpgrading(false);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={onClose} />
+
+      <div className="relative bg-zinc-900 border border-white/10 rounded-2xl w-full max-w-4xl shadow-2xl overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b border-white/10">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-purple-500 flex items-center justify-center">
+              <Rocket className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold text-white">Upgrade to Production</h2>
+              <p className="text-sm text-gray-400">{appName}</p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-2 text-gray-400 hover:text-white rounded-lg hover:bg-white/5"
+          >
+            ✕
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="p-6">
+          <div className="mb-6 text-center">
+            <h3 className="text-xl font-semibold text-white mb-2">
+              Choose Your Production Tier
+            </h3>
+            <p className="text-gray-400 text-sm">
+              Regenerate your app with real integrations and production-grade code
+            </p>
+          </div>
+
+          {/* Pricing Tiers */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            {tiers.map((tier) => (
+              <button
+                key={tier.id}
+                onClick={() => setSelectedTier(tier.id)}
+                className={`relative p-5 rounded-xl border-2 transition-all text-left ${
+                  selectedTier === tier.id
+                    ? `${tier.borderColor} ${tier.bgColor}`
+                    : 'border-white/10 hover:border-white/20 bg-white/5'
+                }`}
+              >
+                {tier.recommended && (
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-gradient-to-r from-violet-600 to-purple-600 text-white text-xs font-medium rounded-full">
+                    Recommended
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-3xl">{tier.icon}</span>
+                  {selectedTier === tier.id && (
+                    <Check className="w-5 h-5 text-violet-400" />
+                  )}
+                </div>
+
+                <h4 className="text-lg font-semibold text-white mb-1">{tier.name}</h4>
+                <div className="mb-2">
+                  <span className="text-2xl font-bold text-white">{tier.price}</span>
+                  <span className="text-gray-500 text-sm ml-1">one-time</span>
+                </div>
+                <p className="text-xs text-gray-400 mb-4">{tier.description}</p>
+
+                <ul className="space-y-2">
+                  {tier.features.map((feature, i) => (
+                    <li key={i} className="flex items-start gap-2 text-xs text-gray-300">
+                      <Check className="w-3 h-3 text-green-400 shrink-0 mt-0.5" />
+                      <span>{feature}</span>
+                    </li>
+                  ))}
+                </ul>
+              </button>
+            ))}
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex gap-3">
+            <button
+              onClick={onClose}
+              className="flex-1 py-3 px-4 bg-white/10 text-white font-medium rounded-xl hover:bg-white/20 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleUpgrade}
+              disabled={!selectedTier || isUpgrading}
+              className={`flex-1 py-3 px-4 font-medium rounded-xl transition-all flex items-center justify-center gap-2 ${
+                selectedTier && !isUpgrading
+                  ? 'bg-gradient-to-r from-violet-600 to-purple-600 text-white hover:from-violet-500 hover:to-purple-500 shadow-lg shadow-violet-500/25'
+                  : 'bg-white/5 text-gray-500 cursor-not-allowed'
+              }`}
+            >
+              {isUpgrading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Upgrading...
+                </>
+              ) : (
+                <>
+                  <Rocket className="w-4 h-4" />
+                  Upgrade Now
+                </>
+              )}
+            </button>
+          </div>
+
+          {/* Info */}
+          <div className="mt-4 flex items-start gap-2 p-3 rounded-lg bg-violet-500/10 border border-violet-500/20">
+            <Sparkles className="w-4 h-4 text-violet-400 shrink-0 mt-0.5" />
+            <p className="text-xs text-violet-300">
+              Your app will be regenerated with the selected tier&apos;s integrations. This takes about 30 seconds.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
 // MAIN COMPONENT
 // ============================================================================
 
@@ -677,6 +914,10 @@ export default function AIWorkspace({
   const [showGoLiveModal, setShowGoLiveModal] = useState(false);
   const [showDeployModal, setShowDeployModal] = useState(false);
   const [showMonetizeModal, setShowMonetizeModal] = useState(false);
+  const [showPricingModal, setShowPricingModal] = useState(false);
+
+  // Original prompt state (needed for upgrade)
+  const [originalPrompt, setOriginalPrompt] = useState<string>('');
 
   // =========================================================================
   // REFS
@@ -706,15 +947,39 @@ export default function AIWorkspace({
   // =========================================================================
   useEffect(() => {
     if (messages.length === 0) {
+      const welcomeMessage = generationMode === 'PREVIEW'
+        ? `Welcome to your FREE preview! Your app "${projectName}" is ready.\n\nThis preview uses mock data to show what your app will look like. Click "Upgrade to Production" to regenerate with real integrations.`
+        : `Welcome to your workspace! Your app "${projectName}" is ready to preview.\n\nThis is a **sandbox preview** — database and auth are simulated. Click "Go Live" to provision real infrastructure.`;
+
       setMessages([
         {
           role: 'assistant',
-          content: `Welcome to your workspace! Your app "${projectName}" is ready to preview.\n\nThis is a **sandbox preview** — database and auth are simulated. Click "Go Live" to provision real infrastructure.`,
+          content: welcomeMessage,
           timestamp: new Date(),
         },
       ]);
     }
-  }, [projectName, messages.length]);
+  }, [projectName, messages.length, generationMode]);
+
+  // =========================================================================
+  // FETCH ORIGINAL PROMPT (for PREVIEW mode upgrade)
+  // =========================================================================
+  useEffect(() => {
+    if (generationMode === 'PREVIEW' && jobId && !originalPrompt) {
+      const fetchPrompt = async () => {
+        try {
+          const response = await fetch(`/api/jobs/${jobId}`);
+          if (response.ok) {
+            const data = await response.json();
+            setOriginalPrompt(data.job?.prompt || '');
+          }
+        } catch (error) {
+          console.error('Failed to fetch original prompt:', error);
+        }
+      };
+      fetchPrompt();
+    }
+  }, [generationMode, jobId, originalPrompt]);
 
   // =========================================================================
   // INITIALIZE WEBCONTAINER (WITH DOUBLE-INIT GUARD)
@@ -912,6 +1177,50 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
     addTerminalOutput('✅ Payments: Stripe (test mode)');
   };
 
+  const handleUpgradeToProduction = async (mode: 'PERSONAL' | 'SINGLE_USER' | 'SAAS') => {
+    if (!originalPrompt) {
+      addTerminalOutput('❌ Error: Could not retrieve original prompt');
+      return;
+    }
+
+    setShowPricingModal(false);
+    addTerminalOutput('');
+    addTerminalOutput('🚀 Upgrading to production...');
+    addTerminalOutput(`📊 Mode: ${mode}`);
+    addTerminalOutput('⏳ Regenerating with real integrations...');
+
+    try {
+      const response = await fetch('/api/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: originalPrompt,
+          mode: mode,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to upgrade');
+      }
+
+      addTerminalOutput('✅ Production generation started!');
+      addTerminalOutput(`🔗 Job ID: ${data.jobId}`);
+      addTerminalOutput('');
+      addTerminalOutput('🔄 Redirecting to new workspace...');
+
+      // Redirect to new workspace
+      setTimeout(() => {
+        window.location.href = `/workspace/${data.jobId}`;
+      }, 2000);
+    } catch (error) {
+      addTerminalOutput(`❌ Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      addTerminalOutput('');
+      addTerminalOutput('💡 Please try again or contact support');
+    }
+  };
+
   // =========================================================================
   // RENDER
   // =========================================================================
@@ -1076,34 +1385,47 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
           {/* Spacer */}
           <div className="flex-1" />
 
-          {/* Go Live Button - PRIMARY ACTION (when not yet live) */}
-          {!liveUrl ? (
+          {/* PREVIEW Mode: Upgrade to Production Button */}
+          {generationMode === 'PREVIEW' ? (
             <button
-              onClick={() => setShowGoLiveModal(true)}
-              className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-medium bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:from-green-500 hover:to-emerald-500 transition-all shadow-lg shadow-green-500/25"
+              onClick={() => setShowPricingModal(true)}
+              className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-medium bg-gradient-to-r from-violet-600 to-purple-600 text-white rounded-lg hover:from-violet-500 hover:to-purple-500 transition-all shadow-lg shadow-violet-500/25"
             >
-              <Zap className="w-3 h-3" />
-              Go Live
+              <Rocket className="w-3 h-3" />
+              Upgrade to Production
             </button>
           ) : (
             <>
-              {/* Deploy Button */}
-              <button
-                onClick={() => setShowDeployModal(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-white/10 text-white rounded-lg hover:bg-white/20 transition-colors"
-              >
-                <Rocket className="w-3 h-3" />
-                Deploy
-              </button>
+              {/* Go Live Button - PRIMARY ACTION (when not yet live) */}
+              {!liveUrl ? (
+                <button
+                  onClick={() => setShowGoLiveModal(true)}
+                  className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-medium bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:from-green-500 hover:to-emerald-500 transition-all shadow-lg shadow-green-500/25"
+                >
+                  <Zap className="w-3 h-3" />
+                  Go Live
+                </button>
+              ) : (
+                <>
+                  {/* Deploy Button */}
+                  <button
+                    onClick={() => setShowDeployModal(true)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-white/10 text-white rounded-lg hover:bg-white/20 transition-colors"
+                  >
+                    <Rocket className="w-3 h-3" />
+                    Deploy
+                  </button>
 
-              {/* Monetize Button */}
-              <button
-                onClick={() => setShowMonetizeModal(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-gradient-to-r from-violet-600 to-purple-600 text-white rounded-lg hover:from-violet-500 hover:to-purple-500 transition-all"
-              >
-                <DollarSign className="w-3 h-3" />
-                Monetize
-              </button>
+                  {/* Monetize Button */}
+                  <button
+                    onClick={() => setShowMonetizeModal(true)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-gradient-to-r from-violet-600 to-purple-600 text-white rounded-lg hover:from-violet-500 hover:to-purple-500 transition-all"
+                  >
+                    <DollarSign className="w-3 h-3" />
+                    Monetize
+                  </button>
+                </>
+              )}
             </>
           )}
         </div>
@@ -1114,13 +1436,19 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
           {activeTab === 'preview' && (
             <div className="h-full flex flex-col">
               {/* Mode Banner */}
-              {previewMode === 'sandbox' && !liveUrl && (
-                <SandboxBanner onGoLive={() => setShowGoLiveModal(true)} />
+              {generationMode === 'PREVIEW' ? (
+                <PreviewBanner onUpgrade={() => setShowPricingModal(true)} />
+              ) : (
+                <>
+                  {previewMode === 'sandbox' && !liveUrl && (
+                    <SandboxBanner onGoLive={() => setShowGoLiveModal(true)} />
+                  )}
+                  {previewMode === 'sandbox' && liveUrl && (
+                    <SandboxBanner onGoLive={() => setPreviewMode('live')} />
+                  )}
+                  {previewMode === 'live' && liveUrl && <LiveBanner url={liveUrl} />}
+                </>
               )}
-              {previewMode === 'sandbox' && liveUrl && (
-                <SandboxBanner onGoLive={() => setPreviewMode('live')} />
-              )}
-              {previewMode === 'live' && liveUrl && <LiveBanner url={liveUrl} />}
 
               {/* Route Tabs (for SAAS apps with multiple routes) */}
               {availableRoutes.length > 1 && (
@@ -1301,6 +1629,15 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
         onClose={() => setShowMonetizeModal(false)}
         generationJobId={jobId}
         appName={projectName}
+      />
+
+      <PricingModal
+        isOpen={showPricingModal}
+        onClose={() => setShowPricingModal(false)}
+        jobId={jobId}
+        appName={projectName}
+        originalPrompt={originalPrompt}
+        onUpgrade={handleUpgradeToProduction}
       />
     </div>
   );
