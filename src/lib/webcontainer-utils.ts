@@ -781,9 +781,27 @@ export const config = {
     sanitized = sanitized.replace(/<\/ClerkProvider>/g, '</>');
   }
 
-  // Remove auth() and currentUser() server calls
-  sanitized = sanitized.replace(/const\s+\{\s*userId\s*\}\s*=\s*await\s+auth\(\);?\s*/g, '');
-  sanitized = sanitized.replace(/const\s+user\s*=\s*await\s+currentUser\(\);?\s*/g, '');
+  // Replace auth() and currentUser() server calls with mock values
+  // CRITICAL: Must provide mock values, not remove entirely, or userId/user will be undefined
+
+  // Handle: const { userId } = await auth();
+  sanitized = sanitized.replace(
+    /const\s+\{\s*userId\s*\}\s*=\s*await\s+auth\(\);?/g,
+    'const { userId } = { userId: "demo-user" };'
+  );
+
+  // Handle: const { userId, sessionId } = await auth();
+  // Handle: const { userId, ...rest } = await auth();
+  sanitized = sanitized.replace(
+    /const\s+\{\s*([^}]*userId[^}]*)\}\s*=\s*await\s+auth\(\);?/g,
+    'const { $1 } = { userId: "demo-user", sessionId: "demo-session", orgId: null, sessionClaims: {} };'
+  );
+
+  // Handle: const user = await currentUser();
+  sanitized = sanitized.replace(
+    /const\s+user\s*=\s*await\s+currentUser\(\);?/g,
+    'const user = { id: "demo-user", firstName: "Demo", lastName: "User", emailAddresses: [{ emailAddress: "demo@example.com" }] };'
+  );
 
   // Remove Clerk hook calls and replace with mock values
   // useAuth() -> mock authenticated state
