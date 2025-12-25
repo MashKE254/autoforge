@@ -119,10 +119,35 @@ const WEBCONTAINER_SAFE_PACKAGES = new Set([
   'sonner',
   'react-hot-toast',
   'react-toastify',
+  'react-use',
+  'usehooks-ts',
+  'immer',
+  'react-error-boundary',
 
   // Icons
   '@radix-ui/react-icons',
   'react-icons',
+  '@heroicons/react',
+
+  // Next.js specific
+  'next-themes',
+  '@t3-oss/env-nextjs',
+
+  // Carousels and UI components
+  'embla-carousel-react',
+  'embla-carousel-autoplay',
+  'react-resizable-panels',
+  'vaul',
+  'react-textarea-autosize',
+  'input-otp',
+
+  // Form libraries
+  'react-select',
+  'react-phone-number-input',
+  'libphonenumber-js',
+
+  // Tables
+  '@tanstack/react-table',
 
   // Radix UI (only packages that actually exist)
   '@radix-ui/react-accordion',
@@ -172,12 +197,17 @@ const WEBCONTAINER_SAFE_PACKAGES = new Set([
 
   // Animation
   'framer-motion',
+  'gsap',
+  'react-intersection-observer',
 
   // DnD
   '@dnd-kit/core',
   '@dnd-kit/sortable',
   '@dnd-kit/utilities',
   'react-beautiful-dnd',
+
+  // Headless UI
+  '@headlessui/react',
 
   // Crypto (browser-compatible)
   'bcryptjs',
@@ -195,6 +225,11 @@ const WEBCONTAINER_SAFE_PACKAGES = new Set([
   'pdf-lib',
   'pdfmake',
   'html2canvas',
+
+  // QR Codes
+  'qrcode.react',
+  'qrcode',
+  'react-qr-code',
 
   // Image handling
   'sharp-browser', // Browser-compatible sharp alternative
@@ -304,9 +339,11 @@ function collectRequiredPackages(files: Array<{ path: string; content: string }>
   const allPackages = new Set<string>();
 
   for (const file of files) {
-    // Only scan code files
+    // Scan all JavaScript/TypeScript files including config files
     if (file.path.endsWith('.tsx') || file.path.endsWith('.ts') ||
-        file.path.endsWith('.jsx') || file.path.endsWith('.js')) {
+        file.path.endsWith('.jsx') || file.path.endsWith('.js') ||
+        file.path.endsWith('.mjs') || file.path.endsWith('.cjs') ||
+        file.path.endsWith('.mts') || file.path.endsWith('.cts')) {
       const packages = scanFileForImports(file.content);
       packages.forEach(pkg => allPackages.add(pkg));
     }
@@ -354,24 +391,58 @@ const PACKAGE_VERSION_DEFAULTS: Record<string, string> = {
   'html2canvas': '^1.4.1',
   'nanoid': '^5.0.0',
   'uuid': '^9.0.0',
+  // Next.js specific
+  'next-themes': '^0.2.1',
+  // Carousels and UI components
+  'embla-carousel-react': '^8.0.0',
+  'embla-carousel-autoplay': '^8.0.0',
+  'react-resizable-panels': '^2.0.0',
+  'vaul': '^0.9.0',
+  'react-textarea-autosize': '^8.5.0',
+  'input-otp': '^1.2.0',
+  // Form libraries
+  'react-select': '^5.8.0',
+  'react-phone-number-input': '^3.3.0',
+  'libphonenumber-js': '^1.10.0',
+  // Tables
+  '@tanstack/react-table': '^8.11.0',
+  // Utilities
+  'react-use': '^17.5.0',
+  'usehooks-ts': '^2.15.0',
+  'immer': '^10.0.0',
+  'react-error-boundary': '^4.0.0',
+  // Icons
+  '@heroicons/react': '^2.1.0',
+  // Animation
+  'gsap': '^3.12.0',
+  'react-intersection-observer': '^9.5.0',
+  // Headless UI
+  '@headlessui/react': '^1.7.0',
+  // QR Codes
+  'qrcode.react': '^3.1.0',
+  'qrcode': '^1.5.0',
+  'react-qr-code': '^2.0.0',
+  // T3 Env
+  '@t3-oss/env-nextjs': '^0.9.0',
 };
 
 /**
  * Validate if a package exists on npm registry
  * This prevents WebContainer from trying to install non-existent packages
+ * NEVER throws errors - returns false on any failure
  */
 async function validateNpmPackageExists(packageName: string): Promise<boolean> {
-  // Check whitelist first (instant validation)
-  if (WEBCONTAINER_SAFE_PACKAGES.has(packageName)) {
-    return true;
-  }
-
-  // Check cache
-  if (npmPackageCache.has(packageName)) {
-    return npmPackageCache.get(packageName)!;
-  }
-
   try {
+    // Check whitelist first (instant validation)
+    if (WEBCONTAINER_SAFE_PACKAGES.has(packageName)) {
+      return true;
+    }
+
+    // Check cache
+    if (npmPackageCache.has(packageName)) {
+      return npmPackageCache.get(packageName)!;
+    }
+
     // Check npm registry
     const response = await fetch(
       `https://registry.npmjs.org/${encodeURIComponent(packageName)}`,
@@ -390,8 +461,9 @@ async function validateNpmPackageExists(packageName: string): Promise<boolean> {
 
     return exists;
   } catch (error) {
-    // On network error, be conservative - assume package doesn't exist
-    console.warn(`⚠️ Failed to validate package "${packageName}":`, error);
+    // On ANY error (network, timeout, invalid name, etc.), be conservative
+    // Assume package doesn't exist to prevent npm install failures
+    console.warn(`⚠️ Failed to validate package "${packageName}":`, error instanceof Error ? error.message : 'Unknown error');
     npmPackageCache.set(packageName, false);
     return false;
   }
@@ -400,32 +472,49 @@ async function validateNpmPackageExists(packageName: string): Promise<boolean> {
 /**
  * Validate all packages in dependencies object
  * Returns only the packages that exist on npm registry
+ * NEVER throws errors - always returns a valid object
  */
 async function validateAndFilterDependencies(
   dependencies: Record<string, string>
 ): Promise<Record<string, string>> {
-  const validated: Record<string, string> = {};
-  const packageNames = Object.keys(dependencies);
+  try {
+    const validated: Record<string, string> = {};
+    const packageNames = Object.keys(dependencies);
 
-  // Validate all packages in parallel for speed
-  const validationResults = await Promise.all(
-    packageNames.map(async (name) => ({
-      name,
-      exists: await validateNpmPackageExists(name),
-      version: dependencies[name]
-    }))
-  );
-
-  // Keep only packages that exist
-  for (const { name, exists, version } of validationResults) {
-    if (exists) {
-      validated[name] = version;
-    } else {
-      console.warn(`⚠️ Removing non-existent package: ${name}@${version}`);
+    if (packageNames.length === 0) {
+      return validated;
     }
-  }
 
-  return validated;
+    // Validate all packages in parallel for speed
+    const validationResults = await Promise.allSettled(
+      packageNames.map(async (name) => ({
+        name,
+        exists: await validateNpmPackageExists(name),
+        version: dependencies[name]
+      }))
+    );
+
+    // Keep only packages that exist
+    for (const result of validationResults) {
+      if (result.status === 'fulfilled') {
+        const { name, exists, version } = result.value;
+        if (exists) {
+          validated[name] = version;
+        } else {
+          console.warn(`⚠️ Removing non-existent package: ${name}@${version}`);
+        }
+      } else {
+        console.warn(`⚠️ Package validation failed:`, result.reason);
+      }
+    }
+
+    return validated;
+  } catch (error) {
+    // If validation completely fails, return original dependencies
+    // Better to try installing them than to have empty dependencies
+    console.error('⚠️ Critical error in package validation, using original dependencies:', error);
+    return dependencies;
+  }
 }
 
 // ============================================================================
@@ -609,8 +698,11 @@ export async function sanitizePackageJsonForWebContainer(
     console.log('✅ Package validation complete');
     return JSON.stringify(pkg, null, 2);
   } catch (error) {
-    console.error('Failed to sanitize package.json:', error);
-    return packageJsonContent; // Return original if parsing fails
+    console.error('❌ Failed to sanitize package.json:', error instanceof Error ? error.message : 'Unknown error');
+    console.error('   Returning original package.json to prevent complete failure');
+    // If JSON parsing or sanitization fails, return original
+    // This is safer than crashing the entire preview
+    return packageJsonContent;
   }
 }
 
@@ -983,56 +1075,75 @@ export default ${componentName};
 
 /**
  * Sanitize all files for WebContainer compatibility
+ * NEVER throws errors - always returns sanitized files
  */
 export async function sanitizeFilesForWebContainer(
   files: Array<{ path: string; content: string }>
 ): Promise<Array<{ path: string; content: string }>> {
-  // Detect if this is a personal tool (lighter sanitization needed)
-  const isPersonal = isPersonalTool(files);
+  try {
+    // Detect if this is a personal tool (lighter sanitization needed)
+    const isPersonal = isPersonalTool(files);
 
-  console.log(`\n🔍 WebContainer Sanitization:`);
-  console.log(`   Tool Type: ${isPersonal ? 'PERSONAL (localStorage)' : 'SAAS (auth/DB)'}`);
-  console.log(`   Files: ${files.length}`);
+    console.log(`\n🔍 WebContainer Sanitization:`);
+    console.log(`   Tool Type: ${isPersonal ? 'PERSONAL (localStorage)' : 'SAAS (auth/DB)'}`);
+    console.log(`   Files: ${files.length}`);
 
-  // First, detect and create stub files for missing components (only for SaaS)
-  const stubComponents = isPersonal ? [] : detectMissingComponents(files);
-  if (stubComponents.length > 0) {
-    console.log(`   Created ${stubComponents.length} stub components`);
+    // First, detect and create stub files for missing components (only for SaaS)
+    const stubComponents = isPersonal ? [] : detectMissingComponents(files);
+    if (stubComponents.length > 0) {
+      console.log(`   Created ${stubComponents.length} stub components`);
+    }
+
+    // Combine original files with stub components
+    const allFiles = [...files, ...stubComponents];
+
+    // CRITICAL: Scan all files for imported packages
+    // This ensures packages used in code are added to package.json
+    console.log('🔎 Scanning files for package imports...');
+    const requiredPackages = collectRequiredPackages(allFiles);
+    console.log(`   Found ${requiredPackages.size} imported packages`);
+
+    // Then sanitize all files
+    const sanitizedFiles = await Promise.allSettled(
+      allFiles.map(async (file) => {
+        if (file.path === 'package.json') {
+          return {
+            ...file,
+            content: await sanitizePackageJsonForWebContainer(file.content, requiredPackages),
+          };
+        }
+
+        // Sanitize TypeScript/JavaScript files
+        if (file.path.endsWith('.tsx') || file.path.endsWith('.ts') ||
+            file.path.endsWith('.jsx') || file.path.endsWith('.js')) {
+          return {
+            ...file,
+            content: sanitizeCodeFile(file.content, file.path, isPersonal),
+          };
+        }
+
+        return file;
+      })
+    );
+
+    // Extract successfully sanitized files, keep original on failure
+    const result = sanitizedFiles.map((result, index) => {
+      if (result.status === 'fulfilled') {
+        return result.value;
+      } else {
+        console.warn(`⚠️ Failed to sanitize file ${allFiles[index].path}, using original:`, result.reason);
+        return allFiles[index];
+      }
+    });
+
+    console.log('✅ WebContainer sanitization complete');
+    return result;
+  } catch (error) {
+    // If sanitization completely fails, return original files
+    // Better to try running them than to have no files at all
+    console.error('❌ Critical error in WebContainer sanitization, using original files:', error instanceof Error ? error.message : 'Unknown error');
+    return files;
   }
-
-  // Combine original files with stub components
-  const allFiles = [...files, ...stubComponents];
-
-  // CRITICAL: Scan all files for imported packages
-  // This ensures packages used in code are added to package.json
-  console.log('🔎 Scanning files for package imports...');
-  const requiredPackages = collectRequiredPackages(allFiles);
-  console.log(`   Found ${requiredPackages.size} imported packages`);
-
-  // Then sanitize all files
-  const sanitizedFiles = await Promise.all(
-    allFiles.map(async (file) => {
-      if (file.path === 'package.json') {
-        return {
-          ...file,
-          content: await sanitizePackageJsonForWebContainer(file.content, requiredPackages),
-        };
-      }
-
-      // Sanitize TypeScript/JavaScript files
-      if (file.path.endsWith('.tsx') || file.path.endsWith('.ts') ||
-          file.path.endsWith('.jsx') || file.path.endsWith('.js')) {
-        return {
-          ...file,
-          content: sanitizeCodeFile(file.content, file.path, isPersonal),
-        };
-      }
-
-      return file;
-    })
-  );
-
-  return sanitizedFiles;
 }
 
 // ============================================================================
