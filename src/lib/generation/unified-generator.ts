@@ -173,19 +173,34 @@ export class UnifiedGenerator {
    */
   async generate(
     prompt: string,
-    mode: 'PERSONAL' | 'SINGLE_USER' | 'SAAS' | 'AUTO' = 'AUTO',
+    mode: 'PREVIEW' | 'PERSONAL' | 'SINGLE_USER' | 'SAAS' | 'AUTO' = 'AUTO',
     jobId?: string,
     callbacks?: StreamCallbacks & {
       onComplexityAnalysis?: (analysis: ComplexityAnalysis) => void;
-      onStrategySelected?: (strategy: 'simple' | 'orchestrated' | 'personal' | 'single-user' | 'multi-agent') => void;
+      onStrategySelected?: (strategy: 'simple' | 'orchestrated' | 'personal' | 'single-user' | 'multi-agent' | 'preview') => void;
       onModulesDetected?: (modules: DynamicModule[]) => void;
-      onModeSelected?: (mode: 'PERSONAL' | 'SINGLE_USER' | 'SAAS') => void;
+      onModeSelected?: (mode: 'PREVIEW' | 'PERSONAL' | 'SINGLE_USER' | 'SAAS') => void;
       onClassificationResult?: (result: ClassificationResult) => void;
       onPhaseStart?: (phase: string, agent: string) => void;
       onPhaseComplete?: (phase: string, duration: number) => void;
       onQualityMetrics?: (metrics: any) => void;
     }
   ): Promise<GenerationResult | MultiAgentResult> {
+    // ========================================================================
+    // STEP 0: PREVIEW MODE (Free, Fast, Mock Data)
+    // ========================================================================
+
+    if (mode === 'PREVIEW') {
+      console.log(`\n🎬 PREVIEW MODE`);
+      console.log(`   Free preview with mock data`);
+      console.log(`   No integrations, no quality checks`);
+      callbacks?.onStrategySelected?.('preview');
+      callbacks?.onModeSelected?.('PREVIEW');
+      callbacks?.onProgress?.('Generating preview with mock data...');
+
+      return await this.boltGenerator.generate(prompt, jobId, callbacks, false, true); // preview=true
+    }
+
     // ========================================================================
     // STEP 1: MODE SELECTION (AI-Powered with Fallback)
     // ========================================================================
