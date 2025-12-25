@@ -688,6 +688,62 @@ export const config = {
     'const { $1 } = { signOut: async () => {}, openSignIn: () => {} };'
   );
 
+  // CRITICAL: Remove Clerk JSX components (prevents "X is not defined" errors)
+  // Replace with mock components or remove entirely
+  const clerkComponents = [
+    'UserButton',
+    'SignInButton',
+    'SignUpButton',
+    'SignOutButton',
+    'SignedIn',
+    'SignedOut',
+    'RedirectToSignIn',
+    'RedirectToSignUp',
+    'ClerkLoaded',
+    'ClerkLoading'
+  ];
+
+  for (const component of clerkComponents) {
+    // Self-closing tags: <UserButton ... />
+    sanitized = sanitized.replace(
+      new RegExp(`<${component}[^>]*\\/>`, 'g'),
+      component === 'UserButton'
+        ? '<div className="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center text-sm">Demo</div>'
+        : ''
+    );
+
+    // Opening and closing tags: <SignedIn>...</SignedIn>
+    // For SignedIn, keep the children (user is signed in in preview)
+    // For SignedOut, remove everything (user is signed in in preview)
+    if (component === 'SignedIn' || component === 'ClerkLoaded') {
+      // Keep children, remove wrapper
+      sanitized = sanitized.replace(
+        new RegExp(`<${component}[^>]*>`, 'g'),
+        '<>'
+      );
+      sanitized = sanitized.replace(
+        new RegExp(`<\\/${component}>`, 'g'),
+        '</>'
+      );
+    } else if (component === 'SignedOut' || component === 'ClerkLoading') {
+      // Remove entire block including children
+      sanitized = sanitized.replace(
+        new RegExp(`<${component}[^>]*>[\\s\\S]*?<\\/${component}>`, 'g'),
+        ''
+      );
+    } else {
+      // Other components: remove opening/closing tags
+      sanitized = sanitized.replace(
+        new RegExp(`<${component}[^>]*>`, 'g'),
+        ''
+      );
+      sanitized = sanitized.replace(
+        new RegExp(`<\\/${component}>`, 'g'),
+        ''
+      );
+    }
+  }
+
   // Remove Supabase imports
   sanitized = sanitized.replace(/import\s+.*from\s+['"]@supabase\/[^'"]+['"];?\s*/g, '');
 
