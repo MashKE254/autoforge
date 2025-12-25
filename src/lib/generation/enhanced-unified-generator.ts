@@ -22,6 +22,7 @@ import { AgentGenerator } from './agent-generator';
 import { SaaSGenerator } from './saas-generator';
 import { APIGenerator } from './api-generator';
 import { InfrastructureGenerator } from './infrastructure-generator';
+import { adminPanelGenerator } from './admin-panel-generator';
 
 // ============================================================================
 // TYPES
@@ -269,7 +270,41 @@ export class EnhancedUnifiedGenerator {
         }
         break;
     }
-    
+
+    // Step 3: Auto-generate admin panel (if app has database models)
+    if (primaryResult.success && allFiles.length > 0) {
+      const prismaSchema = allFiles.find(f => f.path === 'prisma/schema.prisma');
+
+      if (prismaSchema) {
+        callbacks?.onProgress?.('🎨 Auto-generating admin panel...');
+        console.log('   → Generating admin panel for data management');
+        generatorsUsed.push('admin-panel-generator');
+
+        try {
+          const adminResult = await adminPanelGenerator.generate(
+            prismaSchema.content,
+            classification.suggestedTechStack.appName || 'App',
+            allFiles
+          );
+
+          if (adminResult.success) {
+            // Add admin panel files to the project
+            const existingPaths = new Set(allFiles.map(f => f.path));
+            adminResult.files.forEach(f => {
+              if (!existingPaths.has(f.path)) {
+                allFiles.push(f);
+              }
+            });
+
+            console.log(`   ✅ Admin panel generated: ${adminResult.generatedPages.length} pages`);
+          }
+        } catch (error) {
+          console.error('   ⚠️  Admin panel generation failed:', error);
+          // Continue even if admin panel fails - it's a nice-to-have
+        }
+      }
+    }
+
     // Update job with final files if primary generation was successful
     if (jobId && primaryResult.success && allFiles.length > 0) {
       // Save all files to database

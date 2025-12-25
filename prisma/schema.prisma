@@ -93,6 +93,9 @@ model User {
   managedProjects  ManagedProject[]
   managedApps      ManagedApp[]
 
+  // Support tickets
+  supportTickets   SupportTicket[]
+
   @@index([email])
   @@index([stripeCustomerId])
 }
@@ -820,6 +823,9 @@ model ManagedApp {
   user                  User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   generationJob         GenerationJob        @relation(fields: [generationJobId], references: [id], onDelete: Cascade)
   usageRecords          AppUsageRecord[]
+  healthChecks          HealthCheck[]
+  monitoringAlerts      MonitoringAlert[]
+  supportTickets        SupportTicket[]
 
   @@index([userId])
   @@index([subdomain])
@@ -928,4 +934,152 @@ model PlanLimits {
 
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
+}
+
+// =============================================================================
+// MONITORING & HEALTH CHECKS
+// =============================================================================
+
+model HealthCheck {
+  id            String      @id @default(cuid())
+  managedAppId  String
+
+  // Health status
+  status        HealthStatus
+  responseTime  Int         // Response time in milliseconds
+  statusCode    Int?        // HTTP status code
+  error         String?     // Error message if down
+
+  // Timestamp
+  timestamp     DateTime    @default(now())
+
+  // Relations
+  managedApp    ManagedApp  @relation(fields: [managedAppId], references: [id], onDelete: Cascade)
+
+  @@index([managedAppId])
+  @@index([timestamp])
+  @@index([status])
+}
+
+enum HealthStatus {
+  healthy
+  degraded
+  down
+}
+
+model MonitoringAlert {
+  id            String       @id @default(cuid())
+  managedAppId  String
+
+  // Alert details
+  issue         String
+  severity      AlertSeverity
+  autoHealed    Boolean      @default(false)
+
+  // Notification
+  notifiedAt    DateTime     @default(now())
+  acknowledgedAt DateTime?
+
+  // Relations
+  managedApp    ManagedApp   @relation(fields: [managedAppId], references: [id], onDelete: Cascade)
+
+  @@index([managedAppId])
+  @@index([severity])
+  @@index([notifiedAt])
+}
+
+enum AlertSeverity {
+  critical
+  warning
+  info
+}
+
+// =============================================================================
+// SUPPORT TICKETING SYSTEM
+// =============================================================================
+
+model SupportTicket {
+  id              String           @id @default(cuid())
+  userId          String
+  managedAppId    String?          // Optional: associated with specific app
+
+  // Ticket details
+  subject         String
+  description     String
+  category        TicketCategory
+  priority        TicketPriority   @default(MEDIUM)
+  status          TicketStatus     @default(OPEN)
+
+  // AI triage
+  aiTriaged       Boolean          @default(false)
+  aiSuggestion    String?          // AI-suggested solution
+  aiConfidence    Float?           // Confidence score (0-1)
+
+  // Assignment
+  assignedTo      String?          // Support agent ID
+  assignedAt      DateTime?
+
+  // Resolution
+  resolvedAt      DateTime?
+  resolution      String?
+
+  // Timestamps
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  // Relations
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  managedApp      ManagedApp?      @relation(fields: [managedAppId], references: [id], onDelete: SetNull)
+  messages        TicketMessage[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([priority])
+  @@index([createdAt])
+}
+
+enum TicketCategory {
+  TECHNICAL       // App not working, errors
+  BILLING         // Payment, subscription issues
+  FEATURE_REQUEST // New feature requests
+  BUG_REPORT      // Bug reports
+  GENERAL         // General questions
+  ACCOUNT         // Account issues
+}
+
+enum TicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  WAITING_FOR_USER
+  RESOLVED
+  CLOSED
+}
+
+model TicketMessage {
+  id        String        @id @default(cuid())
+  ticketId  String
+
+  // Message details
+  content   String
+  isStaff   Boolean       @default(false)  // True if from support staff
+  authorId  String?       // User or staff ID
+
+  // Attachments
+  attachments Json?       // Array of file URLs
+
+  // Timestamps
+  createdAt DateTime      @default(now())
+
+  // Relations
+  ticket    SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId])
+  @@index([createdAt])
 }
