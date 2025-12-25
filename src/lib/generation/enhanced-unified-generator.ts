@@ -23,6 +23,8 @@ import { SaaSGenerator } from './saas-generator';
 import { APIGenerator } from './api-generator';
 import { InfrastructureGenerator } from './infrastructure-generator';
 import { adminPanelGenerator } from './admin-panel-generator';
+import { BotGenerator } from './bot-generator';
+import { ContextAwareAdminGenerator } from './context-aware-admin-generator';
 
 // ============================================================================
 // TYPES
@@ -53,7 +55,9 @@ export class EnhancedUnifiedGenerator {
   private saasGenerator: SaaSGenerator;
   private apiGenerator: APIGenerator;
   private infrastructureGenerator: InfrastructureGenerator;
-  
+  private botGenerator: BotGenerator;
+  private contextAwareAdminGenerator: ContextAwareAdminGenerator;
+
   constructor() {
     this.boltGenerator = new BoltGenerator();
     this.workflowGenerator = new WorkflowGenerator();
@@ -61,6 +65,8 @@ export class EnhancedUnifiedGenerator {
     this.saasGenerator = new SaaSGenerator();
     this.apiGenerator = new APIGenerator();
     this.infrastructureGenerator = new InfrastructureGenerator();
+    this.botGenerator = new BotGenerator();
+    this.contextAwareAdminGenerator = new ContextAwareAdminGenerator();
   }
   
   /**
@@ -241,7 +247,100 @@ export class EnhancedUnifiedGenerator {
         primaryResult = await this.agentGenerator.generate(prompt, jobId, callbacks);
         allFiles = primaryResult.files;
         break;
-        
+
+      // NEW: Specialized generator types
+      case 'bot':
+        callbacks?.onProgress?.('🤖 Generating bot application...');
+        console.log('   → Routing to Bot Generator');
+        generatorsUsed.push('bot-generator');
+        primaryResult = await this.botGenerator.generate(prompt, jobId, callbacks);
+        allFiles = primaryResult.files;
+        break;
+
+      case 'trading-bot':
+        callbacks?.onProgress?.('📈 Generating trading bot...');
+        console.log('   → Routing to Bot Generator (trading mode)');
+        generatorsUsed.push('bot-generator');
+        // Bot generator handles trading bots with special config
+        primaryResult = await this.botGenerator.generate(prompt, jobId, callbacks);
+        allFiles = primaryResult.files;
+        break;
+
+      case 'web-scraper':
+        callbacks?.onProgress?.('🕷️ Generating web scraper...');
+        console.log('   → Routing to Bolt Generator (scraper mode)');
+        generatorsUsed.push('bolt-generator');
+        // Use Bolt generator with scraper-specific prompt enhancement
+        primaryResult = await this.boltGenerator.generate(
+          `${prompt}\n\nIMPORTANT: Generate a web scraper with:\n- Puppeteer/Playwright for headless browsing\n- Cheerio for HTML parsing\n- Job queue for scheduled scraping\n- Admin dashboard for managing scrape jobs\n- Data export functionality`,
+          jobId,
+          callbacks
+        );
+        allFiles = primaryResult.files;
+        break;
+
+      case 'social-automation':
+        callbacks?.onProgress?.('📱 Generating social automation...');
+        console.log('   → Routing to Bolt Generator (social mode)');
+        generatorsUsed.push('bolt-generator');
+        primaryResult = await this.boltGenerator.generate(
+          `${prompt}\n\nIMPORTANT: Generate social media automation tool with:\n- Multi-platform API integration (Instagram, Twitter, LinkedIn, Facebook)\n- Post scheduler with content calendar\n- Engagement analytics dashboard\n- Account management\n- BullMQ for job scheduling`,
+          jobId,
+          callbacks
+        );
+        allFiles = primaryResult.files;
+        break;
+
+      case 'data-pipeline':
+        callbacks?.onProgress?.('⚙️ Generating data pipeline...');
+        console.log('   → Routing to Workflow Generator (ETL mode)');
+        generatorsUsed.push('workflow-generator');
+        // Workflow generator is perfect for data pipelines
+        primaryResult = await this.workflowGenerator.generate(
+          `${prompt}\n\nIMPORTANT: Generate ETL data pipeline with:\n- Data extraction from sources\n- Transformation logic\n- Loading to data warehouse\n- Orchestration with Airflow or BullMQ\n- Monitoring dashboard`,
+          jobId,
+          callbacks
+        );
+        allFiles = primaryResult.files;
+        break;
+
+      case 'cli-tool':
+        callbacks?.onProgress?.('💻 Generating CLI tool...');
+        console.log('   → Routing to API Generator (CLI mode)');
+        generatorsUsed.push('api-generator');
+        // API generator can create backend, then we add CLI wrapper
+        primaryResult = await this.apiGenerator.generate(
+          `${prompt}\n\nIMPORTANT: Generate as a Node.js CLI tool with:\n- Commander.js for command structure\n- Inquirer.js for interactive prompts\n- Chalk for colored output\n- Ora for spinners\n- Conf for config management\n- No UI - pure command line interface`,
+          jobId,
+          callbacks
+        );
+        allFiles = primaryResult.files;
+        break;
+
+      case 'browser-extension':
+        callbacks?.onProgress?.('🧩 Generating browser extension...');
+        console.log('   → Routing to Bolt Generator (extension mode)');
+        generatorsUsed.push('bolt-generator');
+        primaryResult = await this.boltGenerator.generate(
+          `${prompt}\n\nIMPORTANT: Generate as a browser extension with:\n- manifest.json (Manifest V3)\n- Background service worker\n- Content scripts\n- Popup UI with React\n- Chrome Storage API\n- WebExtension API\n- Webpack bundling`,
+          jobId,
+          callbacks
+        );
+        allFiles = primaryResult.files;
+        break;
+
+      case 'mobile-backend':
+        callbacks?.onProgress?.('📱 Generating mobile backend...');
+        console.log('   → Routing to API Generator (mobile backend mode)');
+        generatorsUsed.push('api-generator');
+        primaryResult = await this.apiGenerator.generate(
+          `${prompt}\n\nIMPORTANT: Generate mobile app backend with:\n- RESTful API endpoints\n- Authentication (JWT/OAuth)\n- Push notifications (FCM)\n- File storage (S3)\n- Rate limiting\n- Mobile-optimized responses\n- WebSocket support for real-time features`,
+          jobId,
+          callbacks
+        );
+        allFiles = primaryResult.files;
+        break;
+
       case 'ui-application':
       default:
         callbacks?.onProgress?.('🎨 Generating UI application...');

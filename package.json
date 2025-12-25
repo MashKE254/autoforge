@@ -127,6 +127,7 @@
     "build": "prisma migrate deploy && prisma generate && next build",
     "dev": "next dev",
     "lint": "next lint",
+    "seed": "tsx prisma/seed.ts",
     "seed:modules": "tsx scripts/seed-modules.ts",
     "start": "next start",
     "test": "vitest",
@@ -135,5 +136,8 @@
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui"
   },
-  "version": "0.1.0"
+  "version": "0.1.0",
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  }
 }

@@ -197,60 +197,65 @@ model StripeConnectedAccount {
 
 model PublishedApp {
   id                String       @id @default(cuid())
-  
+
   // Owner
   userId            String
   generationJobId   String
-  
+
   // App details
   name              String
   slug              String       @unique  // For subdomain: {slug}.autoforge.app
   description       String?
   logoUrl           String?
-  
+
+  // Marketplace category
+  categoryId        String?      // NEW: Category classification
+  tags              String[]     // NEW: Searchable tags
+
   // Custom domain (optional)
   customDomain      String?      @unique
   domainVerified    Boolean      @default(false)
-  
+
   // Deployment
   deploymentUrl     String?
   vercelProjectId   String?
-  
+
   // Pricing configuration
   pricingModel      PricingModel @default(SUBSCRIPTION)
-  
+
   // Subscription pricing (in cents)
   monthlyPrice      Int?         // e.g., 900 = $9.00
   yearlyPrice       Int?
-  
+
   // One-time pricing (in cents)
   oneTimePrice      Int?
-  
+
   // Free trial
   trialDays         Int          @default(0)
-  
+
   // Stripe product/price IDs
   stripeProductId    String?
   stripePriceMonthly String?
   stripePriceYearly  String?
   stripePriceOneTime String?
-  
+
   // App status
   status            AppStatus    @default(DRAFT)
   publishedAt       DateTime?
-  
+
   // Analytics
   totalRevenue      Int          @default(0) // In cents
   totalCustomers    Int          @default(0)
   monthlyRecurring  Int          @default(0) // MRR in cents
-  
+
   // Timestamps
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt
-  
+
   // Relations
   user              User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   generationJob     GenerationJob  @relation(fields: [generationJobId], references: [id], onDelete: Cascade)
+  category          AppCategory?   @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   customers         AppCustomer[]
   transactions      Transaction[]
 
@@ -258,6 +263,7 @@ model PublishedApp {
   @@index([slug])
   @@index([status])
   @@index([customDomain])
+  @@index([categoryId])
 }
 
 enum PricingModel {
@@ -797,6 +803,15 @@ model ManagedApp {
   name                  String
   subdomain             String               @unique  // my-app.autoforge.app
   customDomain          String?              @unique
+  description           String?              // App description for marketplace
+  logoUrl               String?              // Logo for marketplace
+
+  // Marketplace
+  categoryId            String?              // Category (bots, trading, scrapers, etc.)
+  isPublicInMarketplace Boolean              @default(false)
+  marketplaceViews      Int                  @default(0)
+  marketplaceInstalls   Int                  @default(0)
+  tags                  String[]             // Searchable tags
 
   // Credentials (for app to call AutoForge APIs)
   apiKey                String               @unique  // Secret key app uses to auth
@@ -822,6 +837,7 @@ model ManagedApp {
   // Relations
   user                  User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   generationJob         GenerationJob        @relation(fields: [generationJobId], references: [id], onDelete: Cascade)
+  category              AppCategory?         @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   usageRecords          AppUsageRecord[]
   healthChecks          HealthCheck[]
   monitoringAlerts      MonitoringAlert[]
@@ -831,6 +847,8 @@ model ManagedApp {
   @@index([subdomain])
   @@index([status])
   @@index([apiKey])
+  @@index([categoryId])
+  @@index([isPublicInMarketplace])
 }
 
 enum ManagedAppStatus {
@@ -934,6 +952,44 @@ model PlanLimits {
 
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
+}
+
+// =============================================================================
+// MARKETPLACE CATEGORIES
+// =============================================================================
+
+model AppCategory {
+  id          String    @id @default(cuid())
+
+  // Category details
+  name        String    @unique  // "Bots", "Trading Systems", etc.
+  slug        String    @unique  // "bots", "trading-systems"
+  description String?
+  icon        String?   // Icon/emoji for UI
+  color       String?   // Color hex code for UI
+
+  // Display order
+  sortOrder   Int       @default(0)
+
+  // Visibility
+  isActive    Boolean   @default(true)
+  isFeatured  Boolean   @default(false)
+
+  // Statistics
+  appCount    Int       @default(0)  // Cached count of apps
+
+  // Timestamps
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  publishedApps PublishedApp[]
+  managedApps   ManagedApp[]
+
+  @@index([slug])
+  @@index([isActive])
+  @@index([isFeatured])
+  @@index([sortOrder])
 }
 
 // =============================================================================
