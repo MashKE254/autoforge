@@ -42,7 +42,7 @@ export async function GET() {
       method: 'POST',
       body: {
         prompt: 'string (required) - Description of what to build',
-        mode: 'string (optional) - PERSONAL | SAAS | AUTO (default: AUTO)',
+        mode: 'string (optional) - PREVIEW | PERSONAL | SINGLE_USER | SAAS | AUTO (default: AUTO → PREVIEW)',
         generatorType: 'string (optional) - bolt | saas | workflow | agent | api | orchestrated',
       },
     },
@@ -111,9 +111,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate mode
-    if (!['PERSONAL', 'SAAS', 'AUTO'].includes(mode)) {
+    if (!['PREVIEW', 'PERSONAL', 'SINGLE_USER', 'SAAS', 'AUTO'].includes(mode)) {
       return NextResponse.json(
-        { error: 'Invalid mode. Must be PERSONAL, SAAS, or AUTO' },
+        { error: 'Invalid mode. Must be PREVIEW, PERSONAL, SINGLE_USER, SAAS, or AUTO' },
         { status: 400 }
       );
     }
@@ -157,7 +157,7 @@ export async function POST(request: NextRequest) {
         userId: user.id,
         prompt: trimmedPrompt,
         status: 'RUNNING',
-        generationMode: mode === 'AUTO' ? 'PERSONAL' : mode, // Default to PERSONAL for AUTO
+        generationMode: mode === 'AUTO' ? 'PREVIEW' : mode, // Default to PREVIEW for AUTO (free try-before-buy)
         generationStartedAt: new Date(),
       },
     });
@@ -188,7 +188,7 @@ export async function POST(request: NextRequest) {
 
       result = await unifiedGenerator.generate(
         trimmedPrompt,
-        mode as 'PERSONAL' | 'SAAS' | 'AUTO',
+        mode as 'PREVIEW' | 'PERSONAL' | 'SINGLE_USER' | 'SAAS' | 'AUTO',
         job.id,
         {
           onProgress: (message) => {
