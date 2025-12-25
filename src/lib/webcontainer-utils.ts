@@ -89,6 +89,11 @@ const WEBCONTAINER_SAFE_PACKAGES = new Set([
   'tailwindcss',
   'postcss',
   'autoprefixer',
+  'tailwindcss-animate',
+  '@tailwindcss/forms',
+  '@tailwindcss/typography',
+  '@tailwindcss/aspect-ratio',
+  '@tailwindcss/line-clamp',
 
   // UI Libraries
   'lucide-react',
@@ -314,6 +319,13 @@ function collectRequiredPackages(files: Array<{ path: string; content: string }>
  * Package version defaults for commonly imported packages
  */
 const PACKAGE_VERSION_DEFAULTS: Record<string, string> = {
+  // Tailwind plugins
+  'tailwindcss-animate': '^1.0.7',
+  '@tailwindcss/forms': '^0.5.7',
+  '@tailwindcss/typography': '^0.5.10',
+  '@tailwindcss/aspect-ratio': '^0.4.2',
+  '@tailwindcss/line-clamp': '^0.4.4',
+  // Utilities
   'class-variance-authority': '^0.7.0',
   'clsx': '^2.1.0',
   'tailwind-merge': '^2.2.0',
