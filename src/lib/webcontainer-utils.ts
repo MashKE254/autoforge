@@ -367,7 +367,7 @@ const PACKAGE_VERSION_DEFAULTS: Record<string, string> = {
   'clsx': '^2.1.0',
   'tailwind-merge': '^2.2.0',
   'lucide-react': '^0.263.1',
-  'recharts': '^2.10.0',
+  'recharts': '2.5.0', // Pinned version - 2.10.0 has WebContainer issues
   'date-fns': '^3.0.0',
   'react-hook-form': '^7.49.0',
   'zod': '^3.22.0',
@@ -728,6 +728,46 @@ function isPersonalTool(files: Array<{ path: string; content: string }>): boolea
  */
 function sanitizeCodeFile(content: string, filePath: string, isPersonal: boolean = false): string {
   let sanitized = content;
+
+  // CRITICAL: Add 'use client' directive for components that import client-only libraries
+  // This prevents "Super expression must either be null or a function" errors
+  const clientOnlyLibraries = [
+    'recharts',
+    'framer-motion',
+    'react-hot-toast',
+    'react-toastify',
+    'sonner',
+    'react-datepicker',
+    'react-day-picker',
+    'embla-carousel-react',
+    '@dnd-kit/core',
+    'react-beautiful-dnd',
+    'react-hook-form',
+  ];
+
+  const needsUseClient = clientOnlyLibraries.some(lib =>
+    sanitized.includes(`from '${lib}'`) ||
+    sanitized.includes(`from "${lib}"`)
+  );
+
+  // Add 'use client' to component files that need it
+  // Include page.tsx if it imports client libraries (like recharts)
+  if (needsUseClient &&
+      (filePath.endsWith('.tsx') || filePath.endsWith('.jsx')) &&
+      !sanitized.includes("'use client'") &&
+      !sanitized.includes('"use client"')) {
+
+    // Remove async from default export function if it exists
+    // Can't have async server functions in client components
+    sanitized = sanitized.replace(
+      /export\s+default\s+async\s+function/g,
+      'export default function'
+    );
+
+    // Add 'use client' at the very top, before any imports
+    sanitized = `'use client';\n\n${sanitized}`;
+    console.log(`   ✅ Added 'use client' to ${filePath} (uses client-only libraries)`);
+  }
 
   // Personal tools are simpler - they don't have auth/DB to remove
   if (isPersonal) {
