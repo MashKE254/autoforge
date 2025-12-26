@@ -49,10 +49,10 @@ function AppCard({ app }: { app: MarketplaceApp }) {
   return (
     <Link
       href={`/marketplace/${app.slug}`}
-      className="group block border border-gray-200 rounded-xl overflow-hidden hover:border-gray-900 hover:shadow-lg transition-all duration-200 bg-white"
+      className="group block border border-white/10 rounded-xl overflow-hidden hover:border-violet-500/50 hover:shadow-lg hover:shadow-violet-500/10 transition-all duration-200 bg-white/[0.02]"
     >
       {/* App Preview */}
-      <div className="relative h-48 bg-gradient-to-br from-gray-50 to-gray-100 overflow-hidden">
+      <div className="relative h-48 bg-gradient-to-br from-white/[0.05] to-white/[0.08] overflow-hidden">
         {app.logoUrl ? (
           <Image
             src={app.logoUrl}
@@ -62,7 +62,7 @@ function AppCard({ app }: { app: MarketplaceApp }) {
           />
         ) : (
           <div className="flex items-center justify-center h-full">
-            <div className="text-5xl font-bold text-gray-300">
+            <div className="text-5xl font-bold text-gray-600">
               {app.name.charAt(0).toUpperCase()}
             </div>
           </div>
@@ -73,8 +73,8 @@ function AppCard({ app }: { app: MarketplaceApp }) {
 
         {/* Preview Icon */}
         <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-          <div className="bg-white rounded-full p-2 shadow-lg">
-            <ArrowUpRight className="h-4 w-4 text-gray-900" />
+          <div className="bg-violet-500/20 backdrop-blur-sm border border-violet-500/30 rounded-full p-2 shadow-lg">
+            <ArrowUpRight className="h-4 w-4 text-violet-400" />
           </div>
         </div>
       </div>
@@ -83,21 +83,21 @@ function AppCard({ app }: { app: MarketplaceApp }) {
       <div className="p-6">
         {/* Header */}
         <div className="flex items-start justify-between mb-3">
-          <h3 className="text-lg font-semibold text-gray-900 group-hover:text-gray-900">
+          <h3 className="text-lg font-semibold text-white group-hover:text-violet-400 transition-colors">
             {app.name}
           </h3>
-          <div className="text-sm font-medium text-gray-900 shrink-0 ml-3">
+          <div className="text-sm font-medium text-white shrink-0 ml-3">
             {formattedPrice}
           </div>
         </div>
 
         {/* Description */}
-        <p className="text-sm text-gray-600 line-clamp-2 mb-4 min-h-[2.5rem]">
+        <p className="text-sm text-gray-400 line-clamp-2 mb-4 min-h-[2.5rem]">
           {app.description}
         </p>
 
         {/* Footer */}
-        <div className="flex items-center justify-between pt-4 border-t border-gray-100">
+        <div className="flex items-center justify-between pt-4 border-t border-white/10">
           {/* Creator */}
           <div className="flex items-center gap-2">
             {app.creator.image ? (
@@ -109,7 +109,7 @@ function AppCard({ app }: { app: MarketplaceApp }) {
                 className="rounded-full"
               />
             ) : (
-              <div className="w-5 h-5 rounded-full bg-gray-200 flex items-center justify-center text-[10px] font-medium text-gray-600">
+              <div className="w-5 h-5 rounded-full bg-white/10 flex items-center justify-center text-[10px] font-medium text-gray-400">
                 {app.creator.name.charAt(0).toUpperCase()}
               </div>
             )}

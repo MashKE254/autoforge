@@ -301,17 +301,17 @@ export default function Dashboard() {
         throw new Error(data.error || 'Generation failed');
       }
 
-      // Success! Show file count and redirect
-      setStatusMessage(`Generated ${data.fileCount} files! Redirecting...`);
-      
+      // Success! Redirect to progress page
+      setStatusMessage(`Generation started! Redirecting to progress...`);
+
       // Update files list for UI
       if (data.files) {
         setGeneratedFiles(data.files.map((f: { path: string }) => f.path));
       }
 
-      // Redirect to the AI Workspace
+      // Redirect to the Progress Page (not directly to workspace)
       setTimeout(() => {
-        router.push(`/generate/result/${data.jobId}`);
+        router.push(`/generate/progress/${data.jobId}`);
       }, 500);
 
     } catch (error) {

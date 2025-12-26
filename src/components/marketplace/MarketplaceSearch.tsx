@@ -44,13 +44,13 @@ export function MarketplaceSearch({ initialQuery = '' }: MarketplaceSearchProps)
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search apps..."
-            className="w-full pl-12 pr-12 py-4 text-base bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-all"
+            className="w-full pl-12 pr-12 py-4 text-base bg-white/[0.05] border border-white/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition-all text-white placeholder:text-gray-500"
           />
           {query && (
             <button
               type="button"
               onClick={handleClear}
-              className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors"
             >
               <X className="h-5 w-5" />
             </button>

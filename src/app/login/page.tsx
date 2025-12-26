@@ -24,32 +24,34 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4 relative overflow-hidden">
-      {/* Background decoration matching your 'AutoForge' theme */}
-      <div className="absolute inset-0 bg-grid-white/[0.02] bg-[size:60px_60px]" />
-      <div className="absolute h-full w-full bg-background [mask-image:radial-gradient(ellipse_at_center,transparent_20%,black)]" />
-      
-      <Card className="w-full max-w-md relative z-10 border-border/50 bg-card/50 backdrop-blur-xl">
+    <div className="min-h-screen flex items-center justify-center bg-[#0A0A0B] p-4 relative overflow-hidden">
+      {/* Background Effects */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-1/4 right-1/4 w-96 h-96 bg-violet-600/10 rounded-full blur-3xl" />
+        <div className="absolute bottom-1/4 left-1/4 w-96 h-96 bg-cyan-600/10 rounded-full blur-3xl" />
+      </div>
+
+      <Card className="w-full max-w-md relative z-10 border-white/10 bg-white/[0.02] backdrop-blur-xl">
         <CardHeader className="space-y-1 text-center">
           <div className="flex justify-center mb-4">
              {/* Using the logo file found in your public folder */}
-             <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center">
+             <div className="h-12 w-12 rounded-xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center">
                 <Image src="/Logo.svg" alt="AutoForge" width={32} height={32} />
              </div>
           </div>
-          <CardTitle className="text-2xl font-bold tracking-tight">
+          <CardTitle className="text-2xl font-bold tracking-tight text-white">
             Welcome to AutoForge
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="text-gray-400">
             Sign in to start generating apps from prompts
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4">
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             onClick={() => handleLogin("google")}
             disabled={!!isLoading}
-            className="w-full h-11 relative"
+            className="w-full h-11 relative border-white/10 hover:bg-white/[0.05] text-white"
           >
             {isLoading === "google" ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -61,11 +63,11 @@ export default function LoginPage() {
             Continue with Google
           </Button>
           
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             onClick={() => handleLogin("github")}
             disabled={!!isLoading}
-            className="w-full h-11"
+            className="w-full h-11 border-white/10 hover:bg-white/[0.05] text-white"
           >
             {isLoading === "github" ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -77,22 +79,22 @@ export default function LoginPage() {
 
           <div className="relative">
             <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t" />
+              <span className="w-full border-t border-white/10" />
             </div>
             <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-background px-2 text-muted-foreground">
+              <span className="bg-[#0A0A0B] px-2 text-gray-500">
                 Or
               </span>
             </div>
           </div>
-          
-          <div className="text-center text-sm text-muted-foreground">
+
+          <div className="text-center text-sm text-gray-400">
              By clicking continue, you agree to our{" "}
-             <Link href="/terms" className="underline underline-offset-4 hover:text-primary">
+             <Link href="/terms" className="underline underline-offset-4 hover:text-violet-400 transition-colors">
                Terms of Service
              </Link>{" "}
              and{" "}
-             <Link href="/privacy" className="underline underline-offset-4 hover:text-primary">
+             <Link href="/privacy" className="underline underline-offset-4 hover:text-violet-400 transition-colors">
                Privacy Policy
              </Link>
              .
