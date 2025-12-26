@@ -1,15 +1,13 @@
 /**
  * Marketplace Grid Component
- * Displays apps in a responsive grid
+ * Displays apps in a responsive grid - Minimalistic Design
  */
 
 'use client';
 
 import Link from 'next/link';
-import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Star, Users, ExternalLink } from 'lucide-react';
+import { ArrowUpRight } from 'lucide-react';
 import Image from 'next/image';
 
 interface MarketplaceApp {
@@ -46,107 +44,84 @@ export function MarketplaceGrid({ apps }: MarketplaceGridProps) {
 function AppCard({ app }: { app: MarketplaceApp }) {
   const formattedPrice = app.pricingModel === 'FREE'
     ? 'Free'
-    : `$${(app.price / 100).toFixed(2)}${app.pricingModel === 'SUBSCRIPTION' ? '/mo' : ''}`;
+    : `$${(app.price / 100).toFixed(0)}${app.pricingModel === 'SUBSCRIPTION' ? '/mo' : ''}`;
 
   return (
-    <Card className="group hover:shadow-xl transition-shadow duration-300 flex flex-col">
-      <CardHeader className="p-0">
-        {/* App Preview Image */}
-        <div className="relative h-48 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-t-lg overflow-hidden">
-          {app.logoUrl ? (
-            <Image
-              src={app.logoUrl}
-              alt={app.name}
-              fill
-              className="object-cover"
-            />
-          ) : (
-            <div className="flex items-center justify-center h-full">
-              <div className="text-6xl font-bold text-blue-200">
-                {app.name.charAt(0)}
-              </div>
+    <Link
+      href={`/marketplace/${app.slug}`}
+      className="group block border border-gray-200 rounded-xl overflow-hidden hover:border-gray-900 hover:shadow-lg transition-all duration-200 bg-white"
+    >
+      {/* App Preview */}
+      <div className="relative h-48 bg-gradient-to-br from-gray-50 to-gray-100 overflow-hidden">
+        {app.logoUrl ? (
+          <Image
+            src={app.logoUrl}
+            alt={app.name}
+            fill
+            className="object-cover"
+          />
+        ) : (
+          <div className="flex items-center justify-center h-full">
+            <div className="text-5xl font-bold text-gray-300">
+              {app.name.charAt(0).toUpperCase()}
             </div>
-          )}
-
-          {/* Pricing Badge */}
-          <div className="absolute top-4 right-4">
-            <Badge
-              variant={app.pricingModel === 'FREE' ? 'secondary' : 'default'}
-              className="font-semibold"
-            >
-              {formattedPrice}
-            </Badge>
           </div>
+        )}
 
-          {/* Preview Overlay */}
-          {app.deploymentUrl && (
-            <Link
-              href={app.deploymentUrl}
-              target="_blank"
-              className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
-            >
-              <div className="bg-white rounded-full p-3">
-                <ExternalLink className="h-6 w-6 text-blue-600" />
-              </div>
-            </Link>
-          )}
+        {/* Hover Overlay */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+
+        {/* Preview Icon */}
+        <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+          <div className="bg-white rounded-full p-2 shadow-lg">
+            <ArrowUpRight className="h-4 w-4 text-gray-900" />
+          </div>
         </div>
-      </CardHeader>
+      </div>
 
-      <CardContent className="flex-1 p-6">
-        {/* App Name */}
-        <h3 className="text-xl font-bold mb-2 group-hover:text-blue-600 transition-colors">
-          {app.name}
-        </h3>
+      {/* Content */}
+      <div className="p-6">
+        {/* Header */}
+        <div className="flex items-start justify-between mb-3">
+          <h3 className="text-lg font-semibold text-gray-900 group-hover:text-gray-900">
+            {app.name}
+          </h3>
+          <div className="text-sm font-medium text-gray-900 shrink-0 ml-3">
+            {formattedPrice}
+          </div>
+        </div>
 
         {/* Description */}
-        <p className="text-gray-600 text-sm line-clamp-3 mb-4">
+        <p className="text-sm text-gray-600 line-clamp-2 mb-4 min-h-[2.5rem]">
           {app.description}
         </p>
 
-        {/* Creator Info */}
-        <div className="flex items-center gap-2 mb-4">
-          {app.creator.image ? (
-            <Image
-              src={app.creator.image}
-              alt={app.creator.name}
-              width={24}
-              height={24}
-              className="rounded-full"
-            />
-          ) : (
-            <div className="w-6 h-6 rounded-full bg-gray-300 flex items-center justify-center text-xs font-medium">
-              {app.creator.name.charAt(0)}
-            </div>
-          )}
-          <span className="text-sm text-gray-500">by {app.creator.name}</span>
-        </div>
-
-        {/* Stats */}
-        <div className="flex items-center gap-4 text-sm text-gray-500">
-          <div className="flex items-center gap-1">
-            <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-            <span>4.8</span>
+        {/* Footer */}
+        <div className="flex items-center justify-between pt-4 border-t border-gray-100">
+          {/* Creator */}
+          <div className="flex items-center gap-2">
+            {app.creator.image ? (
+              <Image
+                src={app.creator.image}
+                alt={app.creator.name}
+                width={20}
+                height={20}
+                className="rounded-full"
+              />
+            ) : (
+              <div className="w-5 h-5 rounded-full bg-gray-200 flex items-center justify-center text-[10px] font-medium text-gray-600">
+                {app.creator.name.charAt(0).toUpperCase()}
+              </div>
+            )}
+            <span className="text-xs text-gray-500">{app.creator.name}</span>
           </div>
-          <div className="flex items-center gap-1">
-            <Users className="h-4 w-4" />
-            <span>{app.totalCustomers} users</span>
+
+          {/* Users Count */}
+          <div className="text-xs text-gray-500">
+            {app.totalCustomers > 0 && `${app.totalCustomers} ${app.totalCustomers === 1 ? 'user' : 'users'}`}
           </div>
         </div>
-      </CardContent>
-
-      <CardFooter className="p-6 pt-0 gap-2">
-        <Link href={`/marketplace/${app.slug}`} className="flex-1">
-          <Button variant="outline" className="w-full">
-            View Details
-          </Button>
-        </Link>
-        <Link href={`/marketplace/${app.slug}/purchase`} className="flex-1">
-          <Button className="w-full">
-            {app.pricingModel === 'FREE' ? 'Get Free' : 'Buy Now'}
-          </Button>
-        </Link>
-      </CardFooter>
-    </Card>
+      </div>
+    </Link>
   );
 }
