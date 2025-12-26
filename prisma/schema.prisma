@@ -1139,3 +1139,71 @@ model TicketMessage {
   @@index([ticketId])
   @@index([createdAt])
 }
+
+// ============================================================================
+// LAYER 4: FAILURE TRACKING & LEARNING
+// ============================================================================
+
+model GenerationFailure {
+  id        String   @id @default(cuid())
+
+  // Error details
+  errorType     String       // nextjs, typescript, dependency, syntax, unknown
+  errorMessage  String       @db.Text
+  errorFile     String?
+  errorLine     Int?
+  errorCode     String?      @db.Text
+
+  // Generation context
+  prompt        String       @db.Text
+  generator     String       // bolt, saas, workflow, agent, api, etc.
+  filesGenerated Int         @default(0)
+
+  // Recovery attempt
+  recovered     Boolean      @default(false)
+  fixApplied    String?      @db.Text
+  attemptsCount Int          @default(1)
+
+  // Metadata
+  userId        String?
+  jobId         String?
+
+  // Timestamps
+  createdAt     DateTime     @default(now())
+  resolvedAt    DateTime?
+
+  @@index([errorType])
+  @@index([generator])
+  @@index([recovered])
+  @@index([createdAt])
+}
+
+model FailurePattern {
+  id          String   @id @default(cuid())
+
+  // Pattern details
+  patternType String       // recurring error pattern
+  description String       @db.Text
+  frequency   Int          @default(1)
+
+  // Error characteristics
+  errorType   String       // nextjs, typescript, etc.
+  keywords    String[]     // Common keywords in error messages
+
+  // Solution
+  solution    String       @db.Text
+  preventionRule String?   @db.Text  // Rule to add to system prompt
+
+  // Learning status
+  addedToPrompt Boolean   @default(false)
+  promptVersion String?
+
+  // Timestamps
+  firstSeen   DateTime     @default(now())
+  lastSeen    DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@index([errorType])
+  @@index([frequency])
+  @@index([addedToPrompt])
+}
