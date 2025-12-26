@@ -25,10 +25,12 @@ import {
   DollarSign,
   Sparkles,
   Lightbulb,
+  Store,
 } from 'lucide-react';
 
 const navLinks = [
   { href: '/dashboard', label: 'Dashboard' },
+  { href: '/marketplace', label: 'Marketplace', icon: Store },
   { href: '/recommend', label: 'Recommender', icon: Lightbulb },
   { href: '/projects', label: 'Projects' },
   { href: '/pricing', label: 'Pricing' },
