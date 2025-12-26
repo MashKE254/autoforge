@@ -275,28 +275,43 @@ async function getPublishedApps(filters: {
 }
 
 async function getCategories() {
-  // Fetch categories from database with app counts
-  const categories = await prisma.appCategory.findMany({
-    where: { isActive: true },
-    include: {
-      _count: {
-        select: {
-          publishedApps: {
-            where: { status: 'PUBLISHED' }
-          }
+  try {
+    // Try to fetch categories from database with app counts
+    const categories = await prisma.appCategory.findMany({
+      where: { isActive: true },
+      include: {
+        _count: {
+          select: {
+            publishedApps: {
+              where: { status: 'PUBLISHED' }
+            }
+          },
         },
       },
-    },
-    orderBy: { sortOrder: 'asc' },
-  });
+      orderBy: { sortOrder: 'asc' },
+    });
 
-  return categories.map(cat => ({
-    name: cat.name,
-    slug: cat.slug,
-    icon: cat.icon || '📱',
-    count: cat._count.publishedApps,
-    description: cat.description,
-  }));
+    return categories.map(cat => ({
+      name: cat.name,
+      slug: cat.slug,
+      icon: cat.icon || '📱',
+      count: cat._count.publishedApps,
+      description: cat.description,
+    }));
+  } catch (error) {
+    // Fallback to static categories if database is not available
+    console.error('Failed to fetch categories from database:', error);
+    return [
+      { name: 'Bots', slug: 'bots', icon: '🤖', count: 12, description: 'Discord, Telegram, Slack bots' },
+      { name: 'Trading Systems', slug: 'trading-systems', icon: '📈', count: 8, description: 'Crypto & stock trading bots' },
+      { name: 'Web Scrapers', slug: 'web-scrapers', icon: '🕷️', count: 15, description: 'Data extraction tools' },
+      { name: 'SaaS Platforms', slug: 'saas-platforms', icon: '🚀', count: 24, description: 'Full-featured SaaS apps' },
+      { name: 'Automation Tools', slug: 'automation-tools', icon: '⚡', count: 18, description: 'Workflow automation' },
+      { name: 'Analytics', slug: 'analytics', icon: '📊', count: 10, description: 'Data analytics dashboards' },
+      { name: 'CRM', slug: 'crm', icon: '👥', count: 14, description: 'Customer relationship management' },
+      { name: 'E-Commerce', slug: 'ecommerce', icon: '🛍️', count: 20, description: 'Online stores' },
+    ];
+  }
 }
 
 async function getMarketplaceStats() {
