@@ -79,8 +79,8 @@ export default async function MarketplacePage({
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {categories.map((category) => (
               <Link
-                key={category.name}
-                href={`/marketplace?category=${category.name.toLowerCase()}`}
+                key={category.slug}
+                href={`/marketplace?category=${category.slug}`}
                 className="group flex items-center gap-3 p-4 bg-white border border-gray-200 rounded-lg hover:border-blue-500 hover:shadow-md transition-all"
               >
                 <div className="text-2xl">{category.icon}</div>
@@ -272,18 +272,28 @@ async function getPublishedApps(filters: {
 }
 
 async function getCategories() {
-  // TODO: Add category tagging to PublishedApp model
-  // For now, return static categories
-  return [
-    { name: 'SaaS', icon: '🚀', count: 24 },
-    { name: 'E-Commerce', icon: '🛍️', count: 18 },
-    { name: 'CRM', icon: '👥', count: 12 },
-    { name: 'Analytics', icon: '📊', count: 15 },
-    { name: 'Productivity', icon: '⚡', count: 20 },
-    { name: 'AI Tools', icon: '🤖', count: 16 },
-    { name: 'Marketing', icon: '📱', count: 10 },
-    { name: 'Finance', icon: '💰', count: 8 },
-  ];
+  // Fetch categories from database with app counts
+  const categories = await prisma.appCategory.findMany({
+    where: { isActive: true },
+    include: {
+      _count: {
+        select: {
+          publishedApps: {
+            where: { status: 'PUBLISHED' }
+          }
+        },
+      },
+    },
+    orderBy: { sortOrder: 'asc' },
+  });
+
+  return categories.map(cat => ({
+    name: cat.name,
+    slug: cat.slug,
+    icon: cat.icon || '📱',
+    count: cat._count.publishedApps,
+    description: cat.description,
+  }));
 }
 
 async function getMarketplaceStats() {

@@ -83,32 +83,32 @@ interface ClarificationResult {
 
 const quickTemplates: QuickTemplate[] = [
   {
-    id: 'dashboard',
-    title: 'Analytics Dashboard',
-    prompt: 'An analytics dashboard with charts, KPI cards, and data tables',
+    id: 'discord-bot',
+    title: 'Discord Bot',
+    prompt: 'A Discord moderation bot with auto-ban, logging, and custom commands',
+    icon: Bot,
+    color: 'from-indigo-500 to-purple-500',
+  },
+  {
+    id: 'trading-bot',
+    title: 'Trading Bot',
+    prompt: 'A crypto trading bot with technical indicators, alerts, and backtesting',
     icon: Layers,
-    color: 'from-blue-500 to-cyan-500',
-  },
-  {
-    id: 'landing',
-    title: 'Landing Page',
-    prompt: 'A modern SaaS landing page with hero, features, pricing, and testimonials',
-    icon: FileCode,
-    color: 'from-violet-500 to-purple-500',
-  },
-  {
-    id: 'todo',
-    title: 'Todo App',
-    prompt: 'A todo app with categories, priorities, due dates, and dark mode',
-    icon: CheckCircle,
     color: 'from-green-500 to-emerald-500',
   },
   {
-    id: 'chat',
-    title: 'Chat Interface',
-    prompt: 'A real-time chat interface with message bubbles and typing indicators',
-    icon: Bot,
-    color: 'from-orange-500 to-amber-500',
+    id: 'web-scraper',
+    title: 'Web Scraper',
+    prompt: 'A web scraper for price monitoring with scheduled jobs and notifications',
+    icon: Code2,
+    color: 'from-orange-500 to-red-500',
+  },
+  {
+    id: 'saas-platform',
+    title: 'SaaS Platform',
+    prompt: 'A full SaaS CRM with teams, billing, authentication, and admin dashboard',
+    icon: FileCode,
+    color: 'from-violet-500 to-cyan-500',
   },
 ];
 
