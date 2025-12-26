@@ -21,19 +21,22 @@ export const metadata = {
 };
 
 interface MarketplacePageProps {
-  searchParams: {
+  searchParams: Promise<{
     query?: string;
     category?: string;
     pricing?: string;
     sort?: string;
-  };
+  }>;
 }
 
 export default async function MarketplacePage({
   searchParams,
 }: MarketplacePageProps) {
+  // Await searchParams (Next.js 15+ requirement)
+  const params = await searchParams;
+
   // Get published apps with filters
-  const apps = await getPublishedApps(searchParams);
+  const apps = await getPublishedApps(params);
   const categories = await getCategories();
   const stats = await getMarketplaceStats();
 
@@ -67,7 +70,7 @@ export default async function MarketplacePage({
             </div>
 
             {/* Search */}
-            <MarketplaceSearch initialQuery={searchParams.query} />
+            <MarketplaceSearch initialQuery={params.query} />
           </div>
         </div>
       </section>
@@ -118,8 +121,8 @@ export default async function MarketplacePage({
             <aside className="hidden lg:block w-64 flex-shrink-0">
               <MarketplaceFilters
                 categories={categories}
-                selectedCategory={searchParams.category}
-                selectedPricing={searchParams.pricing}
+                selectedCategory={params.category}
+                selectedPricing={params.pricing}
               />
             </aside>
 
@@ -128,10 +131,10 @@ export default async function MarketplacePage({
               <div className="flex items-center justify-between mb-6">
                 <div>
                   <h2 className="text-2xl font-bold">
-                    {searchParams.query
-                      ? `Results for "${searchParams.query}"`
-                      : searchParams.category
-                      ? `${searchParams.category} Apps`
+                    {params.query
+                      ? `Results for "${params.query}"`
+                      : params.category
+                      ? `${params.category} Apps`
                       : 'All Apps'}
                   </h2>
                   <p className="text-gray-600 mt-1">
@@ -142,7 +145,7 @@ export default async function MarketplacePage({
                 {/* Sort Dropdown */}
                 <select
                   className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  defaultValue={searchParams.sort || 'popular'}
+                  defaultValue={params.sort || 'popular'}
                 >
                   <option value="popular">Most Popular</option>
                   <option value="recent">Recently Added</option>
