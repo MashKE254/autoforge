@@ -1629,7 +1629,26 @@ export class BoltGenerator {
       let files = parseFilesFromResponse(responseText);
 
       console.log(`   Parsed ${files.length} files from response (stop_reason: ${stopReason})`);
-      
+
+      // LAYER 2: VALIDATION & AUTO-FIX
+      callbacks?.onProgress?.('🔍 Validating generated code...');
+      const { validationPipeline } = await import('./validators');
+      const validationResult = await validationPipeline.validateAndFix(files);
+
+      if (!validationResult.success) {
+        console.warn(`⚠️  Validation found ${validationResult.summary.remainingIssues} issues`);
+        validationResult.allIssues
+          .filter(i => i.severity === 'error')
+          .forEach(issue => {
+            console.warn(`   ❌ ${issue.file}: ${issue.message}`);
+          });
+      } else {
+        console.log(`✅ Validation passed: ${validationResult.summary.fixedIssues} issues auto-fixed`);
+      }
+
+      // Use validated/fixed files
+      files = validationResult.files;
+
       // Sanitize all generated files (fix CSS issues, replace bad classes)
       files = sanitizeGeneratedFiles(files);
 

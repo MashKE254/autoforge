@@ -181,11 +181,185 @@ Every app MUST include:
 }
 \`\`\`
 
+## NEXT.JS ARCHITECTURE RULES (CRITICAL - PREVENTS BUILD FAILURES)
+
+### Server vs Client Components
+
+**Server Components (DEFAULT):**
+- All components are Server Components by default
+- Can use async/await, access databases directly
+- Can read cookies, headers
+- MUST be used for: layouts, pages (unless they need interactivity)
+- CANNOT use: hooks (useState, useEffect, etc.), browser APIs, event handlers
+
+**Client Components (ADD 'use client'):**
+- Need 'use client' directive at the top
+- Can use hooks, event handlers, browser APIs
+- CANNOT use: async components, server-only imports
+- Use for: forms, interactive UI, state management
+
+### CRITICAL: Layout Files MUST BE Server Components
+
+❌ **NEVER DO THIS:**
+\`\`\`tsx
+// app/layout.tsx
+'use client'; // ← WRONG! Will cause build error
+
+export const metadata = {
+  title: 'My App'
+};
+\`\`\`
+
+✅ **ALWAYS DO THIS:**
+\`\`\`tsx
+// app/layout.tsx (Server Component - no 'use client')
+export const metadata = {
+  title: 'My App'
+};
+
+// For interactivity, import client components:
+import { ClientNav } from './ClientNav';
+
+export default function RootLayout({ children }) {
+  return (
+    <html>
+      <body>
+        <ClientNav /> {/* Client component handles interactivity */}
+        {children}
+      </body>
+    </html>
+  );
+}
+\`\`\`
+
+\`\`\`tsx
+// app/ClientNav.tsx (separate file)
+'use client';
+
+export function ClientNav() {
+  const [isOpen, setIsOpen] = useState(false);
+  return <nav onClick={() => setIsOpen(!isOpen)}>...</nav>;
+}
+\`\`\`
+
+### Metadata Exports
+
+❌ **NEVER mix 'use client' with metadata:**
+\`\`\`tsx
+'use client';
+export const metadata = { ... }; // ← ERROR!
+\`\`\`
+
+✅ **Metadata ONLY in Server Components:**
+\`\`\`tsx
+// No 'use client' directive
+export const metadata = {
+  title: 'My Page',
+  description: '...'
+};
+\`\`\`
+
+### Import Restrictions
+
+❌ **Server-only imports in Client Components:**
+\`\`\`tsx
+'use client';
+import { cookies } from 'next/headers'; // ← ERROR!
+import fs from 'fs'; // ← ERROR!
+\`\`\`
+
+❌ **Client hooks in Server Components:**
+\`\`\`tsx
+// No 'use client'
+export default function Page() {
+  const [state, setState] = useState(0); // ← ERROR!
+  useEffect(() => {}, []); // ← ERROR!
+}
+\`\`\`
+
+✅ **Extract to client component:**
+\`\`\`tsx
+// page.tsx (Server Component)
+import { ClientForm } from './ClientForm';
+
+export default function Page() {
+  return <ClientForm />;
+}
+
+// ClientForm.tsx
+'use client';
+export function ClientForm() {
+  const [state, setState] = useState(0); // ✓ OK
+  return <form>...</form>;
+}
+\`\`\`
+
+### Common Patterns
+
+**Pattern 1: Page with Form**
+\`\`\`tsx
+// app/dashboard/page.tsx (Server Component)
+import { ClientForm } from './ClientForm';
+
+export const metadata = { title: 'Dashboard' };
+
+export default async function DashboardPage() {
+  const data = await fetchData(); // Server-side data fetching
+  return <ClientForm initialData={data} />;
+}
+
+// app/dashboard/ClientForm.tsx
+'use client';
+export function ClientForm({ initialData }) {
+  const [formData, setFormData] = useState(initialData);
+  return <form>...</form>;
+}
+\`\`\`
+
+**Pattern 2: Layout with Navigation**
+\`\`\`tsx
+// app/layout.tsx (Server Component)
+import { Nav } from './Nav';
+
+export const metadata = { title: 'My App' };
+
+export default function RootLayout({ children }) {
+  return (
+    <html>
+      <body>
+        <Nav /> {/* Client component */}
+        {children}
+      </body>
+    </html>
+  );
+}
+
+// app/Nav.tsx
+'use client';
+import { usePathname } from 'next/navigation';
+
+export function Nav() {
+  const pathname = usePathname(); // Hook requires 'use client'
+  return <nav>Current: {pathname}</nav>;
+}
+\`\`\`
+
+### Build Error Prevention Checklist
+
+Before generating, verify:
+- [ ] layout.tsx does NOT have 'use client'
+- [ ] metadata exports are NOT in client components
+- [ ] Hooks (useState, useEffect) are only in 'use client' files
+- [ ] Server imports (cookies, headers, fs) are NOT in client components
+- [ ] Interactive components have 'use client' directive
+
 ## CRITICAL RULES
 
 1. NEVER use NextAuth - ALWAYS use Clerk
 2. NEVER use raw Prisma Client - ALWAYS use Supabase client
 3. ALWAYS include Clerk middleware for protected routes
-4. ALWAYS use Server Components where possible
+4. ALWAYS use Server Components where possible (only add 'use client' when needed)
 5. ALWAYS use the exact import paths shown above
+6. NEVER put 'use client' in layout.tsx or any file with metadata exports
+7. ALWAYS separate interactive logic into client components
 `;
