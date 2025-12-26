@@ -122,10 +122,12 @@ export default function ProgressPage({
 
   if (loading) {
     return (
-      <div className="container mx-auto p-8">
-        <div className="flex flex-col items-center justify-center h-[60vh]">
-          <Loader2 className="w-16 h-16 animate-spin text-primary mb-4" />
-          <h2 className="text-2xl font-semibold mb-2">Loading...</h2>
+      <div className="min-h-screen bg-[#0A0A0B]">
+        <div className="container mx-auto p-8">
+          <div className="flex flex-col items-center justify-center h-[60vh]">
+            <Loader2 className="w-16 h-16 animate-spin text-violet-400 mb-4" />
+            <h2 className="text-2xl font-semibold mb-2 text-white">Loading...</h2>
+          </div>
         </div>
       </div>
     );
@@ -133,11 +135,13 @@ export default function ProgressPage({
 
   if (!data) {
     return (
-      <div className="container mx-auto p-8">
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>Failed to load generation progress</AlertDescription>
-        </Alert>
+      <div className="min-h-screen bg-[#0A0A0B]">
+        <div className="container mx-auto p-8">
+          <Alert variant="destructive" className="border-red-500/50 bg-red-500/10">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>Failed to load generation progress</AlertDescription>
+          </Alert>
+        </div>
       </div>
     );
   }
@@ -147,176 +151,184 @@ export default function ProgressPage({
   const isFailed = data.status === 'FAILED';
 
   return (
-    <div className="container mx-auto p-8 max-w-6xl">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-4xl font-bold mb-2 flex items-center gap-3">
-          <Zap className="w-10 h-10 text-primary" />
-          {isGenerating && 'Generating Application...'}
-          {isCompleted && '🎉 Generation Complete!'}
-          {isFailed && 'Generation Failed'}
-        </h1>
-        <p className="text-muted-foreground text-lg">
-          {isGenerating && 'Please wait while we create your application'}
-          {isCompleted && 'Your application is ready! Open the AI Workspace to preview and edit.'}
-          {isFailed && 'Something went wrong during generation'}
-        </p>
+    <div className="min-h-screen bg-[#0A0A0B] text-white">
+      {/* Background Effects */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-1/4 right-1/4 w-96 h-96 bg-violet-600/10 rounded-full blur-3xl" />
+        <div className="absolute bottom-1/4 left-1/4 w-96 h-96 bg-cyan-600/10 rounded-full blur-3xl" />
       </div>
 
-      {/* Overall Progress */}
-      <Card className="mb-8">
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <span>Overall Progress</span>
-            <Badge variant={isCompleted ? 'default' : 'secondary'} className="text-lg px-4 py-1">
-              {data.progress}%
-            </Badge>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Progress value={data.progress} className="h-4 mb-4" />
-          
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
-            <div>
-              <p className="text-sm text-muted-foreground mb-1">Total Modules</p>
-              <p className="text-2xl font-bold">{data.totalModules}</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground mb-1">Completed</p>
-              <p className="text-2xl font-bold text-green-600">{data.completedModules}</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground mb-1">Failed</p>
-              <p className="text-2xl font-bold text-red-600">{data.failedModules}</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground mb-1">Time Remaining</p>
-              <p className="text-2xl font-bold">
-                {isCompleted ? 'Done!' : data.estimatedTimeRemaining || 'Calculating...'}
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="container mx-auto p-8 max-w-6xl relative z-10">
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-4xl font-bold mb-2 flex items-center gap-3">
+            <Zap className="w-10 h-10 text-violet-400" />
+            {isGenerating && 'Generating Application...'}
+            {isCompleted && '🎉 Generation Complete!'}
+            {isFailed && 'Generation Failed'}
+          </h1>
+          <p className="text-gray-400 text-lg">
+            {isGenerating && 'Please wait while we create your application'}
+            {isCompleted && 'Your application is ready! Open the AI Workspace to preview and edit.'}
+            {isFailed && 'Something went wrong during generation'}
+          </p>
+        </div>
 
-      {/* Action Buttons - Show prominently when complete */}
-      {isCompleted && (
-        <Card className="mb-8 border-green-500 bg-green-50 dark:bg-green-950/20">
-          <CardContent className="pt-6">
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button 
-                size="lg" 
-                onClick={handleOpenWorkspace}
-                className="gap-2 text-lg px-8 py-6"
-              >
-                <Play className="w-5 h-5" />
-                Open AI Workspace
-              </Button>
-              <Button 
-                size="lg" 
-                variant="outline"
-                onClick={handleDownload}
-                disabled={downloading}
-                className="gap-2"
-              >
-                {downloading ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Download className="w-4 h-4" />
-                )}
-                Download ZIP
-              </Button>
-              <Button 
-                size="lg" 
-                variant="outline"
-                onClick={() => router.push('/dashboard')}
-                className="gap-2"
-              >
-                <Home className="w-4 h-4" />
-                Dashboard
-              </Button>
-            </div>
-            <p className="text-center text-sm text-muted-foreground mt-4">
-              The AI Workspace includes a live preview, code editor, and AI chat to modify your app.
-            </p>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Module List */}
-      <Card className="mb-8">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Package className="w-5 h-5" />
-            Generated Modules ({data.completedModules}/{data.totalModules})
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ScrollArea className="h-[300px]">
-            <div className="space-y-2">
-              {data.modules.map((module, index) => (
-                <div
-                  key={index}
-                  className="flex items-center justify-between p-3 bg-muted/50 rounded-lg"
-                >
-                  <div className="flex items-center gap-3">
-                    {module.status === 'completed' ? (
-                      <CheckCircle className="w-5 h-5 text-green-500" />
-                    ) : module.status === 'running' ? (
-                      <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
-                    ) : module.status === 'failed' ? (
-                      <AlertCircle className="w-5 h-5 text-red-500" />
-                    ) : (
-                      <Clock className="w-5 h-5 text-gray-400" />
-                    )}
-                    <span className="font-medium">{module.name}</span>
-                  </div>
-                  <Badge variant="outline">{module.category}</Badge>
-                </div>
-              ))}
-            </div>
-          </ScrollArea>
-        </CardContent>
-      </Card>
-
-      {/* Errors Section */}
-      {data.errors && data.errors.length > 0 && (
-        <Card className="mb-8 border-red-200">
+        {/* Overall Progress */}
+        <Card className="mb-8 border-white/10 bg-white/[0.02] backdrop-blur-xl">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-red-600">
-              <AlertCircle className="w-5 h-5" />
-              Errors ({data.errors.length})
+            <CardTitle className="flex items-center justify-between text-white">
+              <span>Overall Progress</span>
+              <Badge variant={isCompleted ? 'default' : 'secondary'} className={`text-lg px-4 py-1 ${isCompleted ? 'bg-violet-500/20 text-violet-400 border-violet-500/30' : 'bg-white/10 text-gray-400'}`}>
+                {data.progress}%
+              </Badge>
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <ScrollArea className="h-[200px]">
+            <Progress value={data.progress} className="h-4 mb-4" />
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
+              <div>
+                <p className="text-sm text-gray-500 mb-1">Total Modules</p>
+                <p className="text-2xl font-bold text-white">{data.totalModules}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500 mb-1">Completed</p>
+                <p className="text-2xl font-bold text-emerald-400">{data.completedModules}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500 mb-1">Failed</p>
+                <p className="text-2xl font-bold text-red-400">{data.failedModules}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500 mb-1">Time Remaining</p>
+                <p className="text-2xl font-bold text-white">
+                  {isCompleted ? 'Done!' : data.estimatedTimeRemaining || 'Calculating...'}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Action Buttons - Show prominently when complete */}
+        {isCompleted && (
+          <Card className="mb-8 border-emerald-500/50 bg-emerald-500/10 backdrop-blur-xl">
+            <CardContent className="pt-6">
+              <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                <Button
+                  size="lg"
+                  onClick={handleOpenWorkspace}
+                  className="gap-2 text-lg px-8 py-6 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500"
+                >
+                  <Play className="w-5 h-5" />
+                  Open AI Workspace
+                </Button>
+                <Button
+                  size="lg"
+                  variant="outline"
+                  onClick={handleDownload}
+                  disabled={downloading}
+                  className="gap-2 border-white/10 hover:bg-white/[0.05] text-white"
+                >
+                  {downloading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Download className="w-4 h-4" />
+                  )}
+                  Download ZIP
+                </Button>
+                <Button
+                  size="lg"
+                  variant="outline"
+                  onClick={() => router.push('/dashboard')}
+                  className="gap-2 border-white/10 hover:bg-white/[0.05] text-white"
+                >
+                  <Home className="w-4 h-4" />
+                  Dashboard
+                </Button>
+              </div>
+              <p className="text-center text-sm text-gray-400 mt-4">
+                The AI Workspace includes a live preview, code editor, and AI chat to modify your app.
+              </p>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Module List */}
+        <Card className="mb-8 border-white/10 bg-white/[0.02] backdrop-blur-xl">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-white">
+              <Package className="w-5 h-5" />
+              Generated Modules ({data.completedModules}/{data.totalModules})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ScrollArea className="h-[300px]">
               <div className="space-y-2">
-                {data.errors.map((error, index) => (
-                  <Alert key={index} variant="destructive">
-                    <AlertDescription>
-                      {error.message || 'Unknown error'}
-                    </AlertDescription>
-                  </Alert>
+                {data.modules.map((module, index) => (
+                  <div
+                    key={index}
+                    className="flex items-center justify-between p-3 bg-white/[0.05] rounded-lg border border-white/10"
+                  >
+                    <div className="flex items-center gap-3">
+                      {module.status === 'completed' ? (
+                        <CheckCircle className="w-5 h-5 text-emerald-400" />
+                      ) : module.status === 'running' ? (
+                        <Loader2 className="w-5 h-5 animate-spin text-cyan-400" />
+                      ) : module.status === 'failed' ? (
+                        <AlertCircle className="w-5 h-5 text-red-400" />
+                      ) : (
+                        <Clock className="w-5 h-5 text-gray-500" />
+                      )}
+                      <span className="font-medium text-white">{module.name}</span>
+                    </div>
+                    <Badge variant="outline" className="border-white/10 text-gray-400">{module.category}</Badge>
+                  </div>
                 ))}
               </div>
             </ScrollArea>
           </CardContent>
         </Card>
-      )}
 
-      {/* Bottom Actions for non-complete states */}
-      {!isCompleted && (
-        <div className="flex justify-center gap-4">
-          <Button 
-            variant="outline" 
-            onClick={() => router.push('/dashboard')}
-            className="gap-2"
-          >
-            <Home className="w-4 h-4" />
-            Back to Dashboard
-          </Button>
-        </div>
-      )}
+        {/* Errors Section */}
+        {data.errors && data.errors.length > 0 && (
+          <Card className="mb-8 border-red-500/50 bg-white/[0.02] backdrop-blur-xl">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-red-400">
+                <AlertCircle className="w-5 h-5" />
+                Errors ({data.errors.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ScrollArea className="h-[200px]">
+                <div className="space-y-2">
+                  {data.errors.map((error, index) => (
+                    <Alert key={index} variant="destructive" className="border-red-500/50 bg-red-500/10">
+                      <AlertDescription className="text-red-400">
+                        {error.message || 'Unknown error'}
+                      </AlertDescription>
+                    </Alert>
+                  ))}
+                </div>
+              </ScrollArea>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Bottom Actions for non-complete states */}
+        {!isCompleted && (
+          <div className="flex justify-center gap-4">
+            <Button
+              variant="outline"
+              onClick={() => router.push('/dashboard')}
+              className="gap-2 border-white/10 hover:bg-white/[0.05] text-white"
+            >
+              <Home className="w-4 h-4" />
+              Back to Dashboard
+            </Button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
