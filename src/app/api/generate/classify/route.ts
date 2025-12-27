@@ -13,6 +13,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
+import { getAnthropicClient } from '@/lib/mock-anthropic';
 
 // ============================================================================
 // TYPES
@@ -119,9 +120,7 @@ CRITICAL: Return ONLY valid JSON, no markdown, no explanation.`;
 // ============================================================================
 
 async function classifyPrompt(prompt: string): Promise<ClassificationResult> {
-  const client = new Anthropic({
-    apiKey: process.env.ANTHROPIC_API_KEY!,
-  });
+  const client = getAnthropicClient();
 
   const response = await client.messages.create({
     model: 'claude-3-5-haiku-20241022', // Use Haiku for cost efficiency

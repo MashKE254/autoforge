@@ -28,11 +28,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import Anthropic from '@anthropic-ai/sdk';
+import { getAnthropicClient, isSimulationMode } from '@/lib/mock-anthropic';
 
 // Initialize Anthropic client with master key
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
+const anthropic = getAnthropicClient();
 
 // ============================================================================
 // Helper: Verify App Credentials
