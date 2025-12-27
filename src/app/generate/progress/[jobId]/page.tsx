@@ -23,19 +23,14 @@ import {
 interface ProgressData {
   status: string;
   progress: number;
-  totalModules: number;
-  completedModules: number;
-  failedModules: number;
+  filesGenerated: number;
   estimatedTimeRemaining: string;
-  modules: Array<{
-    name: string;
-    category: string;
-    status: string;
-  }>;
   errors: Array<{
     message: string;
     timestamp: string;
   }>;
+  startedAt?: string;
+  completedAt?: string;
 }
 
 export default function ProgressPage({
@@ -146,7 +141,7 @@ export default function ProgressPage({
     );
   }
 
-  const isGenerating = ['RUNNING', 'COMPOSING', 'TESTING', 'DEPLOYING'].includes(data.status);
+  const isGenerating = data.status === 'GENERATING';
   const isCompleted = data.status === 'COMPLETED';
   const isFailed = data.status === 'FAILED';
 
@@ -187,18 +182,14 @@ export default function ProgressPage({
           <CardContent>
             <Progress value={data.progress} className="h-4 mb-4" />
 
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-6">
               <div>
-                <p className="text-sm text-gray-500 mb-1">Total Modules</p>
-                <p className="text-2xl font-bold text-white">{data.totalModules}</p>
+                <p className="text-sm text-gray-500 mb-1">Status</p>
+                <p className="text-2xl font-bold text-white">{data.status}</p>
               </div>
               <div>
-                <p className="text-sm text-gray-500 mb-1">Completed</p>
-                <p className="text-2xl font-bold text-emerald-400">{data.completedModules}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-500 mb-1">Failed</p>
-                <p className="text-2xl font-bold text-red-400">{data.failedModules}</p>
+                <p className="text-sm text-gray-500 mb-1">Files Generated</p>
+                <p className="text-2xl font-bold text-emerald-400">{data.filesGenerated}</p>
               </div>
               <div>
                 <p className="text-sm text-gray-500 mb-1">Time Remaining</p>
@@ -254,39 +245,47 @@ export default function ProgressPage({
           </Card>
         )}
 
-        {/* Module List */}
+        {/* Generation Status */}
         <Card className="mb-8 border-white/10 bg-white/[0.02] backdrop-blur-xl">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-white">
               <Package className="w-5 h-5" />
-              Generated Modules ({data.completedModules}/{data.totalModules})
+              Generation Status
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <ScrollArea className="h-[300px]">
-              <div className="space-y-2">
-                {data.modules.map((module, index) => (
-                  <div
-                    key={index}
-                    className="flex items-center justify-between p-3 bg-white/[0.05] rounded-lg border border-white/10"
+            <div className="space-y-4">
+              <div className="flex items-center gap-3 p-4 bg-white/[0.05] rounded-lg border border-white/10">
+                {isCompleted ? (
+                  <CheckCircle className="w-6 h-6 text-emerald-400" />
+                ) : isGenerating ? (
+                  <Loader2 className="w-6 h-6 animate-spin text-cyan-400" />
+                ) : isFailed ? (
+                  <AlertCircle className="w-6 h-6 text-red-400" />
+                ) : (
+                  <Clock className="w-6 h-6 text-gray-500" />
+                )}
+                <div className="flex-1">
+                  <p className="font-medium text-white text-lg">
+                    {isCompleted && 'Generation Completed Successfully'}
+                    {isGenerating && 'Generating Your Application...'}
+                    {isFailed && 'Generation Failed'}
+                    {!isCompleted && !isGenerating && !isFailed && 'Preparing...'}
+                  </p>
+                  <p className="text-sm text-gray-400 mt-1">
+                    {data.filesGenerated} file{data.filesGenerated !== 1 ? 's' : ''} generated
+                  </p>
+                </div>
+                <div className="text-right">
+                  <Badge
+                    variant={isCompleted ? 'default' : 'secondary'}
+                    className={`${isCompleted ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' : 'bg-white/10 text-gray-400'}`}
                   >
-                    <div className="flex items-center gap-3">
-                      {module.status === 'completed' ? (
-                        <CheckCircle className="w-5 h-5 text-emerald-400" />
-                      ) : module.status === 'running' ? (
-                        <Loader2 className="w-5 h-5 animate-spin text-cyan-400" />
-                      ) : module.status === 'failed' ? (
-                        <AlertCircle className="w-5 h-5 text-red-400" />
-                      ) : (
-                        <Clock className="w-5 h-5 text-gray-500" />
-                      )}
-                      <span className="font-medium text-white">{module.name}</span>
-                    </div>
-                    <Badge variant="outline" className="border-white/10 text-gray-400">{module.category}</Badge>
-                  </div>
-                ))}
+                    {data.status}
+                  </Badge>
+                </div>
               </div>
-            </ScrollArea>
+            </div>
           </CardContent>
         </Card>
 
