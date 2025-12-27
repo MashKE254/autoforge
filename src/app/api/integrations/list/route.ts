@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
 
     // Map to integration configs and add connection status
     const integrations = Object.values(INTEGRATIONS).map((config) => {
-      const credential = credentials.find((c) => c.integrationId === config.id);
+      const credential = credentials.find((c: typeof credentials[0]) => c.integrationId === config.id);
 
       return {
         id: config.id,
