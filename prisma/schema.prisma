@@ -1207,3 +1207,70 @@ model FailurePattern {
   @@index([frequency])
   @@index([addedToPrompt])
 }
+
+// ============================================================================
+// INTEGRATION SYSTEM - OAuth & API Credentials
+// ============================================================================
+
+model IntegrationCredential {
+  id             String   @id @default(cuid())
+  userId         String
+  integrationId  String   // twitter, openai, stripe, etc.
+  type           String   // 'oauth' | 'api-key'
+
+  // OAuth tokens
+  accessToken    String?  @db.Text
+  refreshToken   String?  @db.Text
+  expiresAt      DateTime?
+  scopes         String[] // OAuth scopes granted
+
+  // API keys
+  apiKey         String?  @db.Text
+  apiSecret      String?  @db.Text
+  
+  // Additional config
+  accountInfo    Json?    // Store account details (username, email, etc.)
+  metadata       Json?    // Integration-specific metadata
+
+  // Status
+  isActive       Boolean  @default(true)
+  lastUsedAt     DateTime?
+  
+  // Timestamps
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Relations
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, integrationId])
+  @@index([userId])
+  @@index([integrationId])
+  @@index([isActive])
+}
+
+model IntegrationUsage {
+  id             String   @id @default(cuid())
+  userId         String
+  integrationId  String
+  
+  // Usage tracking
+  action         String   // API method called
+  success        Boolean
+  responseTime   Int?     // milliseconds
+  errorMessage   String?  @db.Text
+  
+  // Demo mode tracking
+  isDemoMode     Boolean  @default(false)
+  
+  // Metadata
+  metadata       Json?    // Request/response details
+  
+  // Timestamps
+  createdAt      DateTime @default(now())
+
+  @@index([userId])
+  @@index([integrationId])
+  @@index([createdAt])
+  @@index([isDemoMode])
+}

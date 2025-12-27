@@ -1654,7 +1654,20 @@ export class BoltGenerator {
 
       // Add any missing essential files (Clerk, Supabase, etc.)
       files = addMissingEssentialFiles(files, prompt, singleUser);
-      
+
+      // LAYER 3: AUTO-INJECT INTEGRATIONS
+      callbacks?.onProgress?.('🔌 Detecting and injecting integrations...');
+      const { injectIntegrations } = await import('./integration-injector');
+      const integrationResult = injectIntegrations(files, prompt);
+      files = integrationResult.files;
+
+      if (integrationResult.detectedIntegrations.length > 0) {
+        console.log(`   ✅ Injected ${integrationResult.detectedIntegrations.length} integrations:`);
+        integrationResult.detectedIntegrations.forEach(id => {
+          console.log(`      - ${id}`);
+        });
+      }
+
       console.log('   Generated files:');
       files.forEach((f: GeneratedFile) => {
         console.log(`   - ${f.path} (${f.content.length} chars)`);
