@@ -1,20 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { prisma } from '@/lib/prisma';
-
-// Define types for the data structures
-interface ModuleWithInfo {
-  module: {
-    name: string;
-    category: string;
-  };
-  status: string;
-}
-
-interface TelemetryEntry {
-  errorMessage: string | null;
-  createdAt: Date;
-}
+import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 
 export async function GET(
   request: NextRequest,
@@ -22,9 +9,9 @@ export async function GET(
 ) {
   try {
     const { jobId } = await params;
-    
+
     // Authentication
-    const session = await getServerSession();
+    const session = await getServerSession(authOptions);
     if (!session?.user?.email) {
       return NextResponse.json(
         { error: 'Unauthorized' },
@@ -44,18 +31,13 @@ export async function GET(
       );
     }
 
-    // Get job with modules
+    // Get job with files and telemetry
     const job = await prisma.generationJob.findUnique({
       where: { id: jobId },
       include: {
-        modules: {
-          include: {
-            module: {
-              select: {
-                name: true,
-                category: true
-              }
-            }
+        files: {
+          select: {
+            path: true,
           }
         },
         telemetry: {
@@ -65,7 +47,11 @@ export async function GET(
           orderBy: {
             createdAt: 'desc'
           },
-          take: 10
+          take: 10,
+          select: {
+            errorMessage: true,
+            createdAt: true,
+          }
         }
       }
     });
@@ -85,26 +71,40 @@ export async function GET(
       );
     }
 
-    // Calculate progress
-    const totalModules = job.totalModules || job.modules.length;
-    const completedModules = job.completedModules || 0;
-    const progress = totalModules > 0 ? (completedModules / totalModules) * 100 : 0;
-
-    // Calculate estimated time remaining
+    // Calculate progress based on status
+    let progress = 0;
     let estimatedTimeRemaining = 'Calculating...';
-    if (job.generationStartedAt && completedModules > 0 && completedModules < totalModules) {
-      const elapsedMinutes = (Date.now() - job.generationStartedAt.getTime()) / 60000;
-      const minutesPerModule = elapsedMinutes / completedModules;
-      const remainingModules = totalModules - completedModules;
-      const remainingMinutes = Math.ceil(minutesPerModule * remainingModules);
-      
-      if (remainingMinutes < 60) {
-        estimatedTimeRemaining = `${remainingMinutes} minute${remainingMinutes !== 1 ? 's' : ''}`;
+
+    if (job.status === 'PENDING') {
+      progress = 0;
+      estimatedTimeRemaining = 'Queued';
+    } else if (job.status === 'GENERATING') {
+      // Estimate based on elapsed time
+      if (job.generationStartedAt) {
+        const elapsed = Date.now() - job.generationStartedAt.getTime();
+        const elapsedMinutes = elapsed / 60000;
+
+        // Assume average generation takes 1-2 minutes
+        if (elapsedMinutes < 1) {
+          progress = 25;
+          estimatedTimeRemaining = '1-2 minutes';
+        } else if (elapsedMinutes < 1.5) {
+          progress = 50;
+          estimatedTimeRemaining = '30-60 seconds';
+        } else {
+          progress = 75;
+          estimatedTimeRemaining = '30 seconds';
+        }
       } else {
-        const hours = Math.floor(remainingMinutes / 60);
-        const minutes = remainingMinutes % 60;
-        estimatedTimeRemaining = `${hours}h ${minutes}m`;
+        progress = 10;
+        estimatedTimeRemaining = '1-2 minutes';
       }
+    } else if (job.status === 'COMPLETED') {
+      progress = 100;
+      estimatedTimeRemaining = 'Complete';
+    } else if (job.status === 'FAILED') {
+      progress = 0;
+      estimatedTimeRemaining = 'Failed';
     }
 
     return NextResponse.json({
@@ -112,27 +112,18 @@ export async function GET(
       jobId: job.id,
       status: job.status,
       progress: Math.round(progress),
-      totalModules,
-      completedModules,
-      failedModules: job.failedModules || 0,
+      filesGenerated: job.files.length,
       estimatedTimeRemaining,
-      // FIX: Add proper type annotation for 'm' parameter
-      modules: job.modules.map((m: ModuleWithInfo) => ({
-        name: m.module.name,
-        category: m.module.category,
-        status: m.status
-      })),
-      // FIX: Add proper type annotation for 't' parameter
-      errors: job.telemetry.map((t: TelemetryEntry) => ({
+      errors: job.telemetry.map((t) => ({
         message: t.errorMessage,
         timestamp: t.createdAt
       })),
       startedAt: job.generationStartedAt,
-      blueprintApprovedAt: job.blueprintApprovedAt
+      completedAt: job.generationCompletedAt,
     });
   } catch (error) {
     console.error('❌ Get progress error:', error);
-    
+
     return NextResponse.json(
       { error: 'Failed to get progress' },
       { status: 500 }
