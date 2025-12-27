@@ -12,6 +12,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '../../auth/[...nextauth]/route';
 import { prisma } from '@/lib/prisma';
 import Anthropic from '@anthropic-ai/sdk';
+import { getAnthropicClient, isSimulationMode } from '@/lib/mock-anthropic';
 import { PREMIUM_UI_SYSTEM_PROMPT, buildPremiumUserPrompt } from '@/lib/generation/premium-ui-prompt';
 
 // ============================================================================
@@ -59,9 +60,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 4. Create Anthropic client
-    const client = new Anthropic({
-      apiKey: process.env.ANTHROPIC_API_KEY!,
-    });
+    const client = getAnthropicClient();
 
     // 5. Create streaming response
     const encoder = new TextEncoder();

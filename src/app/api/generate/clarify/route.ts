@@ -16,6 +16,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../../auth/[...nextauth]/route';
 import Anthropic from '@anthropic-ai/sdk';
+import { getAnthropicClient, isSimulationMode } from '@/lib/mock-anthropic';
 
 // ============================================================================
 // TYPES
@@ -156,9 +157,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 4. Call AI for analysis
-    const client = new Anthropic({
-      apiKey: process.env.ANTHROPIC_API_KEY!,
-    });
+    const client = getAnthropicClient();
 
     const response = await client.messages.create({
       model: 'claude-sonnet-4-20250514',
