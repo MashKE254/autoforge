@@ -23,6 +23,7 @@ import {
   BOT_PATTERNS,
   AI_AGENT_PATTERNS,
 } from './ai-systems-patterns';
+import { getAnthropicClient, isSimulationMode } from '../mock-anthropic';
 
 // ============================================================================
 // TYPES
@@ -1546,11 +1547,13 @@ body {
 
 export class BoltGenerator {
   private client: Anthropic;
-  
+
   constructor() {
-    this.client = new Anthropic({
-      apiKey: process.env.ANTHROPIC_API_KEY!,
-    });
+    this.client = getAnthropicClient();
+
+    if (isSimulationMode()) {
+      console.log('🎭 [BOLT GENERATOR] Running in simulation mode - no real API calls will be made');
+    }
   }
   
   /**
