@@ -20,7 +20,7 @@ export class MockDataGenerator {
     'Great', 'Wonderful', 'Superb', 'Brilliant', 'Perfect'
   ];
 
-  private static productAdjectives = [
+  static productAdjectives = [
     'Revolutionary', 'Innovative', 'Game-changing', 'Next-gen', 'Advanced',
     'Premium', 'Professional', 'Enterprise', 'Modern', 'Smart'
   ];
