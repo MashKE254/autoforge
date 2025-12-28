@@ -64,6 +64,7 @@ export async function GET(request: NextRequest) {
         createdAt: true,
         generationCompletedAt: true,
         errorLog: true,
+        thumbnailUrl: true,
         _count: {
           select: {
             files: true
@@ -85,6 +86,7 @@ export async function GET(request: NextRequest) {
       createdAt: job.createdAt,
       fileCount: job._count.files,
       errorLog: job.errorLog,
+      thumbnail: job.thumbnailUrl,
     }));
 
     return NextResponse.json({ jobs: formattedJobs });
