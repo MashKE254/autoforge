@@ -23,7 +23,7 @@ import { getAnthropicClient, isSimulationMode } from '@/lib/mock-anthropic';
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -49,7 +49,7 @@ export async function POST(
     }
 
     const userId = dbUser.id;
-    const creationId = params.id;
+    const { id: creationId } = await params;
 
     // Parse request body
     const body = await request.json();
