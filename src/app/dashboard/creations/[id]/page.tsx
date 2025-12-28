@@ -226,11 +226,13 @@ export default function CreationDetailPage() {
           </Link>
 
           <div className="flex items-start justify-between">
-            <div>
+            <div className="flex-1 min-w-0 mr-4">
               <h1 className="text-4xl font-bold text-white mb-2">
                 {creation.publishedApp?.name ||
                   creation.managedApp?.name ||
-                  'Untitled Creation'}
+                  (creation.prompt.length > 60
+                    ? creation.prompt.slice(0, 60) + '...'
+                    : creation.prompt)}
               </h1>
               <p className="text-gray-400">
                 Created {formatDate(creation.createdAt)} •{' '}
@@ -325,8 +327,14 @@ export default function CreationDetailPage() {
           </div>
         )}
 
+        {/* Original Prompt */}
+        <div className="mb-8 bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-6">
+          <h3 className="text-lg font-semibold text-white mb-3">Original Prompt</h3>
+          <p className="text-gray-300 leading-relaxed">{creation.prompt}</p>
+        </div>
+
         {/* Deployment Info */}
-        {creation.deploymentUrl && (
+        {creation.deploymentUrl ? (
           <div className="mb-8 bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-6">
             <h3 className="text-lg font-semibold text-white mb-4">Live Deployment</h3>
             <div className="flex items-center gap-3">
@@ -359,6 +367,33 @@ export default function CreationDetailPage() {
               >
                 <ExternalLink className="w-5 h-5 text-white" />
               </a>
+            </div>
+          </div>
+        ) : (
+          <div className="mb-8 bg-gradient-to-r from-cyan-500/10 to-purple-500/10 border border-cyan-500/20 rounded-xl p-6">
+            <div className="flex items-start gap-4">
+              <Rocket className="w-6 h-6 text-cyan-400 flex-shrink-0 mt-1" />
+              <div className="flex-1">
+                <h3 className="text-lg font-semibold text-white mb-2">Ready to Deploy</h3>
+                <p className="text-gray-400 mb-4">
+                  Your app has been generated successfully! Deploy it to make it accessible online.
+                </p>
+                <div className="flex items-center gap-3">
+                  <Link
+                    href={`/generate/result/${creation.id}`}
+                    className="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg transition flex items-center gap-2"
+                  >
+                    <Rocket className="w-4 h-4" />
+                    Go Live
+                  </Link>
+                  <Link
+                    href={`/generate/result/${creation.id}`}
+                    className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg transition"
+                  >
+                    View Code
+                  </Link>
+                </div>
+              </div>
             </div>
           </div>
         )}
