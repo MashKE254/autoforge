@@ -19,17 +19,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Generation job ID required' }, { status: 400 });
     }
 
-    // Verify ownership
+    // Verify ownership - first check if job exists at all
     const job = await prisma.generationJob.findFirst({
       where: {
         id: generationJobId,
         userId: session.user.id,
-        status: 'COMPLETED',
       },
     });
 
     if (!job) {
-      return NextResponse.json({ error: 'Job not found' }, { status: 404 });
+      console.error(`[GO-LIVE] Job not found or unauthorized: ${generationJobId}`);
+      return NextResponse.json({ error: 'Job not found or you do not have access to it' }, { status: 404 });
+    }
+
+    // Check if job is complete
+    if (job.status !== 'COMPLETED') {
+      console.error(`[GO-LIVE] Job not completed. Current status: ${job.status}`);
+      return NextResponse.json({
+        error: `Job is not ready. Current status: ${job.status}. Please wait for generation to complete.`
+      }, { status: 400 });
     }
 
     // Check if already provisioned
