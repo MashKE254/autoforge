@@ -9,7 +9,7 @@ import { provisioningService } from '@/lib/infrastructure/provisioning-service';
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
+    if (!session?.user?.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -23,14 +23,14 @@ export async function POST(request: NextRequest) {
     console.log(`[GO-LIVE] Session user ID: ${session.user.id}`);
     console.log(`[GO-LIVE] Session user email: ${session.user.email}`);
 
-    // Get the database user ID (same pattern as /api/jobs)
+    // Get the database user by EMAIL (same pattern as /api/jobs)
     const dbUser = await prisma.user.findUnique({
-      where: { id: session.user.id },
+      where: { email: session.user.email },
       select: { id: true }
     });
 
     if (!dbUser) {
-      console.error(`[GO-LIVE] Database user not found for session ID: ${session.user.id}`);
+      console.error(`[GO-LIVE] Database user not found for email: ${session.user.email}`);
       return NextResponse.json({ error: 'User not found in database' }, { status: 404 });
     }
 
@@ -113,13 +113,13 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
+    if (!session?.user?.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get the database user ID (same pattern as POST)
+    // Get the database user by EMAIL (same pattern as POST)
     const dbUser = await prisma.user.findUnique({
-      where: { id: session.user.id },
+      where: { email: session.user.email },
       select: { id: true }
     });
 
