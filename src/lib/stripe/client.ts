@@ -13,11 +13,14 @@ import Stripe from 'stripe';
 // STRIPE CLIENT INSTANCE
 // =============================================================================
 
-if (!process.env.STRIPE_SECRET_KEY) {
-  throw new Error('STRIPE_SECRET_KEY is not set in environment variables');
+const SIMULATION_MODE = process.env.SIMULATE_INFRASTRUCTURE === 'true';
+const STRIPE_KEY = process.env.STRIPE_SECRET_KEY;
+
+if (!SIMULATION_MODE && !STRIPE_KEY) {
+  throw new Error('STRIPE_SECRET_KEY is not set in environment variables. Set SIMULATE_INFRASTRUCTURE=true to test without Stripe.');
 }
 
-export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+export const stripe = STRIPE_KEY ? new Stripe(STRIPE_KEY, {
   apiVersion: '2025-11-17.clover', // Use latest stable API version
   typescript: true,
   appInfo: {
@@ -25,7 +28,9 @@ export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
     version: '1.0.0',
     url: 'https://autoforge.ai',
   },
-});
+}) : null as any; // Null in simulation mode
+
+export const isSimulationMode = () => SIMULATION_MODE || !STRIPE_KEY;
 
 // =============================================================================
 // HELPER FUNCTIONS

@@ -297,16 +297,28 @@ export async function createAppStripeProduct(params: {
   priceYearly?: string;
   priceOneTime?: string;
 }> {
-  const { 
-    publishedAppId, 
-    name, 
-    description, 
-    monthlyPrice, 
-    yearlyPrice, 
+  const {
+    publishedAppId,
+    name,
+    description,
+    monthlyPrice,
+    yearlyPrice,
     oneTimePrice,
-    connectedAccountId 
+    connectedAccountId
   } = params;
-  
+
+  // 🎭 SIMULATION MODE
+  if (!stripe) {
+    console.log(`🎭 [STRIPE] Simulating product creation for app: ${name}`);
+    const timestamp = Date.now();
+    return {
+      productId: `prod_sim_${timestamp}`,
+      priceMonthly: monthlyPrice ? `price_sim_monthly_${timestamp}` : undefined,
+      priceYearly: yearlyPrice ? `price_sim_yearly_${timestamp}` : undefined,
+      priceOneTime: oneTimePrice ? `price_sim_onetime_${timestamp}` : undefined,
+    };
+  }
+
   // Create product on connected account
   const product = await stripe.products.create({
     name,
@@ -317,7 +329,7 @@ export async function createAppStripeProduct(params: {
   }, {
     stripeAccount: connectedAccountId,
   });
-  
+
   const result: {
     productId: string;
     priceMonthly?: string;
@@ -326,7 +338,7 @@ export async function createAppStripeProduct(params: {
   } = {
     productId: product.id,
   };
-  
+
   // Create monthly subscription price
   if (monthlyPrice && monthlyPrice > 0) {
     const price = await stripe.prices.create({
@@ -345,7 +357,7 @@ export async function createAppStripeProduct(params: {
     });
     result.priceMonthly = price.id;
   }
-  
+
   // Create yearly subscription price
   if (yearlyPrice && yearlyPrice > 0) {
     const price = await stripe.prices.create({
@@ -364,7 +376,7 @@ export async function createAppStripeProduct(params: {
     });
     result.priceYearly = price.id;
   }
-  
+
   // Create one-time price
   if (oneTimePrice && oneTimePrice > 0) {
     const price = await stripe.prices.create({
