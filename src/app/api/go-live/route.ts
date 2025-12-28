@@ -23,11 +23,25 @@ export async function POST(request: NextRequest) {
     console.log(`[GO-LIVE] Session user ID: ${session.user.id}`);
     console.log(`[GO-LIVE] Session user email: ${session.user.email}`);
 
-    // Verify ownership - first check if job exists at all
+    // Get the database user ID (same pattern as /api/jobs)
+    const dbUser = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { id: true }
+    });
+
+    if (!dbUser) {
+      console.error(`[GO-LIVE] Database user not found for session ID: ${session.user.id}`);
+      return NextResponse.json({ error: 'User not found in database' }, { status: 404 });
+    }
+
+    const dbUserId = dbUser.id;
+    console.log(`[GO-LIVE] Database user ID: ${dbUserId}`);
+
+    // Verify ownership - use database user ID
     const job = await prisma.generationJob.findFirst({
       where: {
         id: generationJobId,
-        userId: session.user.id,
+        userId: dbUserId, // Use database user ID instead of session user ID
       },
     });
 
@@ -75,7 +89,7 @@ export async function POST(request: NextRequest) {
 
     // Start provisioning (async - returns immediately)
     const result = await provisioningService.provision(
-      session.user.id,
+      dbUserId, // Use database user ID
       generationJobId
     );
 
@@ -103,6 +117,16 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // Get the database user ID (same pattern as POST)
+    const dbUser = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { id: true }
+    });
+
+    if (!dbUser) {
+      return NextResponse.json({ error: 'User not found in database' }, { status: 404 });
+    }
+
     const { searchParams } = new URL(request.url);
     const managedProjectId = searchParams.get('id');
 
@@ -113,7 +137,7 @@ export async function GET(request: NextRequest) {
     const project = await prisma.managedProject.findFirst({
       where: {
         id: managedProjectId,
-        userId: session.user.id,
+        userId: dbUser.id, // Use database user ID
       },
       include: {
         provisioningLogs: {
