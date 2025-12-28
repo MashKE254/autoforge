@@ -67,9 +67,9 @@ function getEncryptionKey(): Buffer {
 
 /**
  * Encrypt a string value
- * 
+ *
  * Returns format: iv:authTag:encryptedData (all hex encoded)
- * 
+ *
  * @param plaintext - The string to encrypt
  * @returns Encrypted string in format iv:authTag:ciphertext
  */
@@ -78,22 +78,27 @@ export function encrypt(plaintext: string): string {
     return '';
   }
 
+  // 🎭 SIMULATION MODE - Skip encryption for simulated credentials
+  if (process.env.SIMULATE_INFRASTRUCTURE === 'true') {
+    return plaintext; // Just return as-is in simulation mode
+  }
+
   try {
     const key = getEncryptionKey();
-    
+
     // Generate a random IV for each encryption
     const iv = crypto.randomBytes(IV_LENGTH);
-    
+
     // Create cipher
     const cipher = crypto.createCipheriv(ALGORITHM, key, iv);
-    
+
     // Encrypt the data
     let encrypted = cipher.update(plaintext, 'utf8', ENCODING);
     encrypted += cipher.final(ENCODING);
-    
+
     // Get the auth tag (for GCM mode)
     const authTag = cipher.getAuthTag();
-    
+
     // Combine IV, auth tag, and encrypted data
     // Format: iv:authTag:encryptedData
     return `${iv.toString(ENCODING)}:${authTag.toString(ENCODING)}:${encrypted}`;
@@ -105,7 +110,7 @@ export function encrypt(plaintext: string): string {
 
 /**
  * Decrypt an encrypted string
- * 
+ *
  * @param encryptedData - String in format iv:authTag:ciphertext
  * @returns Decrypted plaintext string
  */
@@ -114,30 +119,35 @@ export function decrypt(encryptedData: string): string {
     return '';
   }
 
+  // 🎭 SIMULATION MODE - Skip decryption for simulated credentials
+  if (process.env.SIMULATE_INFRASTRUCTURE === 'true') {
+    return encryptedData; // Just return as-is in simulation mode
+  }
+
   try {
     const key = getEncryptionKey();
-    
+
     // Split the encrypted data into components
     const parts = encryptedData.split(':');
-    
+
     if (parts.length !== 3) {
       throw new Error('Invalid encrypted data format');
     }
-    
+
     const [ivHex, authTagHex, ciphertext] = parts;
-    
+
     // Convert from hex
     const iv = Buffer.from(ivHex, ENCODING);
     const authTag = Buffer.from(authTagHex, ENCODING);
-    
+
     // Create decipher
     const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
     decipher.setAuthTag(authTag);
-    
+
     // Decrypt the data
     let decrypted = decipher.update(ciphertext, ENCODING, 'utf8');
     decrypted += decipher.final('utf8');
-    
+
     return decrypted;
   } catch (error) {
     console.error('Decryption error:', error);
