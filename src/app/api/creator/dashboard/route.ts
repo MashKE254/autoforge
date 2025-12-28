@@ -163,7 +163,7 @@ export async function GET(request: NextRequest) {
         select: {
           plan: true,
           status: true,
-          currentPeriodEnd: true,
+          stripeCurrentPeriodEnd: true,
         }
       }),
     ]);
@@ -311,7 +311,7 @@ export async function GET(request: NextRequest) {
       subscription: {
         plan: planName,
         status: subscription?.status || 'NONE',
-        currentPeriodEnd: subscription?.currentPeriodEnd,
+        currentPeriodEnd: subscription?.stripeCurrentPeriodEnd,
         limits: planLimits,
         usage: {
           publishedApps: publishedCount,
