@@ -19,6 +19,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Generation job ID required' }, { status: 400 });
     }
 
+    console.log(`[GO-LIVE] Request for job: ${generationJobId}`);
+    console.log(`[GO-LIVE] Session user ID: ${session.user.id}`);
+    console.log(`[GO-LIVE] Session user email: ${session.user.email}`);
+
     // Verify ownership - first check if job exists at all
     const job = await prisma.generationJob.findFirst({
       where: {
@@ -27,8 +31,23 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    // Debug: Also check if job exists without user filter
+    const jobAny = await prisma.generationJob.findUnique({
+      where: { id: generationJobId },
+      select: { id: true, userId: true, status: true }
+    });
+
+    console.log(`[GO-LIVE] Job with user filter:`, job ? 'FOUND' : 'NOT FOUND');
+    console.log(`[GO-LIVE] Job without user filter:`, jobAny);
+
     if (!job) {
       console.error(`[GO-LIVE] Job not found or unauthorized: ${generationJobId}`);
+      if (jobAny) {
+        console.error(`[GO-LIVE] Job exists but belongs to different user. Job userId: ${jobAny.userId}, Session userId: ${session.user.id}`);
+        return NextResponse.json({
+          error: `Job belongs to a different user. This is likely a session issue - try logging out and back in.`
+        }, { status: 403 });
+      }
       return NextResponse.json({ error: 'Job not found or you do not have access to it' }, { status: 404 });
     }
 
