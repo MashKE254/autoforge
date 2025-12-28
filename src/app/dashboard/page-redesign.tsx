@@ -169,6 +169,83 @@ const quickTemplates: QuickTemplate[] = [
 ];
 
 // ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
+
+// Generate unique gradient based on prompt content
+function getPreviewGradient(prompt: string, index: number): string {
+  const lowerPrompt = prompt.toLowerCase();
+
+  // Detect app type and return appropriate gradient
+  if (lowerPrompt.includes('discord') || lowerPrompt.includes('bot') || lowerPrompt.includes('chat')) {
+    return 'bg-gradient-to-br from-indigo-600/40 via-purple-600/30 to-blue-600/40';
+  }
+  if (lowerPrompt.includes('trading') || lowerPrompt.includes('crypto') || lowerPrompt.includes('finance')) {
+    return 'bg-gradient-to-br from-green-600/40 via-emerald-600/30 to-teal-600/40';
+  }
+  if (lowerPrompt.includes('scraper') || lowerPrompt.includes('scraping') || lowerPrompt.includes('data')) {
+    return 'bg-gradient-to-br from-orange-600/40 via-red-600/30 to-pink-600/40';
+  }
+  if (lowerPrompt.includes('saas') || lowerPrompt.includes('crm') || lowerPrompt.includes('dashboard')) {
+    return 'bg-gradient-to-br from-violet-600/40 via-purple-600/30 to-fuchsia-600/40';
+  }
+  if (lowerPrompt.includes('task') || lowerPrompt.includes('todo') || lowerPrompt.includes('kanban') || lowerPrompt.includes('project')) {
+    return 'bg-gradient-to-br from-blue-600/40 via-cyan-600/30 to-sky-600/40';
+  }
+  if (lowerPrompt.includes('api') || lowerPrompt.includes('backend') || lowerPrompt.includes('rest')) {
+    return 'bg-gradient-to-br from-yellow-600/40 via-amber-600/30 to-orange-600/40';
+  }
+  if (lowerPrompt.includes('e-commerce') || lowerPrompt.includes('shop') || lowerPrompt.includes('store')) {
+    return 'bg-gradient-to-br from-pink-600/40 via-rose-600/30 to-red-600/40';
+  }
+
+  // Fallback: cycle through gradients based on index
+  const gradients = [
+    'bg-gradient-to-br from-violet-600/40 via-purple-600/30 to-cyan-600/40',
+    'bg-gradient-to-br from-blue-600/40 via-indigo-600/30 to-purple-600/40',
+    'bg-gradient-to-br from-cyan-600/40 via-teal-600/30 to-emerald-600/40',
+    'bg-gradient-to-br from-fuchsia-600/40 via-pink-600/30 to-rose-600/40',
+  ];
+  return gradients[index % gradients.length];
+}
+
+// Get icon based on prompt content
+function getPreviewIcon(prompt: string): ElementType {
+  const lowerPrompt = prompt.toLowerCase();
+
+  if (lowerPrompt.includes('discord') || lowerPrompt.includes('chat') || lowerPrompt.includes('messaging')) {
+    return MessageSquare;
+  }
+  if (lowerPrompt.includes('bot')) {
+    return Bot;
+  }
+  if (lowerPrompt.includes('trading') || lowerPrompt.includes('crypto') || lowerPrompt.includes('finance')) {
+    return TrendingUp;
+  }
+  if (lowerPrompt.includes('scraper') || lowerPrompt.includes('scraping')) {
+    return Code2;
+  }
+  if (lowerPrompt.includes('saas') || lowerPrompt.includes('crm')) {
+    return Layers;
+  }
+  if (lowerPrompt.includes('task') || lowerPrompt.includes('todo') || lowerPrompt.includes('kanban')) {
+    return Target;
+  }
+  if (lowerPrompt.includes('api') || lowerPrompt.includes('backend')) {
+    return Zap;
+  }
+  if (lowerPrompt.includes('dashboard') || lowerPrompt.includes('admin')) {
+    return BarChart3;
+  }
+  if (lowerPrompt.includes('e-commerce') || lowerPrompt.includes('shop')) {
+    return DollarSign;
+  }
+
+  // Default
+  return FileCode;
+}
+
+// ============================================================================
 // SUB-COMPONENTS
 // ============================================================================
 
@@ -637,49 +714,85 @@ export default function DashboardRedesign() {
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {recentGenerations.map((gen) => (
-                    <Link
-                      key={gen.id}
-                      href={`/generate/result/${gen.id}`}
-                      className="group relative bg-gradient-to-br from-white/10 to-white/5 border border-white/10 rounded-xl hover:border-white/20 hover:from-white/15 overflow-hidden transition-all"
-                    >
-                      {/* Preview Image Placeholder */}
-                      <div className="aspect-video bg-gradient-to-br from-violet-500/20 to-cyan-500/20 flex items-center justify-center border-b border-white/10">
-                        <Code2 className="w-8 h-8 text-white/40" />
-                      </div>
+                  {recentGenerations.map((gen, index) => {
+                    // Generate unique preview based on prompt content
+                    const previewGradient = getPreviewGradient(gen.prompt, index);
+                    const previewIcon = getPreviewIcon(gen.prompt);
+                    const PreviewIcon = previewIcon;
 
-                      {/* Content */}
-                      <div className="p-4">
-                        <div className="flex items-start justify-between mb-2">
-                          <h4 className="text-sm font-medium text-white line-clamp-2 flex-1 group-hover:text-cyan-300 transition-colors">
-                            {gen.prompt}
-                          </h4>
-                          <StatusBadge status={gen.status} />
+                    return (
+                      <Link
+                        key={gen.id}
+                        href={`/generate/result/${gen.id}`}
+                        className="group relative bg-gradient-to-br from-white/10 to-white/5 border border-white/10 rounded-xl hover:border-cyan-500/30 hover:from-white/15 overflow-hidden transition-all shadow-lg hover:shadow-cyan-500/10"
+                      >
+                        {/* Preview Image - Dynamic based on content */}
+                        <div className={`aspect-video relative overflow-hidden border-b border-white/10 ${previewGradient}`}>
+                          {/* Mock Browser/App UI */}
+                          <div className="absolute inset-0 p-4">
+                            {/* Mock browser chrome */}
+                            <div className="bg-black/40 backdrop-blur-sm rounded-lg p-2 mb-2">
+                              <div className="flex items-center gap-1.5 mb-2">
+                                <div className="w-2 h-2 rounded-full bg-red-400/60" />
+                                <div className="w-2 h-2 rounded-full bg-yellow-400/60" />
+                                <div className="w-2 h-2 rounded-full bg-green-400/60" />
+                              </div>
+                              <div className="h-4 bg-white/10 rounded-md" />
+                            </div>
+
+                            {/* Mock app content */}
+                            <div className="space-y-2">
+                              <div className="h-8 bg-white/20 rounded-md w-3/4" />
+                              <div className="h-4 bg-white/10 rounded-md w-1/2" />
+                              <div className="grid grid-cols-2 gap-2 mt-3">
+                                <div className="h-12 bg-white/10 rounded-md" />
+                                <div className="h-12 bg-white/10 rounded-md" />
+                              </div>
+                            </div>
+
+                            {/* App type icon */}
+                            <div className="absolute bottom-4 right-4 w-12 h-12 bg-black/40 backdrop-blur-sm rounded-xl flex items-center justify-center">
+                              <PreviewIcon className="w-6 h-6 text-white/80" />
+                            </div>
+                          </div>
+
+                          {/* Shimmer effect */}
+                          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
                         </div>
 
-                        <div className="flex items-center gap-4 text-xs text-gray-400">
-                          <span className="flex items-center gap-1">
-                            <Clock className="w-3 h-3" />
-                            {new Date(gen.createdAt).toLocaleDateString()}
-                          </span>
-                          {gen.fileCount && (
+                        {/* Content */}
+                        <div className="p-4">
+                          <div className="flex items-start justify-between mb-2">
+                            <h4 className="text-sm font-medium text-white line-clamp-2 flex-1 group-hover:text-cyan-300 transition-colors">
+                              {gen.prompt}
+                            </h4>
+                            <StatusBadge status={gen.status} />
+                          </div>
+
+                          <div className="flex items-center gap-4 text-xs text-gray-400">
                             <span className="flex items-center gap-1">
-                              <FileCode className="w-3 h-3" />
-                              {gen.fileCount} files
+                              <Clock className="w-3 h-3" />
+                              {new Date(gen.createdAt).toLocaleDateString()}
                             </span>
-                          )}
+                            {gen.fileCount && (
+                              <span className="flex items-center gap-1">
+                                <FileCode className="w-3 h-3" />
+                                {gen.fileCount} files
+                              </span>
+                            )}
+                          </div>
                         </div>
-                      </div>
 
-                      {/* Hover overlay */}
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                        <div className="flex items-center gap-2 px-4 py-2 bg-white/10 backdrop-blur-sm rounded-lg text-sm font-medium">
-                          <Eye className="w-4 h-4" />
-                          View Details
+                        {/* Hover overlay */}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                          <div className="flex items-center gap-2 px-4 py-2 bg-white/10 backdrop-blur-sm rounded-lg text-sm font-medium border border-white/20">
+                            <Eye className="w-4 h-4" />
+                            View App
+                          </div>
                         </div>
-                      </div>
-                    </Link>
-                  ))}
+                      </Link>
+                    );
+                  })}
                 </div>
               )}
             </div>
