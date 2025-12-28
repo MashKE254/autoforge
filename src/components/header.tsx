@@ -26,10 +26,12 @@ import {
   Sparkles,
   Lightbulb,
   Store,
+  LayoutDashboard,
 } from 'lucide-react';
 
 const navLinks = [
   { href: '/dashboard', label: 'Dashboard' },
+  { href: '/dashboard/creator', label: 'My Apps', icon: LayoutDashboard },
   { href: '/marketplace', label: 'Marketplace', icon: Store },
   { href: '/recommend', label: 'Recommender', icon: Lightbulb },
   { href: '/projects', label: 'Projects' },
@@ -120,6 +122,14 @@ export default function Header() {
 
                       {/* Main Links */}
                       <div className="py-1">
+                        <Link
+                          href="/dashboard/creator"
+                          className="flex items-center gap-2 px-4 py-2 text-sm text-cyan-400 hover:text-cyan-300 hover:bg-white/5"
+                          onClick={() => setUserMenuOpen(false)}
+                        >
+                          <LayoutDashboard className="w-4 h-4" />
+                          My Apps
+                        </Link>
                         <Link
                           href="/recommend"
                           className="flex items-center gap-2 px-4 py-2 text-sm text-violet-400 hover:text-violet-300 hover:bg-white/5"
@@ -244,6 +254,14 @@ export default function Header() {
             {session && (
               <>
                 <div className="border-t border-white/10 my-2 pt-2">
+                  <Link
+                    href="/dashboard/creator"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center gap-2 px-3 py-2 rounded-lg text-cyan-400 hover:text-cyan-300 hover:bg-white/5"
+                  >
+                    <LayoutDashboard className="w-4 h-4" />
+                    My Apps
+                  </Link>
                   <Link
                     href="/recommend"
                     onClick={() => setMobileMenuOpen(false)}
