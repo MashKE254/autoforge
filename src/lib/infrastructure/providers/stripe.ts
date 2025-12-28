@@ -57,24 +57,40 @@ export interface TransitionToLiveResult {
 // ============================================================================
 
 export class StripeProvisioner {
-  private stripe: Stripe;
-  private testStripe: Stripe;
+  private stripe: Stripe | null;
+  private testStripe: Stripe | null;
   private platformUrl: string;
+  private simulationMode: boolean;
 
   constructor() {
+    this.platformUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://autoforge.app';
+    this.simulationMode = process.env.SIMULATE_INFRASTRUCTURE === 'true';
+
+    if (this.simulationMode) {
+      console.log('🎭 [STRIPE] Running in simulation mode - no real Stripe calls');
+      this.stripe = null;
+      this.testStripe = null;
+      return;
+    }
+
     // Live mode Stripe (for platform operations)
-    this.stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+    const liveKey = process.env.STRIPE_SECRET_KEY;
+    this.stripe = liveKey ? new Stripe(liveKey, {
       apiVersion: '2025-11-17.clover',
       typescript: true,
-    });
+    }) : null;
 
     // Test mode Stripe (for preview environments)
-    this.testStripe = new Stripe(process.env.STRIPE_TEST_SECRET_KEY!, {
+    const testKey = process.env.STRIPE_TEST_SECRET_KEY;
+    this.testStripe = testKey ? new Stripe(testKey, {
       apiVersion: '2025-11-17.clover',
       typescript: true,
-    });
+    }) : null;
 
-    this.platformUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://autoforge.app';
+    if (!this.stripe && !this.testStripe) {
+      console.warn('⚠️ No Stripe keys found - Stripe features will be simulated');
+      this.simulationMode = true;
+    }
   }
 
   // ==========================================================================
@@ -123,6 +139,16 @@ export class StripeProvisioner {
     // We route based on metadata in the webhook payload
     const webhookUrl = `${this.platformUrl}/api/managed/webhook/${managedProjectId}`;
 
+    // 🎭 SIMULATION MODE
+    if (this.simulationMode || !this.testStripe) {
+      console.log(`🎭 [STRIPE] Simulating test webhook creation for: ${webhookUrl}`);
+      return {
+        webhookId: `whsec_sim_${managedProjectId.slice(0, 16)}`,
+        webhookSecret: `whsec_simulated_${Date.now()}`,
+        webhookUrl,
+      };
+    }
+
     console.log(`📡 Creating test webhook: ${webhookUrl}`);
 
     try {
@@ -133,23 +159,23 @@ export class StripeProvisioner {
           // Checkout events
           'checkout.session.completed',
           'checkout.session.expired',
-          
+
           // Subscription events
           'customer.subscription.created',
           'customer.subscription.updated',
           'customer.subscription.deleted',
           'customer.subscription.trial_will_end',
-          
+
           // Payment events
           'invoice.paid',
           'invoice.payment_failed',
           'invoice.payment_action_required',
-          
+
           // Customer events
           'customer.created',
           'customer.updated',
           'customer.deleted',
-          
+
           // Payment Intent events (for one-time payments)
           'payment_intent.succeeded',
           'payment_intent.payment_failed',
