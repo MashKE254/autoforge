@@ -727,34 +727,43 @@ export default function DashboardRedesign() {
                         className="group relative bg-gradient-to-br from-white/10 to-white/5 border border-white/10 rounded-xl hover:border-cyan-500/30 hover:from-white/15 overflow-hidden transition-all shadow-lg hover:shadow-cyan-500/10"
                       >
                         {/* Preview Image - Dynamic based on content */}
-                        <div className={`aspect-video relative overflow-hidden border-b border-white/10 ${previewGradient}`}>
-                          {/* Mock Browser/App UI */}
-                          <div className="absolute inset-0 p-4">
-                            {/* Mock browser chrome */}
-                            <div className="bg-black/40 backdrop-blur-sm rounded-lg p-2 mb-2">
-                              <div className="flex items-center gap-1.5 mb-2">
-                                <div className="w-2 h-2 rounded-full bg-red-400/60" />
-                                <div className="w-2 h-2 rounded-full bg-yellow-400/60" />
-                                <div className="w-2 h-2 rounded-full bg-green-400/60" />
+                        <div className={`aspect-video relative overflow-hidden border-b border-white/10 ${gen.thumbnail ? 'bg-black' : previewGradient}`}>
+                          {gen.thumbnail ? (
+                            // Real screenshot
+                            <img
+                              src={gen.thumbnail}
+                              alt={gen.prompt}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            // Mock Browser/App UI (fallback)
+                            <div className="absolute inset-0 p-4">
+                              {/* Mock browser chrome */}
+                              <div className="bg-black/40 backdrop-blur-sm rounded-lg p-2 mb-2">
+                                <div className="flex items-center gap-1.5 mb-2">
+                                  <div className="w-2 h-2 rounded-full bg-red-400/60" />
+                                  <div className="w-2 h-2 rounded-full bg-yellow-400/60" />
+                                  <div className="w-2 h-2 rounded-full bg-green-400/60" />
+                                </div>
+                                <div className="h-4 bg-white/10 rounded-md" />
                               </div>
-                              <div className="h-4 bg-white/10 rounded-md" />
-                            </div>
 
-                            {/* Mock app content */}
-                            <div className="space-y-2">
-                              <div className="h-8 bg-white/20 rounded-md w-3/4" />
-                              <div className="h-4 bg-white/10 rounded-md w-1/2" />
-                              <div className="grid grid-cols-2 gap-2 mt-3">
-                                <div className="h-12 bg-white/10 rounded-md" />
-                                <div className="h-12 bg-white/10 rounded-md" />
+                              {/* Mock app content */}
+                              <div className="space-y-2">
+                                <div className="h-8 bg-white/20 rounded-md w-3/4" />
+                                <div className="h-4 bg-white/10 rounded-md w-1/2" />
+                                <div className="grid grid-cols-2 gap-2 mt-3">
+                                  <div className="h-12 bg-white/10 rounded-md" />
+                                  <div className="h-12 bg-white/10 rounded-md" />
+                                </div>
+                              </div>
+
+                              {/* App type icon */}
+                              <div className="absolute bottom-4 right-4 w-12 h-12 bg-black/40 backdrop-blur-sm rounded-xl flex items-center justify-center">
+                                <PreviewIcon className="w-6 h-6 text-white/80" />
                               </div>
                             </div>
-
-                            {/* App type icon */}
-                            <div className="absolute bottom-4 right-4 w-12 h-12 bg-black/40 backdrop-blur-sm rounded-xl flex items-center justify-center">
-                              <PreviewIcon className="w-6 h-6 text-white/80" />
-                            </div>
-                          </div>
+                          )}
 
                           {/* Shimmer effect */}
                           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />

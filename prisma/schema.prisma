@@ -580,6 +580,9 @@ model GenerationJob {
   generationStartedAt   DateTime?
   totalModules          Int                   @default(0)
 
+  // Screenshot/thumbnail for visual preview
+  thumbnailUrl          String?
+
   // NEW: Generation mode (Personal Tool vs SaaS)
   generationMode        GenerationMode        @default(PERSONAL)
   parentJobId           String?               // For SaaS upgrades, points to original personal tool
