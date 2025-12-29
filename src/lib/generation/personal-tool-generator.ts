@@ -14,7 +14,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { prisma } from '../prisma';
 import type { GeneratedFile, GenerationResult, StreamCallbacks } from './bolt-generator';
-import { getAnthropicClient, isSimulationMode } from '../mock-anthropic';
+
 
 // ============================================================================
 // PERSONAL TOOL SYSTEM PROMPT
@@ -344,11 +344,9 @@ export class PersonalToolGenerator {
   private client: Anthropic;
 
   constructor(apiKey?: string) {
-    this.client = getAnthropicClient(apiKey);
-
-    if (isSimulationMode()) {
-      console.log('🎭 [PERSONAL TOOL GENERATOR] Running in simulation mode');
-    }
+    this.client = new Anthropic({
+      apiKey: apiKey || process.env.ANTHROPIC_API_KEY,
+    });
   }
 
   /**

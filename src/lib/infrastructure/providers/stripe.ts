@@ -58,20 +58,11 @@ export interface TransitionToLiveResult {
 
 export class StripeProvisioner {
   private stripe: Stripe | null;
-  private testStripe: Stripe | null;
+  private testStripe: Stripe;
   private platformUrl: string;
-  private simulationMode: boolean;
 
   constructor() {
     this.platformUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://autoforge.app';
-    this.simulationMode = process.env.SIMULATE_INFRASTRUCTURE === 'true';
-
-    if (this.simulationMode) {
-      console.log('🎭 [STRIPE] Running in simulation mode - no real Stripe calls');
-      this.stripe = null;
-      this.testStripe = null;
-      return;
-    }
 
     // Live mode Stripe (for platform operations)
     const liveKey = process.env.STRIPE_SECRET_KEY;
@@ -82,15 +73,14 @@ export class StripeProvisioner {
 
     // Test mode Stripe (for preview environments)
     const testKey = process.env.STRIPE_TEST_SECRET_KEY;
-    this.testStripe = testKey ? new Stripe(testKey, {
+    if (!testKey) {
+      throw new Error('STRIPE_TEST_SECRET_KEY is required for payment provisioning');
+    }
+
+    this.testStripe = new Stripe(testKey, {
       apiVersion: '2025-11-17.clover',
       typescript: true,
-    }) : null;
-
-    if (!this.stripe && !this.testStripe) {
-      console.warn('⚠️ No Stripe keys found - Stripe features will be simulated');
-      this.simulationMode = true;
-    }
+    });
   }
 
   // ==========================================================================
@@ -138,16 +128,6 @@ export class StripeProvisioner {
     // Webhook URL points to AutoForge platform
     // We route based on metadata in the webhook payload
     const webhookUrl = `${this.platformUrl}/api/managed/webhook/${managedProjectId}`;
-
-    // 🎭 SIMULATION MODE
-    if (this.simulationMode || !this.testStripe) {
-      console.log(`🎭 [STRIPE] Simulating test webhook creation for: ${webhookUrl}`);
-      return {
-        webhookId: `whsec_sim_${managedProjectId.slice(0, 16)}`,
-        webhookSecret: `whsec_simulated_${Date.now()}`,
-        webhookUrl,
-      };
-    }
 
     console.log(`📡 Creating test webhook: ${webhookUrl}`);
 

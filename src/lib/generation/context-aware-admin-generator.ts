@@ -16,7 +16,7 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk';
-import { getAnthropicClient, isSimulationMode } from '../mock-anthropic';
+
 import { GeneratedFile } from './bolt-generator';
 import { AdminPanelGenerator } from './admin-panel-generator';
 import { enhancedClassifyPrompt, EnhancedGenerationType } from './enhanced-prompt-classifier';
@@ -66,7 +66,7 @@ export class ContextAwareAdminGenerator {
     if (!apiKey) {
       throw new Error('ANTHROPIC_API_KEY environment variable is required');
     }
-    this.anthropic = getAnthropicClient();
+    this.anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
     this.fallbackGenerator = new AdminPanelGenerator();
   }
 

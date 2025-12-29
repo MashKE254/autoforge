@@ -27,15 +27,8 @@ export class ProvisioningService {
   private clerk: ClerkProvisioner;
   private vercel: VercelProvisioner;
   private stripe: StripeProvisioner;
-  private simulationMode: boolean;
 
   constructor() {
-    this.simulationMode = process.env.SIMULATE_INFRASTRUCTURE === 'true';
-
-    if (this.simulationMode) {
-      console.log('🎭 [PROVISIONING] Running in simulation mode - no real infrastructure');
-    }
-
     this.supabase = new SupabaseProvisioner();
     this.clerk = new ClerkProvisioner();
     this.vercel = new VercelProvisioner();
@@ -62,84 +55,6 @@ export class ProvisioningService {
         expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
       },
     });
-
-    // 🎭 SIMULATION MODE - Mock complete infrastructure provisioning
-    if (this.simulationMode) {
-      console.log('🎭 [PROVISIONING] Simulating infrastructure provisioning...');
-
-      try {
-        // Simulate database provisioning
-        await this.simulateStep(managedProject.id, 'database', callbacks);
-        await prisma.managedProject.update({
-          where: { id: managedProject.id },
-          data: {
-            supabaseProjectId: `sim_${Date.now()}`,
-            supabaseUrl: `https://simulated-${generationJobId.slice(0, 8)}.supabase.co`,
-            supabaseAnonKey: `sim_anon_key_${Date.now()}`,
-            supabaseServiceKey: encrypt(`sim_service_key_${Date.now()}`),
-            status: 'DATABASE_READY',
-          },
-        });
-
-        // Simulate auth provisioning
-        await this.simulateStep(managedProject.id, 'auth', callbacks);
-        await prisma.managedProject.update({
-          where: { id: managedProject.id },
-          data: {
-            clerkInstanceId: `sim_clerk_${Date.now()}`,
-            clerkPublishableKey: `pk_test_simulated_${Date.now()}`,
-            clerkSecretKey: encrypt(`sk_test_simulated_${Date.now()}`),
-            status: 'AUTH_READY',
-          },
-        });
-
-        // Simulate Stripe setup
-        await this.simulateStep(managedProject.id, 'payments', callbacks);
-        await prisma.managedProject.update({
-          where: { id: managedProject.id },
-          data: {
-            stripeTestPublishable: `pk_test_simulated_${Date.now()}`,
-            stripeTestSecret: encrypt(`sk_test_simulated_${Date.now()}`),
-            stripeTestWebhookSecret: encrypt(`whsec_simulated_${Date.now()}`),
-          },
-        });
-
-        // Simulate Vercel deployment
-        await this.simulateStep(managedProject.id, 'deploy', callbacks);
-        const simulatedUrl = `https://simulated-${generationJobId.slice(0, 8)}.vercel.app`;
-        await prisma.managedProject.update({
-          where: { id: managedProject.id },
-          data: {
-            vercelProjectId: `sim_vercel_${Date.now()}`,
-            vercelUrl: simulatedUrl,
-            status: 'PREVIEW_READY',
-            provisioningStep: 'completed',
-          },
-        });
-
-        console.log('🎭 [PROVISIONING] Simulation complete!');
-
-        return {
-          success: true,
-          managedProjectId: managedProject.id,
-          previewUrl: simulatedUrl,
-        };
-      } catch (error) {
-        await prisma.managedProject.update({
-          where: { id: managedProject.id },
-          data: {
-            status: 'ERROR',
-            errorMessage: error instanceof Error ? error.message : 'Simulation failed',
-          },
-        });
-
-        return {
-          success: false,
-          managedProjectId: managedProject.id,
-          error: error instanceof Error ? error.message : 'Simulation failed',
-        };
-      }
-    }
 
     try {
       // Step 1: Provision Supabase Database
@@ -355,50 +270,6 @@ export class ProvisioningService {
       callbacks?.onStepError?.(stepName, errorMessage);
       throw error;
     }
-  }
-
-  /**
-   * Simulate a provisioning step (for testing/demo purposes)
-   */
-  private async simulateStep(
-    managedProjectId: string,
-    stepName: string,
-    callbacks: ProvisioningCallbacks | undefined
-  ): Promise<void> {
-    const startTime = Date.now();
-
-    console.log(`🎭 [PROVISIONING] Simulating step: ${stepName}`);
-    callbacks?.onStepStart?.(stepName);
-
-    await prisma.provisioningLog.create({
-      data: {
-        managedProjectId,
-        step: stepName,
-        status: 'started',
-      },
-    });
-
-    await prisma.managedProject.update({
-      where: { id: managedProjectId },
-      data: { provisioningStep: stepName },
-    });
-
-    // Simulate some work (500ms-1.5s)
-    await new Promise(resolve => setTimeout(resolve, 500 + Math.random() * 1000));
-
-    const duration = Date.now() - startTime;
-
-    await prisma.provisioningLog.create({
-      data: {
-        managedProjectId,
-        step: stepName,
-        status: 'completed',
-        duration,
-      },
-    });
-
-    callbacks?.onStepComplete?.(stepName, duration);
-    console.log(`🎭 [PROVISIONING] Completed simulation: ${stepName} (${duration}ms)`);
   }
 
   /**

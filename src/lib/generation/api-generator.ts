@@ -14,7 +14,7 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk';
-import { getAnthropicClient, isSimulationMode } from '../mock-anthropic';
+
 import { prisma } from '../prisma';
 import { GeneratedFile, GenerationResult, StreamCallbacks } from './bolt-generator';
 
@@ -423,7 +423,7 @@ export class APIGenerator {
   private client: Anthropic;
   
   constructor() {
-    this.client = getAnthropicClient();
+    this.client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
   }
   
   async generate(

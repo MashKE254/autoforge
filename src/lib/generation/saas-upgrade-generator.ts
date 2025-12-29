@@ -12,7 +12,7 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk';
-import { getAnthropicClient, isSimulationMode } from '../mock-anthropic';
+
 import { prisma } from '../prisma';
 import type { GeneratedFile, GenerationResult, StreamCallbacks } from './bolt-generator';
 
@@ -437,7 +437,7 @@ export class SaaSUpgradeGenerator {
   private client: Anthropic;
 
   constructor(apiKey?: string) {
-    this.client = getAnthropicClient();
+    this.client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
   }
 
   /**

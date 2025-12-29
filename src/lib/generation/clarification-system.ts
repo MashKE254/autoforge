@@ -13,7 +13,7 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk';
-import { getAnthropicClient, isSimulationMode } from '../mock-anthropic';
+
 
 // ============================================================================
 // TYPES
@@ -114,7 +114,7 @@ export class ClarificationSystem {
   private client: Anthropic;
   
   constructor() {
-    this.client = getAnthropicClient();
+    this.client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
   }
   
   /**

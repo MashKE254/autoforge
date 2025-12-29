@@ -14,7 +14,6 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
-import { getAnthropicClient, isSimulationMode } from '@/lib/mock-anthropic';
 import { getServerSession } from 'next-auth';
 
 // ============================================================================
@@ -222,9 +221,11 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-    
-    const client = getAnthropicClient();
-    
+
+    const client = new Anthropic({
+      apiKey: process.env.ANTHROPIC_API_KEY,
+    });
+
     // Build prompt with optional preferences
     let userPrompt = `Recommend software solutions for this professional:
 

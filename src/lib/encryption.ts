@@ -78,11 +78,6 @@ export function encrypt(plaintext: string): string {
     return '';
   }
 
-  // 🎭 SIMULATION MODE - Skip encryption for simulated credentials
-  if (process.env.SIMULATE_INFRASTRUCTURE === 'true') {
-    return plaintext; // Just return as-is in simulation mode
-  }
-
   try {
     const key = getEncryptionKey();
 
@@ -117,11 +112,6 @@ export function encrypt(plaintext: string): string {
 export function decrypt(encryptedData: string): string {
   if (!encryptedData) {
     return '';
-  }
-
-  // 🎭 SIMULATION MODE - Skip decryption for simulated credentials
-  if (process.env.SIMULATE_INFRASTRUCTURE === 'true') {
-    return encryptedData; // Just return as-is in simulation mode
   }
 
   try {

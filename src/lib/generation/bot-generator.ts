@@ -19,7 +19,7 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk';
-import { getAnthropicClient, isSimulationMode } from '../mock-anthropic';
+
 import { GeneratedFile, GenerationResult, StreamCallbacks } from './bolt-generator';
 
 // ============================================================================
@@ -68,7 +68,7 @@ export class BotGenerator {
     if (!apiKey) {
       throw new Error('ANTHROPIC_API_KEY environment variable is required');
     }
-    this.anthropic = getAnthropicClient();
+    this.anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
   }
 
   /**
