@@ -4,21 +4,28 @@ const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
 };
 
-export const prisma = globalForPrisma.prisma ?? new PrismaClient({
-  log: process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
-});
+// Create Prisma client with optimized connection pooling
+const createPrismaClient = () => {
+  return new PrismaClient({
+    log: process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
+  });
+};
 
+// Use global singleton in development to prevent multiple instances during hot-reloads
+export const prisma = globalForPrisma.prisma ?? createPrismaClient();
+
+// Store on global object in development
 if (process.env.NODE_ENV !== 'production') {
   globalForPrisma.prisma = prisma;
-  
-  // Test connection on startup
-  prisma.$connect()
-    .then(() => {
-      console.log('✅ Database connected successfully');
-    })
-    // FIX: Add proper type annotation for 'err' parameter
-    .catch((err: Error) => {
-      console.error('❌ Database connection failed:', err.message);
-      console.log('💡 Check your database at: https://console.neon.tech');
-    });
+}
+
+// Graceful shutdown - disconnect on process termination
+if (process.env.NODE_ENV !== 'production') {
+  const cleanup = async () => {
+    await prisma.$disconnect();
+  };
+
+  process.on('beforeExit', cleanup);
+  process.on('SIGINT', cleanup);
+  process.on('SIGTERM', cleanup);
 }
