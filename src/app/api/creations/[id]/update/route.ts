@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../../../auth/[...nextauth]/route';
 import { prisma } from '@/lib/prisma';
-import { getAnthropicClient, isSimulationMode } from '@/lib/mock-anthropic';
+import Anthropic from '@anthropic-ai/sdk';
 
 /**
  * POST /api/creations/[id]/update
@@ -111,8 +111,10 @@ export async function POST(
       );
     }
 
-    // Get Anthropic client (mock or real based on env)
-    const client = getAnthropicClient();
+    // Get Anthropic client
+    const client = new Anthropic({
+      apiKey: process.env.ANTHROPIC_API_KEY,
+    });
 
     // Build context from existing files
     const filesContext = creation.files

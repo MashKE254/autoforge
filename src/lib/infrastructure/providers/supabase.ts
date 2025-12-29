@@ -113,37 +113,19 @@ const MAX_POLL_ATTEMPTS = 60; // 5 minutes max wait
 // ============================================================================
 
 export class SupabaseProvisioner {
-  private accessToken: string | null;
-  private organizationId: string | null;
-  private simulationMode: boolean;
+  private accessToken: string;
+  private organizationId: string;
 
   constructor() {
-    this.simulationMode = process.env.SIMULATE_INFRASTRUCTURE === 'true';
-
-    if (this.simulationMode) {
-      console.log('🎭 [SUPABASE] Running in simulation mode - no real Supabase calls');
-      this.accessToken = null;
-      this.organizationId = null;
-      return;
-    }
-
     const token = process.env.SUPABASE_ACCESS_TOKEN;
     const orgId = process.env.SUPABASE_ORG_ID;
 
     if (!token) {
-      console.warn('⚠️ SUPABASE_ACCESS_TOKEN not set - enabling simulation mode');
-      this.simulationMode = true;
-      this.accessToken = null;
-      this.organizationId = null;
-      return;
+      throw new Error('SUPABASE_ACCESS_TOKEN is required for database provisioning');
     }
 
     if (!orgId) {
-      console.warn('⚠️ SUPABASE_ORG_ID not set - enabling simulation mode');
-      this.simulationMode = true;
-      this.accessToken = null;
-      this.organizationId = null;
-      return;
+      throw new Error('SUPABASE_ORG_ID is required for database provisioning');
     }
 
     this.accessToken = token;

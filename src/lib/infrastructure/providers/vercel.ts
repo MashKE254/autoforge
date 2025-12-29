@@ -14,29 +14,15 @@ interface DeployOptions {
 }
 
 export class VercelProvisioner {
-  private token: string | null;
-  private teamId: string | null;
-  private simulationMode: boolean;
+  private token: string;
+  private teamId: string;
 
   constructor() {
-    this.simulationMode = process.env.SIMULATE_INFRASTRUCTURE === 'true';
-
-    if (this.simulationMode) {
-      console.log('🎭 [VERCEL] Running in simulation mode - no real Vercel calls');
-      this.token = null;
-      this.teamId = null;
-      return;
-    }
-
     const token = process.env.VERCEL_TOKEN;
     const teamId = process.env.VERCEL_TEAM_ID;
 
     if (!token || !teamId) {
-      console.warn('⚠️ VERCEL_TOKEN or VERCEL_TEAM_ID not set - enabling simulation mode');
-      this.simulationMode = true;
-      this.token = null;
-      this.teamId = null;
-      return;
+      throw new Error('VERCEL_TOKEN and VERCEL_TEAM_ID are required for deployment');
     }
 
     this.token = token;
@@ -44,24 +30,6 @@ export class VercelProvisioner {
   }
 
   async deploy(options: DeployOptions): Promise<DeployResult> {
-    // 🎭 SIMULATION MODE
-    if (this.simulationMode || !this.token) {
-      console.log(`🎭 [VERCEL] Simulating deployment for: ${options.name}`);
-      const timestamp = Date.now();
-      const deploymentId = `dpl_sim_${timestamp}`;
-      const projectId = `prj_sim_${timestamp}`;
-      const simulatedUrl = `${options.name}-sim-${timestamp.toString(36)}.vercel.app`;
-
-      // Simulate deployment delay (500ms-1.5s)
-      await new Promise(resolve => setTimeout(resolve, 500 + Math.random() * 1000));
-
-      return {
-        projectId,
-        deploymentId,
-        url: `https://${simulatedUrl}`,
-      };
-    }
-
     // Step 1: Create or get project
     const project = await this.ensureProject(options.name);
 
