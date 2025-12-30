@@ -48,8 +48,8 @@ function FloatingGrid() {
       <div
         className="absolute inset-0"
         style={{
-          backgroundImage: 'radial-gradient(circle, rgba(255, 255, 255, 0.15) 2px, transparent 2px)',
-          backgroundSize: '40px 40px',
+          backgroundImage: 'radial-gradient(circle, rgba(139, 92, 246, 0.4) 1px, transparent 1px)',
+          backgroundSize: '32px 32px',
         }}
       />
     </div>
