@@ -137,10 +137,9 @@ export default client;`;
                 style={{ animationDelay: `${i * 50}ms` }}
               >
                 <span className="text-gray-600 mr-4 select-none">{i + 1}</span>
-                <span className="text-blue-400">
-                  {line.includes('import') && line.split(' ')[0]}
+                <span className={line?.includes('import') ? 'text-blue-400' : 'text-gray-300'}>
+                  {line || ''}
                 </span>
-                <span className="text-gray-300">{line.replace(/^import\s/, '')}</span>
               </div>
             ))}
           </div>
