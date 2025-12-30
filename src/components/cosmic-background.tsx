@@ -13,13 +13,8 @@ import { useState, useEffect } from 'react';
 export function AnimatedBackground() {
   return (
     <div className="fixed inset-0 -z-10 overflow-hidden">
-      {/* Pure black space background */}
+      {/* Pure pitch black space background */}
       <div className="absolute inset-0 bg-black" />
-
-      {/* Animated gradient orbs - extremely subtle for true deep space */}
-      <div className="absolute top-0 left-1/4 w-[800px] h-[800px] bg-purple-500/5 rounded-full blur-[150px] animate-blob" />
-      <div className="absolute top-1/3 right-1/4 w-[600px] h-[600px] bg-blue-500/8 rounded-full blur-[150px] animate-blob animation-delay-2000" />
-      <div className="absolute bottom-0 left-1/2 w-[700px] h-[700px] bg-cyan-500/5 rounded-full blur-[150px] animate-blob animation-delay-4000" />
     </div>
   );
 }
