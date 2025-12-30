@@ -70,6 +70,7 @@ const config: Config = {
         'blob': 'blob 7s infinite',
         'shimmer': 'shimmer 2s infinite',
         'pulse-glow': 'pulseGlow 2s infinite',
+        'pulse-slow': 'pulseSlow 4s ease-in-out infinite',
         'gradient': 'gradient 8s linear infinite',
       },
       animationDelay: {
@@ -102,6 +103,10 @@ const config: Config = {
         pulseGlow: {
           '0%, 100%': { opacity: '0.5' },
           '50%': { opacity: '1' },
+        },
+        pulseSlow: {
+          '0%, 100%': { opacity: '0.3', transform: 'scale(1)' },
+          '50%': { opacity: '0.5', transform: 'scale(1.05)' },
         },
         gradient: {
           '0%, 100%': { backgroundPosition: '0% 50%' },
