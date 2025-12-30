@@ -41,11 +41,17 @@ function AnimatedBackground() {
   );
 }
 
-// Floating grid particles
+// Dot grid pattern background
 function FloatingGrid() {
   return (
     <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
-      <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff03_1px,transparent_1px),linear-gradient(to_bottom,#ffffff03_1px,transparent_1px)] bg-[size:80px_80px] [mask-image:radial-gradient(ellipse_80%_50%_at_50%_50%,#000_60%,transparent_100%)]" />
+      <div
+        className="absolute inset-0 [mask-image:radial-gradient(ellipse_80%_50%_at_50%_50%,#000_60%,transparent_100%)]"
+        style={{
+          backgroundImage: 'radial-gradient(circle, rgba(255, 255, 255, 0.06) 1.5px, transparent 1.5px)',
+          backgroundSize: '48px 48px',
+        }}
+      />
     </div>
   );
 }
