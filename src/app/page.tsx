@@ -46,12 +46,25 @@ function FloatingGrid() {
   return (
     <div className="fixed inset-0 -z-[5] overflow-hidden pointer-events-none">
       <div
-        className="absolute inset-0"
+        className="absolute inset-0 animate-grid-drift"
         style={{
           backgroundImage: 'radial-gradient(circle, rgba(139, 92, 246, 0.4) 1px, transparent 1px)',
           backgroundSize: '32px 32px',
         }}
       />
+      <style jsx>{`
+        @keyframes grid-drift {
+          0% {
+            background-position: 0px 0px;
+          }
+          100% {
+            background-position: 32px 32px;
+          }
+        }
+        .animate-grid-drift {
+          animation: grid-drift 8s linear infinite;
+        }
+      `}</style>
     </div>
   );
 }
