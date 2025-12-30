@@ -72,6 +72,7 @@ const config: Config = {
         'pulse-glow': 'pulseGlow 2s infinite',
         'pulse-slow': 'pulseSlow 4s ease-in-out infinite',
         'gradient': 'gradient 8s linear infinite',
+        'grid-drift': 'gridDrift 8s linear infinite',
       },
       animationDelay: {
         '2000': '2s',
@@ -111,6 +112,10 @@ const config: Config = {
         gradient: {
           '0%, 100%': { backgroundPosition: '0% 50%' },
           '50%': { backgroundPosition: '100% 50%' },
+        },
+        gridDrift: {
+          '0%': { backgroundPosition: '0px 0px' },
+          '100%': { backgroundPosition: '32px 32px' },
         },
       },
       backgroundImage: {
