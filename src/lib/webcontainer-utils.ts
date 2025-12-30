@@ -266,6 +266,28 @@ const WEBCONTAINER_SAFE_PACKAGES = new Set([
   'prettier',
   'eslint-config-next',
   'eslint-config-prettier',
+
+  // Additional common packages (from bolt-generator)
+  'source-map-js',
+  '@clerk/nextjs',
+  '@supabase/ssr',
+  '@supabase/supabase-js',
+  'stripe',
+
+  // React ecosystem
+  'react-is',
+  'prop-types',
+  'scheduler',
+
+  // Build tools
+  'esbuild',
+  'vite',
+  'webpack',
+
+  // Other utilities
+  'ms',
+  'debug',
+  'chalk',
 ]);
 
 /**
