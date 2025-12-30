@@ -50,40 +50,40 @@ export default function Header() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-14">
           {/* Logo */}
-          <div className="flex items-center gap-6">
+          <div className="flex items-center">
             <Link href="/" className="flex items-center gap-2">
-              <Image 
-                src="/BASED IN.png" 
-                alt="AutoForge Logo" 
-                width={50} 
-                height={50} 
-                className="rounded-lg" 
+              <Image
+                src="/BASED IN.png"
+                alt="AutoForge Logo"
+                width={50}
+                height={50}
+                className="rounded-lg"
               />
             </Link>
-
-            {/* Desktop Nav */}
-            <nav className="hidden md:flex items-center gap-1">
-              {navLinks.map((link) => {
-                const isActive = pathname === link.href || pathname.startsWith(link.href + '/');
-                const IconComponent = 'icon' in link ? link.icon : null;
-                
-                return (
-                  <Link
-                    key={link.href}
-                    href={link.href}
-                    className={`px-3 py-1.5 text-sm rounded-md transition-colors flex items-center gap-1.5 ${
-                      isActive
-                        ? 'text-white bg-white/10'
-                        : 'text-gray-400 hover:text-white hover:bg-white/5'
-                    } ${link.href === '/recommend' ? 'text-violet-400 hover:text-violet-300' : ''}`}
-                  >
-                    {IconComponent && <IconComponent className="w-3.5 h-3.5" />}
-                    {link.label}
-                  </Link>
-                );
-              })}
-            </nav>
           </div>
+
+          {/* Centered Desktop Nav */}
+          <nav className="hidden md:flex items-center gap-3 absolute left-1/2 -translate-x-1/2">
+            {navLinks.map((link) => {
+              const isActive = pathname === link.href || pathname.startsWith(link.href + '/');
+              const IconComponent = 'icon' in link ? link.icon : null;
+
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors flex items-center gap-2 ${
+                    isActive
+                      ? 'text-white bg-white/10'
+                      : 'text-gray-400 hover:text-white hover:bg-white/5'
+                  } ${link.href === '/recommend' ? 'text-violet-400 hover:text-violet-300' : ''}`}
+                >
+                  {IconComponent && <IconComponent className="w-4 h-4" />}
+                  {link.label}
+                </Link>
+              );
+            })}
+          </nav>
 
           {/* Right side */}
           <div className="flex items-center gap-3">
