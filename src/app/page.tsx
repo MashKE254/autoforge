@@ -52,19 +52,6 @@ function FloatingGrid() {
           backgroundSize: '32px 32px',
         }}
       />
-      <style jsx>{`
-        @keyframes grid-drift {
-          0% {
-            background-position: 0px 0px;
-          }
-          100% {
-            background-position: 32px 32px;
-          }
-        }
-        .animate-grid-drift {
-          animation: grid-drift 8s linear infinite;
-        }
-      `}</style>
     </div>
   );
 }
