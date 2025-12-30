@@ -30,13 +30,10 @@ function AnimatedBackground() {
       {/* Pure black space background */}
       <div className="absolute inset-0 bg-black" />
 
-      {/* Animated gradient orbs - darker for deeper space */}
-      <div className="absolute top-0 left-1/4 w-[800px] h-[800px] bg-purple-500/10 rounded-full blur-[150px] animate-blob" />
-      <div className="absolute top-1/3 right-1/4 w-[600px] h-[600px] bg-blue-500/18 rounded-full blur-[150px] animate-blob animation-delay-2000" />
-      <div className="absolute bottom-0 left-1/2 w-[700px] h-[700px] bg-cyan-500/10 rounded-full blur-[150px] animate-blob animation-delay-4000" />
-
-      {/* Subtle grain texture */}
-      <div className="absolute inset-0 opacity-[0.015] bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzMDAiIGhlaWdodD0iMzAwIj48ZmlsdGVyIGlkPSJhIiB4PSIwIiB5PSIwIj48ZmVUdXJidWxlbmNlIGJhc2VGcmVxdWVuY3k9Ii43NSIgc3RpdGNoVGlsZXM9InN0aXRjaCIgdHlwZT0iZnJhY3RhbE5vaXNlIi8+PGZlQ29sb3JNYXRyaXggdHlwZT0ic2F0dXJhdGUiIHZhbHVlcz0iMCIvPjwvZmlsdGVyPjxwYXRoIGQ9Ik0wIDBoMzAwdjMwMEgweiIgZmlsdGVyPSJ1cmwoI2EpIiBvcGFjaXR5PSIuMDUiLz48L3N2Zz4=')]" />
+      {/* Animated gradient orbs - extremely subtle for true deep space */}
+      <div className="absolute top-0 left-1/4 w-[800px] h-[800px] bg-purple-500/5 rounded-full blur-[150px] animate-blob" />
+      <div className="absolute top-1/3 right-1/4 w-[600px] h-[600px] bg-blue-500/8 rounded-full blur-[150px] animate-blob animation-delay-2000" />
+      <div className="absolute bottom-0 left-1/2 w-[700px] h-[700px] bg-cyan-500/5 rounded-full blur-[150px] animate-blob animation-delay-4000" />
     </div>
   );
 }
@@ -304,7 +301,7 @@ client.on('ready', () => {
                   className="absolute top-0 left-1/2 -translate-x-1/2 w-[750px] z-30 transition-transform duration-200"
                   style={{ transform: `translateZ(40px) translateX(${parallax.x * 2}px) translateY(${parallax.y * 2}px)` }}
                 >
-                  <div className="bg-black/95 backdrop-blur-2xl border border-white/20 rounded-2xl overflow-hidden shadow-2xl shadow-blue-500/10">
+                  <div className="bg-black/98 backdrop-blur-2xl border border-white/20 rounded-2xl overflow-hidden shadow-2xl shadow-blue-500/10">
                     <div className="flex items-center gap-2 px-4 py-3 border-b border-white/10 bg-gradient-to-r from-white/5 to-white/[0.02]">
                       <div className="flex gap-1.5">
                         <div className="w-3 h-3 rounded-full bg-red-500" />
@@ -349,7 +346,7 @@ client.on('ready', () => {
                   className="absolute top-56 left-0 w-[580px] z-20 transition-transform duration-200"
                   style={{ transform: `translateZ(20px) translateX(${parallax.x}px) translateY(${parallax.y}px)` }}
                 >
-                  <div className="bg-black/95 backdrop-blur-2xl border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
+                  <div className="bg-black/98 backdrop-blur-2xl border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
                     <div className="flex items-center gap-2 px-4 py-3 border-b border-white/10 bg-white/5">
                       <div className="flex gap-1.5">
                         <div className="w-3 h-3 rounded-full bg-red-500/80" />
@@ -390,7 +387,7 @@ client.on('ready', () => {
                   className="absolute top-56 right-0 w-[580px] z-20 transition-transform duration-200"
                   style={{ transform: `translateZ(20px) translateX(${-parallax.x}px) translateY(${parallax.y}px)` }}
                 >
-                  <div className="bg-black/95 backdrop-blur-2xl border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
+                  <div className="bg-black/98 backdrop-blur-2xl border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
                     <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 bg-white/5">
                       <div className="flex items-center gap-2 text-sm text-gray-400">
                         <FileCode className="w-4 h-4" />
@@ -420,7 +417,7 @@ client.on('ready', () => {
                   className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[520px] z-10 transition-transform duration-200"
                   style={{ transform: `translateZ(10px) translateY(${parallax.y * 0.5}px)` }}
                 >
-                  <div className="bg-black/95 backdrop-blur-2xl border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
+                  <div className="bg-black/98 backdrop-blur-2xl border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
                     <div className="px-4 py-3 border-b border-white/10 bg-white/5">
                       <div className="text-sm text-gray-400">Console Output</div>
                     </div>
