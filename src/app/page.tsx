@@ -41,17 +41,52 @@ function AnimatedBackground() {
   );
 }
 
-// Dot grid pattern background
-function FloatingGrid() {
+// Starfield background
+function Starfield() {
+  const [stars, setStars] = useState<Array<{
+    x: number;
+    y: number;
+    size: number;
+    opacity: number;
+    twinkle: boolean;
+    color: string;
+    delay: number;
+  }>>([]);
+
+  useEffect(() => {
+    // Generate random stars
+    const newStars = Array.from({ length: 150 }, () => ({
+      x: Math.random() * 100, // percentage
+      y: Math.random() * 100,
+      size: Math.random() > 0.8 ? 2 : Math.random() > 0.95 ? 3 : 1,
+      opacity: 0.3 + Math.random() * 0.5,
+      twinkle: Math.random() > 0.5,
+      color: Math.random() > 0.7 ? 'rgba(139, 92, 246, 1)' : Math.random() > 0.85 ? 'rgba(96, 165, 250, 1)' : 'rgba(255, 255, 255, 1)',
+      delay: Math.random() * 5,
+    }));
+    setStars(newStars);
+  }, []);
+
   return (
     <div className="fixed inset-0 -z-[5] overflow-hidden pointer-events-none">
-      <div
-        className="absolute inset-0 animate-grid-drift"
-        style={{
-          backgroundImage: 'radial-gradient(circle, rgba(139, 92, 246, 0.4) 1px, transparent 1px)',
-          backgroundSize: '32px 32px',
-        }}
-      />
+      {stars.map((star, i) => (
+        <div
+          key={i}
+          className={star.twinkle ? 'animate-twinkle' : ''}
+          style={{
+            position: 'absolute',
+            left: `${star.x}%`,
+            top: `${star.y}%`,
+            width: `${star.size}px`,
+            height: `${star.size}px`,
+            backgroundColor: star.color,
+            borderRadius: '50%',
+            opacity: star.opacity,
+            animationDelay: `${star.delay}s`,
+            boxShadow: star.size > 1 ? `0 0 ${star.size * 2}px ${star.color}` : 'none',
+          }}
+        />
+      ))}
     </div>
   );
 }
@@ -206,7 +241,7 @@ client.on('ready', () => {
   return (
     <div className="min-h-screen text-white overflow-hidden">
       <AnimatedBackground />
-      <FloatingGrid />
+      <Starfield />
 
       {/* Minimal Nav */}
       <nav className="fixed top-0 left-0 right-0 z-50 backdrop-blur-md bg-black/20 border-b border-white/5">
