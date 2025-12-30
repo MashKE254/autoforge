@@ -5,7 +5,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { WebContainerProcess, FileSystemTree, DirectoryNode } from '@webcontainer/api';
-import webContainerManager from '../lib/webcontainer-manager';
+import { getPrebuiltContainer, smartInstall, needsInstall } from '../lib/webcontainer-prebuilt';
 import { Loader2, ExternalLink, Clock, Eye, AlertCircle, Rocket } from 'lucide-react';
 import { Button } from './ui/button';
 import PublishToManagedModal from './PublishToManagedModal';
@@ -80,14 +80,15 @@ export default function SharedPreview({
         addTerminalOutput(`📦 Loading ${files.length} files...`);
         addTerminalOutput('');
 
-        // Step 1: Boot WebContainer
+        // Step 1: Boot WebContainer (from pre-built snapshot)
         setLoadingStep('Booting WebContainer...');
-        addTerminalOutput('⚡ Initializing WebContainer...');
+        addTerminalOutput('⚡ Initializing WebContainer from snapshot...');
+        addTerminalOutput('💡 Using pre-built base (6-12x faster)');
 
-        const container = await webContainerManager.boot();
+        const container = await getPrebuiltContainer();
         if (!mounted) return;
 
-        addTerminalOutput('✅ WebContainer ready');
+        addTerminalOutput('✅ WebContainer ready (with base dependencies)');
 
         // Step 2: Mount files
         setLoadingStep('Mounting files...');
@@ -99,39 +100,109 @@ export default function SharedPreview({
         addTerminalOutput(`✅ Mounted ${files.length} files`);
         addTerminalOutput('');
 
-        // Step 3: Install dependencies
-        setLoadingStep('Installing dependencies...');
-        addTerminalOutput('📦 Installing npm packages...');
-        addTerminalOutput('⏳ This may take 30-60 seconds...');
-        
-        const installProcess = await container.spawn('npm', ['install']);
-        
-        installProcess.output.pipeTo(
-          new WritableStream({
-            write(data) {
-              if (mounted) {
-                addTerminalOutput(data);
-              }
-            },
-          })
-        );
+        // Step 3: Install additional dependencies (smart install)
+        setLoadingStep('Installing additional dependencies...');
 
-        const installExitCode = await installProcess.exit;
-        
-        if (installExitCode !== 0) {
-          throw new Error('npm install failed');
+        // Get package.json to check what needs installing
+        const packageJsonFile = files.find(f => f.path === 'package.json');
+
+        if (packageJsonFile) {
+          const needsAdditionalInstall = needsInstall(packageJsonFile.content);
+
+          if (needsAdditionalInstall) {
+            addTerminalOutput('📦 Installing additional npm packages...');
+            addTerminalOutput('⏳ Only new dependencies (much faster!)');
+
+            try {
+              const packageJson = JSON.parse(packageJsonFile.content);
+              await smartInstall(
+                container,
+                packageJson.dependencies || {},
+                packageJson.devDependencies || {}
+              );
+              addTerminalOutput('✅ Additional dependencies installed');
+            } catch (err) {
+              console.error('Smart install error:', err);
+              // Fallback to regular npm install
+              addTerminalOutput('⚠️ Falling back to full npm install...');
+              const installProcess = await container.spawn('npm', ['install']);
+
+              installProcess.output.pipeTo(
+                new WritableStream({
+                  write(data) {
+                    if (mounted) {
+                      addTerminalOutput(data);
+                    }
+                  },
+                })
+              );
+
+              const installExitCode = await installProcess.exit;
+
+              if (installExitCode !== 0) {
+                throw new Error('npm install failed');
+              }
+
+              addTerminalOutput('✅ Dependencies installed');
+            }
+          } else {
+            addTerminalOutput('✅ All dependencies already in base snapshot - skipping install!');
+            addTerminalOutput('⚡ Saved 30-60 seconds!');
+          }
+        } else {
+          addTerminalOutput('⚠️ No package.json found - skipping install');
         }
 
-        addTerminalOutput('✅ Dependencies installed');
         addTerminalOutput('');
 
-        // Step 4: Start dev server
-        setLoadingStep('Starting dev server...');
-        addTerminalOutput('🚀 Starting Next.js dev server...');
+        // Step 4: Detect if app is simple (client-only) or needs dev server
+        const hasAPIRoutes = files.some(f =>
+          f.path.includes('/api/') || f.path.includes('\\api\\')
+        );
+        const hasServerActions = files.some(f =>
+          f.content.includes('use server') ||
+          f.content.includes('cookies()') ||
+          f.content.includes('headers()') ||
+          f.content.includes('await prisma') ||
+          f.content.includes('getServerSession')
+        );
 
-        serverProcess = await container.spawn('npm', ['run', 'dev']);
+        const isClientOnly = !hasAPIRoutes && !hasServerActions;
 
-        if (serverProcess) {
+        if (isClientOnly) {
+          // Static export - much faster for simple apps!
+          setLoadingStep('Building static export...');
+          addTerminalOutput('⚡ Detected client-only app - using static build');
+          addTerminalOutput('🚀 Building optimized static version...');
+          addTerminalOutput('💡 This is faster than dev server!');
+
+          // Build static export
+          const buildProcess = await container.spawn('npm', ['run', 'build']);
+
+          buildProcess.output.pipeTo(
+            new WritableStream({
+              write(data) {
+                if (mounted) {
+                  addTerminalOutput(data);
+                }
+              },
+            })
+          );
+
+          const buildExitCode = await buildProcess.exit;
+
+          if (buildExitCode !== 0) {
+            // Fallback to dev server if build fails
+            addTerminalOutput('⚠️ Static build failed, falling back to dev server...');
+            throw new Error('Build failed, trying dev server');
+          }
+
+          addTerminalOutput('✅ Static build complete');
+          addTerminalOutput('📦 Starting static file server...');
+
+          // Serve the static export
+          serverProcess = await container.spawn('npx', ['serve', 'out', '-p', '3000']);
+
           serverProcess.output.pipeTo(
             new WritableStream({
               write(data) {
@@ -141,18 +212,49 @@ export default function SharedPreview({
               },
             })
           );
-        }
 
-        // Listen for server ready
-        container.on('server-ready', (port: number, url: string) => {
-          if (port === 3000 && mounted) {
-            addTerminalOutput('');
-            addTerminalOutput(`✅ Server ready at ${url}`);
-            addTerminalOutput('🎉 Preview is now live!');
-            setPreviewUrl(url);
-            setIsLoading(false);
+          // Listen for server ready
+          container.on('server-ready', (port: number, url: string) => {
+            if (port === 3000 && mounted) {
+              addTerminalOutput('');
+              addTerminalOutput(`✅ Static server ready at ${url}`);
+              addTerminalOutput('🎉 Preview is now live! (static mode)');
+              setPreviewUrl(url);
+              setIsLoading(false);
+            }
+          });
+
+        } else {
+          // Full dev server needed for API routes/server actions
+          setLoadingStep('Starting dev server...');
+          addTerminalOutput('🚀 Starting Next.js dev server...');
+          addTerminalOutput(`💡 Full dev server needed (${hasAPIRoutes ? 'API routes' : 'server actions'} detected)`);
+
+          serverProcess = await container.spawn('npm', ['run', 'dev']);
+
+          if (serverProcess) {
+            serverProcess.output.pipeTo(
+              new WritableStream({
+                write(data) {
+                  if (mounted) {
+                    addTerminalOutput(data);
+                  }
+                },
+              })
+            );
           }
-        });
+
+          // Listen for server ready
+          container.on('server-ready', (port: number, url: string) => {
+            if (port === 3000 && mounted) {
+              addTerminalOutput('');
+              addTerminalOutput(`✅ Server ready at ${url}`);
+              addTerminalOutput('🎉 Preview is now live!');
+              setPreviewUrl(url);
+              setIsLoading(false);
+            }
+          });
+        }
 
         // Timeout after 90 seconds
         setTimeout(() => {

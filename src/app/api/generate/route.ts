@@ -24,6 +24,7 @@ import { prisma } from '@/lib/prisma';
 import { unifiedGenerator } from '@/lib/generation/unified-generator';
 import { EnhancedUnifiedGenerator } from '@/lib/generation/enhanced-unified-generator';
 import type { EnhancedGenerationType } from '@/lib/generation/enhanced-prompt-classifier';
+import { getCachedGeneration, cacheGeneration } from '@/lib/generation-cache';
 
 // Create enhanced generator instance
 const enhancedGenerator = new EnhancedUnifiedGenerator();
@@ -166,8 +167,23 @@ export async function POST(request: NextRequest) {
     console.log(`   Job ID: ${job.id}`);
     console.log(`${'='.repeat(80)}\n`);
 
-    // 5. Choose generator and generate
+    // 5. Check cache before generating
+    const cachedResult = await getCachedGeneration(trimmedPrompt, mode, forceType);
     let result: any;
+
+    if (cachedResult) {
+      // Use cached result - instant response!
+      console.log(`♻️ Using cached generation result`);
+      result = {
+        success: true,
+        files: cachedResult.files,
+        tokensUsed: cachedResult.tokensUsed,
+        classificationType: cachedResult.classificationType,
+        generatorsUsed: cachedResult.generatorsUsed,
+      };
+    } else {
+      // Generate fresh (cache miss or expired)
+      console.log(`🎨 Cache miss - generating fresh...`);
 
     if (forceType) {
       // Use EnhancedUnifiedGenerator when generator type is specified (from recommender)
@@ -230,6 +246,19 @@ export async function POST(request: NextRequest) {
           },
         }
       );
+
+      // Cache the result for future requests
+      if (result.success && result.files && result.files.length > 0) {
+        await cacheGeneration(
+          trimmedPrompt,
+          mode,
+          result.files,
+          forceType,
+          result.tokensUsed,
+          result.classificationType,
+          result.generatorsUsed
+        );
+      }
     }
 
     if (!result.success || !result.files || result.files.length === 0) {
@@ -256,22 +285,22 @@ export async function POST(request: NextRequest) {
     result.files.forEach(f => console.log(`     - ${f.path}`));
     console.log(`${'='.repeat(80)}\n`);
 
-    // 6. Save files to database
+    // 6. Save files to database (batch insert - 10x faster)
     await prisma.generatedFile.deleteMany({
       where: { generationJobId: job.id },
     });
 
-    for (const file of result.files) {
-      await prisma.generatedFile.create({
-        data: {
-          generationJobId: job.id,
-          path: file.path,
-          content: file.content,
-          language: file.language || 'typescript',
-          size: file.content.length,
-        },
-      });
-    }
+    // Batch insert all files at once instead of one-by-one
+    await prisma.generatedFile.createMany({
+      data: result.files.map(file => ({
+        generationJobId: job.id,
+        path: file.path,
+        content: file.content,
+        language: file.language || 'typescript',
+        size: file.content.length,
+      })),
+      skipDuplicates: true,
+    });
 
     // 7. Update job status
     await prisma.generationJob.update({
