@@ -264,12 +264,6 @@ export default function RecommenderPage() {
   if (!results) {
     return (
       <div className="min-h-screen text-white">
-        {/* Background */}
-        <div className="fixed inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-violet-600/20 rounded-full blur-3xl" />
-          <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-cyan-600/20 rounded-full blur-3xl" />
-        </div>
-        
         <div className="relative z-10 max-w-4xl mx-auto px-4 py-16">
           {/* Header */}
           <div className="text-center mb-12">
@@ -364,13 +358,6 @@ export default function RecommenderPage() {
   // ============================================================================
   
   return (
-    <div className="min-h-screen text-white">
-      {/* Background */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-violet-600/10 rounded-full blur-3xl" />
-        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-cyan-600/10 rounded-full blur-3xl" />
-      </div>
-      
       <div className="relative z-10 max-w-7xl mx-auto px-4 py-8">
         {/* Back Button */}
         <button
