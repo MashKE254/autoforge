@@ -5,7 +5,7 @@ import { signIn } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Github, Loader2, AlertCircle, Sparkles, Rocket } from "lucide-react";
+import { Github, Loader2, AlertCircle, Rocket } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 
@@ -52,16 +52,11 @@ export default function LoginPage() {
 
         {/* Logo & Branding */}
         <div className="text-center mb-8">
-          <Link href="/" className="inline-flex items-center gap-3 group mb-6">
-            <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-violet-500 to-cyan-500 flex items-center justify-center group-hover:scale-110 transition-transform">
-              <Image src="/BASED IN.png" alt="AutoForge" width={32} height={32} className="rounded-lg" />
+          <Link href="/" className="inline-block group">
+            <div className="h-16 w-16 mx-auto rounded-2xl bg-gradient-to-br from-violet-500 to-cyan-500 flex items-center justify-center group-hover:scale-110 transition-transform shadow-2xl">
+              <Image src="/BASED IN.png" alt="AutoForge" width={36} height={36} className="rounded-lg" />
             </div>
-            <span className="text-2xl font-bold text-white">AutoForge</span>
           </Link>
-          <div className="inline-flex items-center gap-2 px-4 py-2 bg-violet-500/10 border border-violet-500/20 rounded-full text-violet-400 text-sm">
-            <Sparkles className="w-4 h-4" />
-            <span>Build. Deploy. Earn.</span>
-          </div>
         </div>
 
         {/* Auth Card */}
