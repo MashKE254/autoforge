@@ -30,10 +30,10 @@ function AnimatedBackground() {
       {/* Pure black space background */}
       <div className="absolute inset-0 bg-black" />
 
-      {/* Animated gradient orbs */}
-      <div className="absolute top-0 left-1/4 w-[800px] h-[800px] bg-purple-500/20 rounded-full blur-[150px] animate-blob" />
-      <div className="absolute top-1/3 right-1/4 w-[600px] h-[600px] bg-blue-500/20 rounded-full blur-[150px] animate-blob animation-delay-2000" />
-      <div className="absolute bottom-0 left-1/2 w-[700px] h-[700px] bg-cyan-500/20 rounded-full blur-[150px] animate-blob animation-delay-4000" />
+      {/* Animated gradient orbs - darker for deeper space */}
+      <div className="absolute top-0 left-1/4 w-[800px] h-[800px] bg-purple-500/10 rounded-full blur-[150px] animate-blob" />
+      <div className="absolute top-1/3 right-1/4 w-[600px] h-[600px] bg-blue-500/18 rounded-full blur-[150px] animate-blob animation-delay-2000" />
+      <div className="absolute bottom-0 left-1/2 w-[700px] h-[700px] bg-cyan-500/10 rounded-full blur-[150px] animate-blob animation-delay-4000" />
 
       {/* Subtle grain texture */}
       <div className="absolute inset-0 opacity-[0.015] bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzMDAiIGhlaWdodD0iMzAwIj48ZmlsdGVyIGlkPSJhIiB4PSIwIiB5PSIwIj48ZmVUdXJidWxlbmNlIGJhc2VGcmVxdWVuY3k9Ii43NSIgc3RpdGNoVGlsZXM9InN0aXRjaCIgdHlwZT0iZnJhY3RhbE5vaXNlIi8+PGZlQ29sb3JNYXRyaXggdHlwZT0ic2F0dXJhdGUiIHZhbHVlcz0iMCIvPjwvZmlsdGVyPjxwYXRoIGQ9Ik0wIDBoMzAwdjMwMEgweiIgZmlsdGVyPSJ1cmwoI2EpIiBvcGFjaXR5PSIuMDUiLz48L3N2Zz4=')]" />
@@ -54,14 +54,14 @@ function Starfield() {
   }>>([]);
 
   useEffect(() => {
-    // Generate random stars
-    const newStars = Array.from({ length: 150 }, () => ({
+    // Generate random stars - dense starfield
+    const newStars = Array.from({ length: 400 }, () => ({
       x: Math.random() * 100, // percentage
       y: Math.random() * 100,
       size: Math.random() > 0.8 ? 2 : Math.random() > 0.95 ? 3 : 1,
       opacity: 0.3 + Math.random() * 0.5,
       twinkle: Math.random() > 0.5,
-      color: Math.random() > 0.7 ? 'rgba(139, 92, 246, 1)' : Math.random() > 0.85 ? 'rgba(96, 165, 250, 1)' : 'rgba(255, 255, 255, 1)',
+      color: Math.random() > 0.6 ? 'rgba(96, 165, 250, 1)' : Math.random() > 0.8 ? 'rgba(139, 92, 246, 1)' : 'rgba(255, 255, 255, 1)',
       delay: Math.random() * 5,
     }));
     setStars(newStars);
