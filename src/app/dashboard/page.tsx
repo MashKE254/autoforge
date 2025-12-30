@@ -436,6 +436,24 @@ export default function DashboardRedesign() {
 
   // UI State
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const [currentTipIndex, setCurrentTipIndex] = useState(0);
+
+  // Pro Tips Rotation
+  const proTips = [
+    "Apps with clear use cases sell better",
+    "Price your first app low to get reviews",
+    "Use templates to learn the platform",
+    "Add screenshots to increase conversions",
+    "Respond to user feedback quickly"
+  ];
+
+  // Rotate tips every 10 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentTipIndex((prev) => (prev + 1) % proTips.length);
+    }, 10000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Keyboard shortcut for Command Palette
   useEffect(() => {
@@ -699,12 +717,55 @@ export default function DashboardRedesign() {
                   ))}
                 </div>
               ) : recentGenerations.length === 0 ? (
-                <div className="text-center py-16 bg-gradient-to-br from-white/5 to-white/[0.02] rounded-2xl border border-white/10 border-dashed">
+                <div className="text-center py-12 bg-gradient-to-br from-white/5 to-white/[0.02] rounded-2xl border border-white/10">
                   <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-violet-500/20 to-cyan-500/20 flex items-center justify-center mx-auto mb-4">
                     <Rocket className="w-8 h-8 text-cyan-400" />
                   </div>
-                  <p className="text-gray-300 font-medium mb-2">No apps generated yet</p>
-                  <p className="text-sm text-gray-500 mb-6">Start building by describing your app above</p>
+                  <p className="text-xl font-semibold text-white mb-2">Ready to build your first app?</p>
+                  <p className="text-sm text-gray-400 mb-8">Get started in seconds - choose your path:</p>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-2xl mx-auto px-6">
+                    <button
+                      onClick={() => setCommandPaletteOpen(true)}
+                      className="flex flex-col items-center gap-3 p-6 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-cyan-500/30 rounded-xl transition-all group"
+                    >
+                      <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-violet-500 to-purple-500 flex items-center justify-center">
+                        <Layers className="w-6 h-6 text-white" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-white mb-1 group-hover:text-cyan-300 transition-colors">Try a Template</p>
+                        <p className="text-xs text-gray-400">Start with proven apps</p>
+                      </div>
+                    </button>
+
+                    <button
+                      onClick={() => document.querySelector('textarea')?.focus()}
+                      className="flex flex-col items-center gap-3 p-6 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-cyan-500/30 rounded-xl transition-all group"
+                    >
+                      <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center">
+                        <Sparkles className="w-6 h-6 text-white" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-white mb-1 group-hover:text-cyan-300 transition-colors">Start from Scratch</p>
+                        <p className="text-xs text-gray-400">Describe your idea</p>
+                      </div>
+                    </button>
+
+                    <a
+                      href="https://www.youtube.com/watch?v=demo"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex flex-col items-center gap-3 p-6 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-cyan-500/30 rounded-xl transition-all group"
+                    >
+                      <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-emerald-500 to-green-500 flex items-center justify-center">
+                        <PlayCircle className="w-6 h-6 text-white" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-white mb-1 group-hover:text-cyan-300 transition-colors">Watch 2-min Demo</p>
+                        <p className="text-xs text-gray-400">See how it works</p>
+                      </div>
+                    </a>
+                  </div>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -857,17 +918,77 @@ export default function DashboardRedesign() {
               </div>
             </div>
 
-            {/* Helpful Tips */}
-            <div className="bg-gradient-to-br from-violet-500/10 to-cyan-500/10 border border-violet-500/20 rounded-xl p-6">
-              <div className="flex items-start gap-3 mb-4">
-                <div className="w-8 h-8 rounded-lg bg-violet-500/20 flex items-center justify-center flex-shrink-0">
-                  <Sparkles className="w-4 h-4 text-violet-400" />
+            {/* Social Proof */}
+            <div className="bg-gradient-to-br from-white/5 to-white/[0.02] border border-white/10 rounded-xl p-6">
+              <h3 className="text-sm font-semibold text-gray-300 mb-4">Community Activity</h3>
+              <div className="space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center">
+                    <Rocket className="w-5 h-5 text-white" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-white">1,247 apps generated</p>
+                    <p className="text-xs text-gray-400">by our community</p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-sm font-semibold text-white mb-1">Pro Tip</h3>
-                  <p className="text-xs text-gray-300 leading-relaxed">
-                    Be specific! Instead of "todo app", try "task manager with drag-and-drop Kanban boards, team collaboration, and deadline reminders"
+
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
+                    <Users className="w-5 h-5 text-white" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-white">423 creators building</p>
+                    <p className="text-xs text-gray-400">on AutoForge</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-orange-500 to-red-500 flex items-center justify-center">
+                    <Flame className="w-5 h-5 text-white" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-white">3 apps published</p>
+                    <p className="text-xs text-gray-400">in the last hour</p>
+                  </div>
+                </div>
+
+                <div className="pt-4 border-t border-white/10">
+                  <div className="flex items-start gap-2 mb-2">
+                    <div className="w-6 h-6 rounded-full bg-gradient-to-br from-cyan-400 to-blue-400 flex items-center justify-center flex-shrink-0 text-xs font-bold text-white">
+                      @
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-xs text-gray-300 italic leading-relaxed">
+                        "Generated my first SaaS in 4 minutes"
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">— @buildfast_dev</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Rotating Pro Tips */}
+            <div className="bg-gradient-to-br from-violet-500/10 to-cyan-500/10 border border-violet-500/20 rounded-xl p-6">
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-lg bg-violet-500/20 flex items-center justify-center flex-shrink-0">
+                  <Target className="w-4 h-4 text-violet-400" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-sm font-semibold text-white mb-2">Pro Tip</h3>
+                  <p className="text-xs text-gray-300 leading-relaxed transition-opacity duration-300">
+                    {proTips[currentTipIndex]}
                   </p>
+                  <div className="flex gap-1 mt-3">
+                    {proTips.map((_, i) => (
+                      <div
+                        key={i}
+                        className={`h-1 flex-1 rounded-full transition-all ${
+                          i === currentTipIndex ? 'bg-violet-400' : 'bg-white/10'
+                        }`}
+                      />
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
