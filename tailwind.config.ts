@@ -70,6 +70,11 @@ const config: Config = {
         'blob': 'blob 7s infinite',
         'shimmer': 'shimmer 2s infinite',
         'pulse-glow': 'pulseGlow 2s infinite',
+        'gradient': 'gradient 8s linear infinite',
+      },
+      animationDelay: {
+        '2000': '2s',
+        '4000': '4s',
       },
       keyframes: {
         fadeIn: {
@@ -98,6 +103,10 @@ const config: Config = {
           '0%, 100%': { opacity: '0.5' },
           '50%': { opacity: '1' },
         },
+        gradient: {
+          '0%, 100%': { backgroundPosition: '0% 50%' },
+          '50%': { backgroundPosition: '100% 50%' },
+        },
       },
       backgroundImage: {
         'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
@@ -105,7 +114,32 @@ const config: Config = {
       },
     },
   },
-  plugins: [tailwindcssAnimate],
+  plugins: [
+    tailwindcssAnimate,
+    function ({ addUtilities }: any) {
+      const newUtilities = {
+        '.animation-delay-100': {
+          'animation-delay': '100ms',
+        },
+        '.animation-delay-200': {
+          'animation-delay': '200ms',
+        },
+        '.animation-delay-300': {
+          'animation-delay': '300ms',
+        },
+        '.animation-delay-400': {
+          'animation-delay': '400ms',
+        },
+        '.animation-delay-2000': {
+          'animation-delay': '2s',
+        },
+        '.animation-delay-4000': {
+          'animation-delay': '4s',
+        },
+      };
+      addUtilities(newUtilities);
+    },
+  ],
 };
 
 export default config;
