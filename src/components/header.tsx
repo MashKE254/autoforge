@@ -34,9 +34,6 @@ const navLinks = [
   { href: '/dashboard/creator', label: 'My Apps', icon: LayoutDashboard },
   { href: '/marketplace', label: 'Marketplace', icon: Store },
   { href: '/recommend', label: 'Recommender', icon: Lightbulb },
-  { href: '/projects', label: 'Projects' },
-  { href: '/pricing', label: 'Pricing' },
-  { href: '/docs', label: 'Docs' },
 ];
 
 export default function Header() {
