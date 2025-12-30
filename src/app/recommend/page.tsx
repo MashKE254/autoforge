@@ -744,6 +744,5 @@ export default function RecommenderPage() {
           </div>
         </div>
       </div>
-    </div>
   );
 }
