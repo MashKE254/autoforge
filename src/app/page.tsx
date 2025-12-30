@@ -5,30 +5,159 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
-import { Sparkles, ArrowRight, Zap, Rocket, DollarSign } from 'lucide-react';
+import { Sparkles, ArrowRight, Zap, Rocket, DollarSign, Check, Loader2, FileCode, Terminal as TerminalIcon } from 'lucide-react';
 
-// Animated orb background (like Bolt.new)
-function OrbBackground() {
+// Live generation demo showcase (like Linear's product preview)
+function LiveGenerationShowcase() {
+  const [step, setStep] = useState(0);
+  const [codeLines, setCodeLines] = useState<string[]>([]);
+
+  const steps = [
+    { icon: '⚡', text: 'Analyzing prompt...', status: 'complete' },
+    { icon: '📁', text: 'Creating project structure', status: 'complete' },
+    { icon: '⚙️', text: 'Generating bot.ts', status: 'progress' },
+    { icon: '📦', text: 'Installing dependencies', status: 'pending' },
+    { icon: '🔧', text: 'Configuring database', status: 'pending' },
+    { icon: '✅', text: 'Deploying to Vercel', status: 'pending' },
+  ];
+
+  const code = `import { Client, GatewayIntentBits } from 'discord.js';
+import { Database } from './database';
+import { CommandHandler } from './commands';
+
+const client = new Client({
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,
+  ],
+});
+
+client.on('ready', () => {
+  console.log(\`✓ Bot online as \${client.user.tag}\`);
+});
+
+export default client;`;
+
+  useEffect(() => {
+    // Cycle through steps
+    const stepInterval = setInterval(() => {
+      setStep((prev) => (prev + 1) % steps.length);
+    }, 2000);
+
+    return () => clearInterval(stepInterval);
+  }, []);
+
+  useEffect(() => {
+    // Typing effect for code
+    let currentLine = 0;
+    const lines = code.split('\n');
+
+    const codeInterval = setInterval(() => {
+      if (currentLine < lines.length) {
+        setCodeLines((prev) => [...prev, lines[currentLine]]);
+        currentLine++;
+      } else {
+        setCodeLines([]);
+        currentLine = 0;
+      }
+    }, 200);
+
+    return () => clearInterval(codeInterval);
+  }, []);
+
   return (
-    <div className="fixed inset-0 -z-10 overflow-hidden">
-      <div className="absolute inset-0 bg-black" />
-
-      {/* Main glowing orb - like bolt.new */}
-      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px]">
-        <div className="absolute inset-0 bg-gradient-to-r from-purple-600/30 via-blue-600/30 to-cyan-600/30 rounded-full blur-[120px] animate-pulse-slow" />
-      </div>
-
-      {/* Secondary orbs */}
-      <div className="absolute top-0 left-0 w-[600px] h-[600px] bg-purple-600/20 rounded-full blur-[100px] animate-blob" />
-      <div className="absolute bottom-0 right-0 w-[600px] h-[600px] bg-blue-600/20 rounded-full blur-[100px] animate-blob animation-delay-2000" />
-
-      {/* Subtle grid */}
+    <div className="absolute inset-0 flex items-center justify-center pointer-events-none overflow-hidden">
+      {/* 3D tilted container - like Linear */}
       <div
-        className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff08_1px,transparent_1px),linear-gradient(to_bottom,#ffffff08_1px,transparent_1px)] bg-[size:64px_64px]"
+        className="relative w-[1000px] h-[700px] opacity-20"
         style={{
-          maskImage: 'radial-gradient(ellipse 60% 50% at 50% 0%, #000 60%, transparent 100%)',
+          transform: 'perspective(1000px) rotateX(8deg) rotateY(-12deg) rotateZ(2deg)',
         }}
-      />
+      >
+        {/* Terminal window */}
+        <div className="absolute top-0 left-0 w-[600px] bg-black/90 backdrop-blur-xl border border-white/20 rounded-2xl overflow-hidden shadow-2xl">
+          {/* Terminal header */}
+          <div className="flex items-center gap-2 px-4 py-3 border-b border-white/10 bg-white/5">
+            <div className="flex gap-1.5">
+              <div className="w-3 h-3 rounded-full bg-red-500/80" />
+              <div className="w-3 h-3 rounded-full bg-yellow-500/80" />
+              <div className="w-3 h-3 rounded-full bg-green-500/80" />
+            </div>
+            <div className="flex items-center gap-2 text-sm text-gray-400 ml-2">
+              <TerminalIcon className="w-4 h-4" />
+              <span>Generating Discord Bot...</span>
+            </div>
+          </div>
+
+          {/* Terminal content */}
+          <div className="p-6 font-mono text-sm space-y-3">
+            {steps.map((s, i) => (
+              <div
+                key={i}
+                className={`flex items-center gap-3 transition-all duration-500 ${
+                  i <= step ? 'opacity-100' : 'opacity-30'
+                }`}
+              >
+                {i < step ? (
+                  <Check className="w-4 h-4 text-green-400 flex-shrink-0" />
+                ) : i === step ? (
+                  <Loader2 className="w-4 h-4 text-blue-400 animate-spin flex-shrink-0" />
+                ) : (
+                  <div className="w-4 h-4 rounded-full border border-gray-600 flex-shrink-0" />
+                )}
+                <span className={i <= step ? 'text-gray-300' : 'text-gray-600'}>
+                  {s.text}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Code editor window */}
+        <div className="absolute top-10 right-0 w-[550px] bg-black/90 backdrop-blur-xl border border-white/20 rounded-2xl overflow-hidden shadow-2xl">
+          {/* Editor header */}
+          <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 bg-white/5">
+            <div className="flex items-center gap-2 text-sm text-gray-400">
+              <FileCode className="w-4 h-4" />
+              <span>bot.ts</span>
+            </div>
+            <div className="flex gap-1.5">
+              <div className="w-3 h-3 rounded-full bg-red-500/80" />
+              <div className="w-3 h-3 rounded-full bg-yellow-500/80" />
+              <div className="w-3 h-3 rounded-full bg-green-500/80" />
+            </div>
+          </div>
+
+          {/* Code content */}
+          <div className="p-6 font-mono text-xs leading-relaxed">
+            {codeLines.map((line, i) => (
+              <div
+                key={i}
+                className="text-gray-300 animate-fade-in"
+                style={{ animationDelay: `${i * 50}ms` }}
+              >
+                <span className="text-gray-600 mr-4 select-none">{i + 1}</span>
+                <span className="text-blue-400">
+                  {line.includes('import') && line.split(' ')[0]}
+                </span>
+                <span className="text-gray-300">{line.replace(/^import\s/, '')}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Preview window */}
+        <div className="absolute bottom-0 left-20 w-[400px] bg-black/90 backdrop-blur-xl border border-white/20 rounded-2xl overflow-hidden shadow-2xl">
+          <div className="px-4 py-3 border-b border-white/10 bg-white/5">
+            <div className="text-sm text-gray-400">Console Output</div>
+          </div>
+          <div className="p-6 font-mono text-xs space-y-2">
+            <div className="text-green-400">✓ Bot is online as AutoBot#1234</div>
+            <div className="text-blue-400">→ Connected to 5 servers</div>
+            <div className="text-gray-500">Listening for commands...</div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -92,8 +221,21 @@ export default function LandingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-black text-white">
-      <OrbBackground />
+    <div className="min-h-screen bg-black text-white overflow-hidden">
+      {/* Dark gradient background */}
+      <div className="fixed inset-0 -z-10 bg-gradient-to-br from-black via-gray-900 to-black" />
+
+      {/* Grid overlay */}
+      <div
+        className="fixed inset-0 -z-10 opacity-20"
+        style={{
+          backgroundImage: 'linear-gradient(to right, #ffffff08 1px, transparent 1px), linear-gradient(to bottom, #ffffff08 1px, transparent 1px)',
+          backgroundSize: '64px 64px',
+        }}
+      />
+
+      {/* Live generation showcase in background */}
+      <LiveGenerationShowcase />
 
       {/* Minimal Nav */}
       <nav className="fixed top-0 left-0 right-0 z-50 backdrop-blur-sm">
@@ -122,11 +264,11 @@ export default function LandingPage() {
         </div>
       </nav>
 
-      {/* Hero - Massive & Bold like Linear */}
+      {/* Hero - Foreground content */}
       <section className="relative min-h-screen flex items-center justify-center px-6">
-        <div className="max-w-5xl mx-auto text-center pt-16">
+        <div className="max-w-5xl mx-auto text-center pt-16 relative z-10">
 
-          {/* Headline - Huge & Bold */}
+          {/* Headline */}
           <h1 className="text-7xl md:text-8xl lg:text-9xl font-bold tracking-tight mb-8 leading-[0.95]">
             <span className="block mb-4">Build. Sell.</span>
             <span className="block bg-gradient-to-r from-blue-400 via-cyan-400 to-blue-500 bg-clip-text text-transparent">
@@ -136,19 +278,19 @@ export default function LandingPage() {
 
           {/* Subtitle */}
           <p className="text-xl md:text-2xl text-gray-400 mb-16 max-w-3xl mx-auto font-light">
-            Generate production-ready apps from a single prompt.
+            Watch your app come to life in <span className="text-white font-medium">60 seconds</span>.
             <br />
-            Deploy instantly. Monetize immediately.
+            From prompt to production. Instantly.
           </p>
 
-          {/* Main Input - Like Bolt.new */}
+          {/* Main Input */}
           <div className="max-w-3xl mx-auto mb-16">
             <div className="relative group">
-              {/* Glow effect on focus */}
-              <div className="absolute -inset-1 bg-gradient-to-r from-blue-600 to-cyan-600 rounded-2xl opacity-0 group-hover:opacity-20 blur-xl transition-opacity duration-500" />
+              {/* Glow effect */}
+              <div className="absolute -inset-1 bg-gradient-to-r from-blue-600 to-cyan-600 rounded-2xl opacity-0 group-hover:opacity-30 blur-xl transition-opacity duration-500" />
 
               {/* Input */}
-              <div className="relative flex items-center gap-3 bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-3 transition-all group-hover:border-white/20">
+              <div className="relative flex items-center gap-3 bg-black/60 backdrop-blur-xl border border-white/20 rounded-2xl p-3 transition-all group-hover:border-white/40">
                 <div className="flex-1 relative">
                   <input
                     type="text"
@@ -176,7 +318,7 @@ export default function LandingPage() {
               </div>
             </div>
 
-            {/* Small trust line */}
+            {/* Trust line */}
             <p className="text-sm text-gray-500 mt-6">
               Production-ready · Deploy in 60s · No credit card required
             </p>
@@ -185,11 +327,10 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Feature Section - Minimal Cards */}
+      {/* Feature Section */}
       <section className="relative py-32 px-6">
-        <div className="max-w-6xl mx-auto">
+        <div className="max-w-6xl mx-auto relative z-10">
 
-          {/* Section Header */}
           <div className="text-center mb-20">
             <h2 className="text-5xl md:text-6xl font-bold mb-6">
               Everything you need
@@ -199,9 +340,8 @@ export default function LandingPage() {
             </p>
           </div>
 
-          {/* 3 Feature Cards */}
           <div className="grid md:grid-cols-3 gap-8">
-            <div className="group relative bg-white/5 backdrop-blur-sm border border-white/10 rounded-3xl p-10 hover:border-white/20 transition-all">
+            <div className="group relative bg-black/60 backdrop-blur-sm border border-white/20 rounded-3xl p-10 hover:border-white/40 transition-all">
               <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-600 to-blue-600 rounded-3xl opacity-0 group-hover:opacity-100 blur transition-opacity" />
               <div className="relative">
                 <div className="w-14 h-14 bg-gradient-to-br from-purple-500/20 to-blue-500/20 rounded-2xl flex items-center justify-center mb-6">
@@ -214,7 +354,7 @@ export default function LandingPage() {
               </div>
             </div>
 
-            <div className="group relative bg-white/5 backdrop-blur-sm border border-white/10 rounded-3xl p-10 hover:border-white/20 transition-all">
+            <div className="group relative bg-black/60 backdrop-blur-sm border border-white/20 rounded-3xl p-10 hover:border-white/40 transition-all">
               <div className="absolute -inset-0.5 bg-gradient-to-r from-blue-600 to-cyan-600 rounded-3xl opacity-0 group-hover:opacity-100 blur transition-opacity" />
               <div className="relative">
                 <div className="w-14 h-14 bg-gradient-to-br from-blue-500/20 to-cyan-500/20 rounded-2xl flex items-center justify-center mb-6">
@@ -227,7 +367,7 @@ export default function LandingPage() {
               </div>
             </div>
 
-            <div className="group relative bg-white/5 backdrop-blur-sm border border-white/10 rounded-3xl p-10 hover:border-white/20 transition-all">
+            <div className="group relative bg-black/60 backdrop-blur-sm border border-white/20 rounded-3xl p-10 hover:border-white/40 transition-all">
               <div className="absolute -inset-0.5 bg-gradient-to-r from-cyan-600 to-green-600 rounded-3xl opacity-0 group-hover:opacity-100 blur transition-opacity" />
               <div className="relative">
                 <div className="w-14 h-14 bg-gradient-to-br from-cyan-500/20 to-green-500/20 rounded-2xl flex items-center justify-center mb-6">
@@ -243,11 +383,10 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Pricing - Single Premium Card */}
+      {/* Pricing */}
       <section className="relative py-32 px-6">
-        <div className="max-w-2xl mx-auto">
+        <div className="max-w-2xl mx-auto relative z-10">
 
-          {/* Header */}
           <div className="text-center mb-16">
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-blue-500/10 border border-blue-500/20 text-sm text-blue-300 mb-6">
               <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse" />
@@ -261,13 +400,11 @@ export default function LandingPage() {
             </p>
           </div>
 
-          {/* Pricing Card */}
           <div className="relative group">
             <div className="absolute -inset-1 bg-gradient-to-r from-blue-600 to-cyan-600 rounded-3xl blur-xl opacity-20 group-hover:opacity-40 transition-opacity" />
 
-            <div className="relative bg-black/80 backdrop-blur-xl border border-white/10 rounded-3xl p-12">
+            <div className="relative bg-black/80 backdrop-blur-xl border border-white/20 rounded-3xl p-12">
 
-              {/* Price */}
               <div className="text-center mb-10">
                 <div className="flex items-baseline justify-center gap-2 mb-2">
                   <span className="text-7xl font-bold bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">
@@ -280,7 +417,6 @@ export default function LandingPage() {
                 </p>
               </div>
 
-              {/* Features */}
               <div className="space-y-4 mb-10">
                 {[
                   'Unlimited app generation',
@@ -298,7 +434,6 @@ export default function LandingPage() {
                 ))}
               </div>
 
-              {/* CTA */}
               <Link
                 href={session ? '/dashboard' : '/login'}
                 className="w-full flex items-center justify-center gap-3 px-8 py-5 bg-gradient-to-r from-blue-600 to-cyan-600 text-white font-semibold rounded-xl hover:from-blue-500 hover:to-cyan-500 transition-all hover:scale-105 group"
