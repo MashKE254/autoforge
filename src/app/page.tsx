@@ -235,9 +235,9 @@ client.on('ready', () => {
           {/* Headline */}
           <div className="text-center mb-16 animate-fade-in-up">
             <h1 className="text-7xl md:text-8xl lg:text-9xl font-bold mb-6 leading-[0.9] tracking-tight">
-              <span className="block mb-2">Build. Sell.</span>
+              <span className="block mb-2">Forge Apps.</span>
               <span className="block bg-gradient-to-r from-blue-400 via-cyan-400 to-blue-400 bg-clip-text text-transparent bg-[length:200%_auto] animate-gradient">
-                Earn Revenue.
+                Build Empires.
               </span>
             </h1>
             <p className="text-xl md:text-2xl text-gray-400 max-w-3xl mx-auto leading-relaxed">
@@ -296,7 +296,7 @@ client.on('ready', () => {
                           className="flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-blue-600 to-cyan-600 text-white font-semibold rounded-lg hover:from-blue-500 hover:to-cyan-500 disabled:opacity-50 transition-all hover:scale-105 hover:shadow-lg hover:shadow-blue-500/50"
                         >
                           <Sparkles className="w-5 h-5" />
-                          Generate
+                          Forge
                         </button>
                       </div>
                     </div>
