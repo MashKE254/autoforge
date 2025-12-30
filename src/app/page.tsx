@@ -346,7 +346,7 @@ client.on('ready', () => {
 
                 {/* Terminal - LEFT */}
                 <div
-                  className="absolute top-40 left-0 w-[580px] z-20 transition-transform duration-200"
+                  className="absolute top-56 left-0 w-[580px] z-20 transition-transform duration-200"
                   style={{ transform: `translateZ(20px) translateX(${parallax.x}px) translateY(${parallax.y}px)` }}
                 >
                   <div className="bg-black/95 backdrop-blur-2xl border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
@@ -387,7 +387,7 @@ client.on('ready', () => {
 
                 {/* Code Editor - RIGHT */}
                 <div
-                  className="absolute top-40 right-0 w-[580px] z-20 transition-transform duration-200"
+                  className="absolute top-56 right-0 w-[580px] z-20 transition-transform duration-200"
                   style={{ transform: `translateZ(20px) translateX(${-parallax.x}px) translateY(${parallax.y}px)` }}
                 >
                   <div className="bg-black/95 backdrop-blur-2xl border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
