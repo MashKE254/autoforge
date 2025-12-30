@@ -166,7 +166,7 @@ export default function LandingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0A0A0B] text-white overflow-hidden">
+    <div className="min-h-screen text-white overflow-hidden">
       {/* Background Effects */}
       <GradientOrbs />
       <GridPattern />
@@ -465,7 +465,7 @@ export default function LandingPage() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="relative rounded-2xl overflow-hidden border border-white/10 bg-[#1A1A1C] shadow-2xl">
             {/* Browser Chrome */}
-            <div className="flex items-center gap-2 px-4 py-3 border-b border-white/10 bg-[#0A0A0B]">
+            <div className="flex items-center gap-2 px-4 py-3 border-b border-white/10">
               <div className="flex gap-1.5">
                 <div className="w-3 h-3 rounded-full bg-red-500/80" />
                 <div className="w-3 h-3 rounded-full bg-yellow-500/80" />

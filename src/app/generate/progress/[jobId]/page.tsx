@@ -117,7 +117,7 @@ export default function ProgressPage({
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#0A0A0B]">
+      <div className="min-h-screen">
         <div className="container mx-auto p-8">
           <div className="flex flex-col items-center justify-center h-[60vh]">
             <Loader2 className="w-16 h-16 animate-spin text-violet-400 mb-4" />
@@ -130,7 +130,7 @@ export default function ProgressPage({
 
   if (!data) {
     return (
-      <div className="min-h-screen bg-[#0A0A0B]">
+      <div className="min-h-screen">
         <div className="container mx-auto p-8">
           <Alert variant="destructive" className="border-red-500/50 bg-red-500/10">
             <AlertCircle className="h-4 w-4" />
@@ -146,7 +146,7 @@ export default function ProgressPage({
   const isFailed = data.status === 'FAILED';
 
   return (
-    <div className="min-h-screen bg-[#0A0A0B] text-white">
+    <div className="min-h-screen text-white">
       {/* Background Effects */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-1/4 right-1/4 w-96 h-96 bg-violet-600/10 rounded-full blur-3xl" />
