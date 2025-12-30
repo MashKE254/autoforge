@@ -608,6 +608,10 @@ model GenerationJob {
   parentJob             GenerationJob?        @relation("SaaSUpgrade", fields: [parentJobId], references: [id])
   upgradedJobs          GenerationJob[]       @relation("SaaSUpgrade")
 
+  // Viral sharing
+  shareLink             ShareLink?
+  remixedFrom           ShareRemix?
+
   @@index([userId])
   @@index([status])
   @@index([createdAt])
@@ -1279,4 +1283,101 @@ model IntegrationUsage {
   @@index([integrationId])
   @@index([createdAt])
   @@index([isDemoMode])
+}
+
+// =============================================================================
+// VIRAL SHARING SYSTEM
+// =============================================================================
+
+model ShareLink {
+  id                String        @id @default(cuid())
+  generationJobId   String        @unique
+
+  // Short share ID for clean URLs (e.g., autoforge.ai/share/abc123)
+  shareId           String        @unique @default(cuid())
+
+  // Share settings
+  isPublic          Boolean       @default(true)
+  allowRemix        Boolean       @default(true)
+  showCode          Boolean       @default(false)  // Whether to show source code
+
+  // Creator info (for attribution)
+  creatorId         String
+  creatorName       String?
+
+  // Analytics
+  viewCount         Int           @default(0)
+  remixCount        Int           @default(0)
+  lastViewedAt      DateTime?
+
+  // Social metadata
+  title             String?       // Custom title for sharing
+  description       String?       // Custom description
+  thumbnailUrl      String?       // Screenshot/preview image
+
+  // Timestamps
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  expiresAt         DateTime?     // Optional expiration
+
+  // Relations
+  generationJob     GenerationJob @relation(fields: [generationJobId], references: [id], onDelete: Cascade)
+  views             ShareView[]
+  remixes           ShareRemix[]
+
+  @@index([shareId])
+  @@index([creatorId])
+  @@index([viewCount])
+  @@index([createdAt])
+  @@index([isPublic])
+}
+
+model ShareView {
+  id            String    @id @default(cuid())
+  shareLinkId   String
+
+  // Visitor info (anonymous tracking)
+  ipAddress     String?
+  userAgent     String?
+  referrer      String?   // Where they came from (Twitter, LinkedIn, etc.)
+  country       String?
+
+  // Session tracking
+  sessionId     String?   // Track unique visitors
+
+  // Timestamps
+  viewedAt      DateTime  @default(now())
+
+  // Relations
+  shareLink     ShareLink @relation(fields: [shareLinkId], references: [id], onDelete: Cascade)
+
+  @@index([shareLinkId])
+  @@index([viewedAt])
+  @@index([sessionId])
+  @@index([referrer])
+}
+
+model ShareRemix {
+  id                  String        @id @default(cuid())
+  originalShareId     String
+
+  // New generation created from remix
+  newGenerationJobId  String        @unique
+
+  // Remix creator
+  remixedByUserId     String?       // Null if anonymous
+
+  // Remix details
+  modifiedPrompt      String?       // If they changed the prompt
+
+  // Timestamps
+  createdAt           DateTime      @default(now())
+
+  // Relations
+  originalShare       ShareLink     @relation(fields: [originalShareId], references: [id], onDelete: Cascade)
+  newGenerationJob    GenerationJob @relation(fields: [newGenerationJobId], references: [id], onDelete: Cascade)
+
+  @@index([originalShareId])
+  @@index([remixedByUserId])
+  @@index([createdAt])
 }
