@@ -27,8 +27,8 @@ function useMousePosition() {
 function AnimatedBackground() {
   return (
     <div className="fixed inset-0 -z-10 overflow-hidden">
-      {/* Base gradient */}
-      <div className="absolute inset-0 bg-gradient-to-br from-black via-gray-950 to-black" />
+      {/* Pure black space background */}
+      <div className="absolute inset-0 bg-black" />
 
       {/* Animated gradient orbs */}
       <div className="absolute top-0 left-1/4 w-[800px] h-[800px] bg-purple-500/20 rounded-full blur-[150px] animate-blob" />
