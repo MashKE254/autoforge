@@ -44,7 +44,7 @@ function AnimatedBackground() {
 // Dot grid pattern background
 function FloatingGrid() {
   return (
-    <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
+    <div className="fixed inset-0 -z-[5] overflow-hidden pointer-events-none">
       <div
         className="absolute inset-0"
         style={{
