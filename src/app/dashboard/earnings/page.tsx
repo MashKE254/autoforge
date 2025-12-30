@@ -127,14 +127,14 @@ export default function EarningsPage() {
 
   if (loading || authStatus === 'loading') {
     return (
-      <div className="min-h-screen bg-[#0A0A0B] flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="w-8 h-8 text-violet-500 animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#0A0A0B] text-white">
+    <div className="min-h-screen text-white">
       <div className="max-w-6xl mx-auto px-4 py-12">
         <div className="flex items-center justify-between mb-8">
           <div>

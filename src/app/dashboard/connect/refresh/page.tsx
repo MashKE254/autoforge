@@ -13,7 +13,7 @@ export default function ConnectRefreshPage() {
   }, [router]);
 
   return (
-    <div className="min-h-screen bg-[#0A0A0B] flex items-center justify-center">
+    <div className="min-h-screen flex items-center justify-center">
       <div className="text-center">
         <Loader2 className="w-8 h-8 text-violet-500 animate-spin mx-auto mb-4" />
         <p className="text-gray-400">Redirecting...</p>

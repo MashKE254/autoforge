@@ -117,7 +117,7 @@ export default function PricingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0A0A0B] text-white">
+    <div className="min-h-screen text-white">
       {/* Header */}
       <div className="pt-24 pb-16 px-4">
         <div className="max-w-4xl mx-auto text-center">

@@ -68,7 +68,7 @@ export default function GeneratePage() {
   }, [prompt, router]);
 
   return (
-    <div className="min-h-screen bg-[#0A0A0B] text-white flex items-center justify-center">
+    <div className="min-h-screen text-white flex items-center justify-center">
       <div className="text-center max-w-md px-6">
         {status === 'initiating' && (
           <>

@@ -18,7 +18,7 @@ export default function ConnectCompletePage() {
   }, [router]);
 
   return (
-    <div className="min-h-screen bg-[#0A0A0B] flex items-center justify-center">
+    <div className="min-h-screen flex items-center justify-center">
       <div className="text-center">
         <div className="w-16 h-16 rounded-full bg-green-500/20 flex items-center justify-center mx-auto mb-4">
           <CheckCircle className="w-8 h-8 text-green-400" />

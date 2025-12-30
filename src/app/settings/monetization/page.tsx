@@ -14,7 +14,7 @@ export default function MonetizationPage() {
       </div>
 
       {/* Stripe Connect Card */}
-      <div className="p-6 bg-[#0A0A0B] border border-white/10 rounded-xl">
+      <div className="p-6 border border-white/10 rounded-xl">
         <div className="flex items-start justify-between mb-6">
           <div className="flex gap-4">
             <div className="w-12 h-12 bg-[#635BFF] rounded-lg flex items-center justify-center">
@@ -64,7 +64,7 @@ export default function MonetizationPage() {
         <p className="text-sm text-gray-400">Set the default pricing model for new generated apps (can be overridden per project)</p>
         
         <div className="grid md:grid-cols-2 gap-4">
-          <div className="p-4 bg-[#0A0A0B] border border-violet-500/50 rounded-lg relative">
+          <div className="p-4 border border-violet-500/50 rounded-lg relative">
             <div className="absolute top-4 right-4 text-violet-500">
               <CheckCircle2Icon className="w-5 h-5" />
             </div>
@@ -73,7 +73,7 @@ export default function MonetizationPage() {
             <p className="text-xs text-gray-500">Monthly recurring revenue with tiered plans.</p>
           </div>
 
-          <div className="p-4 bg-[#0A0A0B] border border-white/10 rounded-lg opacity-50 cursor-not-allowed">
+          <div className="p-4 border border-white/10 rounded-lg opacity-50 cursor-not-allowed">
             <DollarSign className="w-6 h-6 text-gray-400 mb-3" />
             <h4 className="font-bold mb-1">One-time Payment</h4>
             <p className="text-xs text-gray-500">Coming soon.</p>

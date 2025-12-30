@@ -14,7 +14,7 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
   const pathname = usePathname();
 
   return (
-    <div className="min-h-screen bg-[#0A0A0B] text-white">
+    <div className="min-h-screen text-white">
       <div className="max-w-6xl mx-auto px-4 py-8 md:py-12">
         <h1 className="text-3xl font-bold mb-8">Settings</h1>
         

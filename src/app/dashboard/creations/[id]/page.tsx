@@ -179,7 +179,7 @@ export default function CreationDetailPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#0A0A0B] flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="w-12 h-12 text-cyan-400 animate-spin mx-auto mb-4" />
           <p className="text-gray-300">Loading creation details...</p>
@@ -190,7 +190,7 @@ export default function CreationDetailPage() {
 
   if (error || !creation) {
     return (
-      <div className="min-h-screen bg-[#0A0A0B] flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
           <p className="text-gray-300 mb-4">{error || 'Creation not found'}</p>
@@ -206,7 +206,7 @@ export default function CreationDetailPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0A0A0B] text-white">
+    <div className="min-h-screen text-white">
       {/* Gradient Background */}
       <div className="fixed inset-0 pointer-events-none">
         <div className="absolute top-0 left-1/4 w-96 h-96 bg-violet-500/10 rounded-full blur-3xl" />
