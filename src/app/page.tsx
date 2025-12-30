@@ -297,7 +297,7 @@ client.on('ready', () => {
                 transformStyle: 'preserve-3d',
               }}
             >
-              <div className="relative h-[650px]">
+              <div className="relative h-[800px]">
 
                 {/* Input Window - CENTER */}
                 <div
