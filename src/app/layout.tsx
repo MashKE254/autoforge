@@ -10,6 +10,7 @@ import type { Metadata, Viewport } from 'next';
 import { Inter } from 'next/font/google';
 import { Providers } from '@/components/providers';
 import Header from '@/components/header';
+import { AnimatedBackground, Starfield } from '@/components/cosmic-background';
 import './globals.css';
 
 const inter = Inter({ 
@@ -52,7 +53,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={inter.variable} suppressHydrationWarning>
-      <body className={`${inter.className} antialiased`}>
+      <body className={`${inter.className} antialiased bg-black text-white min-h-screen`}>
+        <AnimatedBackground />
+        <Starfield />
         <Providers>
           <Header />
           {children}
