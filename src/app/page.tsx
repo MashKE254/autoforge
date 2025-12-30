@@ -46,10 +46,10 @@ function FloatingGrid() {
   return (
     <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
       <div
-        className="absolute inset-0 [mask-image:radial-gradient(ellipse_80%_50%_at_50%_50%,#000_60%,transparent_100%)]"
+        className="absolute inset-0"
         style={{
-          backgroundImage: 'radial-gradient(circle, rgba(255, 255, 255, 0.06) 1.5px, transparent 1.5px)',
-          backgroundSize: '48px 48px',
+          backgroundImage: 'radial-gradient(circle, rgba(255, 255, 255, 0.15) 2px, transparent 2px)',
+          backgroundSize: '40px 40px',
         }}
       />
     </div>
