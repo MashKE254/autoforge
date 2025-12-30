@@ -53,9 +53,7 @@ export default function LoginPage() {
         {/* Logo & Branding */}
         <div className="text-center mb-8">
           <Link href="/" className="inline-block group">
-            <div className="h-16 w-16 mx-auto rounded-2xl bg-gradient-to-br from-violet-500 to-cyan-500 flex items-center justify-center group-hover:scale-110 transition-transform shadow-2xl">
-              <Image src="/BASED IN.png" alt="AutoForge" width={36} height={36} className="rounded-lg" />
-            </div>
+              <Image src="/BASED IN.png" alt="AutoForge" width={100} height={100} className="rounded-lg" />
           </Link>
         </div>
 
@@ -123,7 +121,7 @@ export default function LoginPage() {
                 <div className="flex-1">
                   <p className="text-sm font-medium text-white mb-1">First time here?</p>
                   <p className="text-xs text-gray-300 leading-relaxed">
-                    No separate signup needed! Just click either button above and we'll automatically create your account when you sign in for the first time.
+                    No separate signup needed! Just click either button above and we&apos;ll automatically create your account when you sign in for the first time.
                   </p>
                 </div>
               </div>
