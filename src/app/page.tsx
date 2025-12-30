@@ -213,7 +213,7 @@ client.on('ready', () => {
                 </div>
 
                 {/* Terminal Window - LEFT */}
-                <div className="absolute top-32 left-0 w-[450px] z-20">
+                <div className="absolute top-32 left-0 w-[550px] z-20">
                   <div className="bg-black/90 backdrop-blur-xl border border-white/20 rounded-2xl overflow-hidden shadow-2xl">
                     <div className="flex items-center gap-2 px-4 py-3 border-b border-white/10 bg-white/5">
                       <div className="flex gap-1.5">
@@ -226,7 +226,7 @@ client.on('ready', () => {
                         <span>Terminal</span>
                       </div>
                     </div>
-                    <div className="p-6 font-mono text-sm space-y-3 h-[200px]">
+                    <div className="p-8 font-mono text-base space-y-4 h-[280px]">
                       {steps.map((s, i) => (
                         <div
                           key={i}
@@ -235,11 +235,11 @@ client.on('ready', () => {
                           }`}
                         >
                           {i < step ? (
-                            <Check className="w-4 h-4 text-green-400" />
+                            <Check className="w-5 h-5 text-green-400" />
                           ) : i === step ? (
-                            <Loader2 className="w-4 h-4 text-blue-400 animate-spin" />
+                            <Loader2 className="w-5 h-5 text-blue-400 animate-spin" />
                           ) : (
-                            <div className="w-4 h-4 rounded-full border border-gray-600" />
+                            <div className="w-5 h-5 rounded-full border-2 border-gray-600" />
                           )}
                           <span className={i <= step ? 'text-gray-300' : 'text-gray-600'}>
                             {s.text}
@@ -251,7 +251,7 @@ client.on('ready', () => {
                 </div>
 
                 {/* Code Editor Window - RIGHT */}
-                <div className="absolute top-32 right-0 w-[450px] z-20">
+                <div className="absolute top-32 right-0 w-[550px] z-20">
                   <div className="bg-black/90 backdrop-blur-xl border border-white/20 rounded-2xl overflow-hidden shadow-2xl">
                     <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 bg-white/5">
                       <div className="flex items-center gap-2 text-sm text-gray-400">
@@ -264,7 +264,7 @@ client.on('ready', () => {
                         <div className="w-3 h-3 rounded-full bg-green-500/80" />
                       </div>
                     </div>
-                    <div className="p-6 font-mono text-xs leading-relaxed h-[200px] overflow-hidden">
+                    <div className="p-8 font-mono text-sm leading-relaxed h-[280px] overflow-hidden">
                       {codeLines.map((line, i) => (
                         <div key={i} className="text-gray-300">
                           <span className="text-gray-600 mr-4">{i + 1}</span>
