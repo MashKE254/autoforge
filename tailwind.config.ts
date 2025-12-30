@@ -73,6 +73,8 @@ const config: Config = {
         'pulse-slow': 'pulseSlow 4s ease-in-out infinite',
         'gradient': 'gradient 8s linear infinite',
         'grid-drift': 'gridDrift 8s linear infinite',
+        'twinkle': 'twinkle 3s ease-in-out infinite',
+        'twinkle-slow': 'twinkle 5s ease-in-out infinite',
       },
       animationDelay: {
         '2000': '2s',
@@ -116,6 +118,10 @@ const config: Config = {
         gridDrift: {
           '0%': { backgroundPosition: '0px 0px' },
           '100%': { backgroundPosition: '32px 32px' },
+        },
+        twinkle: {
+          '0%, 100%': { opacity: '0.3' },
+          '50%': { opacity: '1' },
         },
       },
       backgroundImage: {
