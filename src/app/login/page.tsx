@@ -2,105 +2,174 @@
 
 import { useState } from "react";
 import { signIn } from "next-auth/react";
+import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Github, Loader2 } from "lucide-react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Github, Loader2, AlertCircle, Sparkles, Rocket } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 
 export default function LoginPage() {
   const [isLoading, setIsLoading] = useState<string | null>(null);
+  const searchParams = useSearchParams();
+  const error = searchParams.get("error");
 
   const handleLogin = async (provider: "google" | "github") => {
     setIsLoading(provider);
     try {
-      // This redirects to the dashboard after successful login
       await signIn(provider, { callbackUrl: "/dashboard" });
     } catch (error) {
       console.error("Login error:", error);
-    } finally {
       setIsLoading(null);
+    }
+  };
+
+  const getErrorMessage = (error: string | null) => {
+    switch (error) {
+      case "OAuthSignin":
+        return "Error connecting to the authentication provider. Please try again.";
+      case "OAuthCallback":
+        return "Error processing authentication. Please try again.";
+      case "OAuthCreateAccount":
+        return "Could not create your account. Please try again or contact support.";
+      case "EmailCreateAccount":
+        return "Could not create account with that email.";
+      case "Callback":
+        return "Authentication error. Please try again.";
+      case "OAuthAccountNotLinked":
+        return "This email is already associated with another account. Please sign in using your original method.";
+      case "SessionRequired":
+        return "Please sign in to access this page.";
+      default:
+        return "An error occurred. Please try again.";
     }
   };
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
-      {/* Background Effects */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-1/4 right-1/4 w-96 h-96 bg-violet-600/10 rounded-full blur-3xl" />
-        <div className="absolute bottom-1/4 left-1/4 w-96 h-96 bg-cyan-600/10 rounded-full blur-3xl" />
+      {/* Main Content */}
+      <div className="w-full max-w-md relative z-10">
+
+        {/* Logo & Branding */}
+        <div className="text-center mb-8">
+          <Link href="/" className="inline-flex items-center gap-3 group mb-6">
+            <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-violet-500 to-cyan-500 flex items-center justify-center group-hover:scale-110 transition-transform">
+              <Image src="/BASED IN.png" alt="AutoForge" width={32} height={32} className="rounded-lg" />
+            </div>
+            <span className="text-2xl font-bold text-white">AutoForge</span>
+          </Link>
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-violet-500/10 border border-violet-500/20 rounded-full text-violet-400 text-sm">
+            <Sparkles className="w-4 h-4" />
+            <span>Build. Deploy. Earn.</span>
+          </div>
+        </div>
+
+        {/* Auth Card */}
+        <Card className="border-white/10 bg-black/60 backdrop-blur-2xl shadow-2xl">
+          <CardHeader className="space-y-1 text-center pb-4">
+            <CardTitle className="text-2xl font-bold tracking-tight text-white">
+              Welcome Back
+            </CardTitle>
+            <CardDescription className="text-gray-400">
+              Sign in or create your account to start building apps with AI
+            </CardDescription>
+          </CardHeader>
+
+          <CardContent className="space-y-4">
+            {/* Error Message */}
+            {error && (
+              <div className="flex items-start gap-3 p-4 bg-red-500/10 border border-red-500/20 rounded-xl">
+                <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-red-300 mb-1">Authentication Error</p>
+                  <p className="text-xs text-red-400/80">{getErrorMessage(error)}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Google OAuth */}
+            <Button
+              variant="outline"
+              onClick={() => handleLogin("google")}
+              disabled={!!isLoading}
+              className="w-full h-12 relative border-white/20 hover:bg-white/10 hover:border-white/30 text-white bg-white/5 transition-all group"
+            >
+              {isLoading === "google" ? (
+                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+              ) : (
+                <svg className="mr-2 h-5 w-5" aria-hidden="true" focusable="false" data-prefix="fab" data-icon="google" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 488 512">
+                  <path fill="currentColor" d="M488 261.8C488 403.3 391.1 504 248 504 110.8 504 0 393.2 0 256S110.8 8 248 8c66.8 0 123 24.5 166.3 64.9l-67.5 64.9C258.5 52.6 94.3 116.6 94.3 256c0 86.5 69.1 156.6 153.7 156.6 98.2 0 135-70.4 140.8-106.9H248v-85.3h236.1c2.3 12.7 3.9 24.9 3.9 41.4z"></path>
+                </svg>
+              )}
+              <span className="font-medium">Continue with Google</span>
+            </Button>
+
+            {/* GitHub OAuth */}
+            <Button
+              variant="outline"
+              onClick={() => handleLogin("github")}
+              disabled={!!isLoading}
+              className="w-full h-12 border-white/20 hover:bg-white/10 hover:border-white/30 text-white bg-white/5 transition-all group"
+            >
+              {isLoading === "github" ? (
+                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+              ) : (
+                <Github className="mr-2 h-5 w-5" />
+              )}
+              <span className="font-medium">Continue with GitHub</span>
+            </Button>
+
+            {/* Info Box */}
+            <div className="mt-6 p-4 bg-gradient-to-br from-cyan-500/10 to-blue-500/10 border border-cyan-500/20 rounded-xl">
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-lg bg-cyan-500/20 flex items-center justify-center flex-shrink-0">
+                  <Rocket className="w-4 h-4 text-cyan-400" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-white mb-1">First time here?</p>
+                  <p className="text-xs text-gray-300 leading-relaxed">
+                    No separate signup needed! Just click either button above and we'll automatically create your account when you sign in for the first time.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Terms */}
+            <div className="text-center text-xs text-gray-400 leading-relaxed">
+              By continuing, you agree to our{" "}
+              <Link href="/terms" className="underline underline-offset-2 hover:text-cyan-400 transition-colors">
+                Terms of Service
+              </Link>{" "}
+              and{" "}
+              <Link href="/privacy" className="underline underline-offset-2 hover:text-cyan-400 transition-colors">
+                Privacy Policy
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Help Text */}
+        <div className="mt-6 text-center">
+          <p className="text-sm text-gray-400 mb-2">Having trouble signing in?</p>
+          <Link
+            href="mailto:support@autoforge.dev"
+            className="text-sm text-cyan-400 hover:text-cyan-300 transition-colors"
+          >
+            Contact Support
+          </Link>
+        </div>
+
+        {/* Back to Home */}
+        <div className="mt-8 text-center">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-2 text-sm text-gray-400 hover:text-white transition-colors group"
+          >
+            <span>←</span>
+            <span className="group-hover:underline">Back to Home</span>
+          </Link>
+        </div>
       </div>
-
-      <Card className="w-full max-w-md relative z-10 border-white/10 bg-white/[0.02] backdrop-blur-xl">
-        <CardHeader className="space-y-1 text-center">
-          <div className="flex justify-center mb-4">
-             {/* Using the logo file found in your public folder */}
-             <div className="h-12 w-12 rounded-xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center">
-                <Image src="/Logo.svg" alt="AutoForge" width={32} height={32} />
-             </div>
-          </div>
-          <CardTitle className="text-2xl font-bold tracking-tight text-white">
-            Welcome to AutoForge
-          </CardTitle>
-          <CardDescription className="text-gray-400">
-            Sign in to start generating apps from prompts
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-4">
-          <Button
-            variant="outline"
-            onClick={() => handleLogin("google")}
-            disabled={!!isLoading}
-            className="w-full h-11 relative border-white/10 hover:bg-white/[0.05] text-white"
-          >
-            {isLoading === "google" ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <svg className="mr-2 h-4 w-4" aria-hidden="true" focusable="false" data-prefix="fab" data-icon="google" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 488 512">
-                <path fill="currentColor" d="M488 261.8C488 403.3 391.1 504 248 504 110.8 504 0 393.2 0 256S110.8 8 248 8c66.8 0 123 24.5 166.3 64.9l-67.5 64.9C258.5 52.6 94.3 116.6 94.3 256c0 86.5 69.1 156.6 153.7 156.6 98.2 0 135-70.4 140.8-106.9H248v-85.3h236.1c2.3 12.7 3.9 24.9 3.9 41.4z"></path>
-              </svg>
-            )}
-            Continue with Google
-          </Button>
-          
-          <Button
-            variant="outline"
-            onClick={() => handleLogin("github")}
-            disabled={!!isLoading}
-            className="w-full h-11 border-white/10 hover:bg-white/[0.05] text-white"
-          >
-            {isLoading === "github" ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <Github className="mr-2 h-4 w-4" />
-            )}
-            Continue with GitHub
-          </Button>
-
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t border-white/10" />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-[#0A0A0B] px-2 text-gray-500">
-                Or
-              </span>
-            </div>
-          </div>
-
-          <div className="text-center text-sm text-gray-400">
-             By clicking continue, you agree to our{" "}
-             <Link href="/terms" className="underline underline-offset-4 hover:text-violet-400 transition-colors">
-               Terms of Service
-             </Link>{" "}
-             and{" "}
-             <Link href="/privacy" className="underline underline-offset-4 hover:text-violet-400 transition-colors">
-               Privacy Policy
-             </Link>
-             .
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }
