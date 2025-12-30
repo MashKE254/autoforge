@@ -27,6 +27,7 @@ import {
   Lightbulb,
   Store,
   LayoutDashboard,
+  Key,
 } from 'lucide-react';
 
 const navLinks = [
@@ -117,24 +118,8 @@ export default function Header() {
                         </p>
                       </div>
 
-                      {/* Main Links */}
+                      {/* Account Links */}
                       <div className="py-1">
-                        <Link
-                          href="/dashboard/creator"
-                          className="flex items-center gap-2 px-4 py-2 text-sm text-cyan-400 hover:text-cyan-300 hover:bg-white/5"
-                          onClick={() => setUserMenuOpen(false)}
-                        >
-                          <LayoutDashboard className="w-4 h-4" />
-                          My Apps
-                        </Link>
-                        <Link
-                          href="/recommend"
-                          className="flex items-center gap-2 px-4 py-2 text-sm text-violet-400 hover:text-violet-300 hover:bg-white/5"
-                          onClick={() => setUserMenuOpen(false)}
-                        >
-                          <Lightbulb className="w-4 h-4" />
-                          Software Recommender
-                        </Link>
                         <Link
                           href="/settings"
                           className="flex items-center gap-2 px-4 py-2 text-sm text-gray-400 hover:text-white hover:bg-white/5"
@@ -158,6 +143,14 @@ export default function Header() {
                         >
                           <DollarSign className="w-4 h-4" />
                           Earnings
+                        </Link>
+                        <Link
+                          href="/settings/api-keys"
+                          className="flex items-center gap-2 px-4 py-2 text-sm text-gray-400 hover:text-white hover:bg-white/5"
+                          onClick={() => setUserMenuOpen(false)}
+                        >
+                          <Key className="w-4 h-4" />
+                          API Keys
                         </Link>
                         <Link
                           href="/help"
@@ -247,25 +240,17 @@ export default function Header() {
               );
             })}
             
-            {/* Mobile-only links when logged in */}
+            {/* Mobile-only account links when logged in */}
             {session && (
               <>
                 <div className="border-t border-white/10 my-2 pt-2">
                   <Link
-                    href="/dashboard/creator"
+                    href="/settings"
                     onClick={() => setMobileMenuOpen(false)}
-                    className="flex items-center gap-2 px-3 py-2 rounded-lg text-cyan-400 hover:text-cyan-300 hover:bg-white/5"
+                    className="flex items-center gap-2 px-3 py-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/5"
                   >
-                    <LayoutDashboard className="w-4 h-4" />
-                    My Apps
-                  </Link>
-                  <Link
-                    href="/recommend"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="flex items-center gap-2 px-3 py-2 rounded-lg text-violet-400 hover:text-violet-300 hover:bg-white/5"
-                  >
-                    <Lightbulb className="w-4 h-4" />
-                    Software Recommender
+                    <Settings className="w-4 h-4" />
+                    Settings
                   </Link>
                   <Link
                     href="/dashboard/billing"
@@ -284,12 +269,20 @@ export default function Header() {
                     Earnings
                   </Link>
                   <Link
-                    href="/settings"
+                    href="/settings/api-keys"
                     onClick={() => setMobileMenuOpen(false)}
                     className="flex items-center gap-2 px-3 py-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/5"
                   >
-                    <Settings className="w-4 h-4" />
-                    Settings
+                    <Key className="w-4 h-4" />
+                    API Keys
+                  </Link>
+                  <Link
+                    href="/help"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center gap-2 px-3 py-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/5"
+                  >
+                    <HelpCircle className="w-4 h-4" />
+                    Help
                   </Link>
                 </div>
                 <div className="border-t border-white/10 my-2 pt-2">
