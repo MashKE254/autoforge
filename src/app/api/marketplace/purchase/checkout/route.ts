@@ -18,25 +18,16 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 
 export async function POST(request: NextRequest) {
   try {
-    // 1. Authenticate
+    // 1. Check authentication (OPTIONAL for paid apps - guests allowed!)
     const session = await getServerSession(authOptions);
-    if (!session?.user?.email) {
-      return NextResponse.json(
-        { error: 'Please sign in to continue' },
-        { status: 401 }
-      );
-    }
+    const isAuthenticated = !!session?.user?.email;
 
-    // 2. Get user
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
-    });
-
-    if (!user) {
-      return NextResponse.json(
-        { error: 'User not found' },
-        { status: 404 }
-      );
+    // 2. Get user if authenticated
+    let user = null;
+    if (isAuthenticated) {
+      user = await prisma.user.findUnique({
+        where: { email: session.user.email },
+      });
     }
 
     // 3. Parse request
@@ -79,41 +70,50 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 5. Check if user already owns this app
-    const existingSubscription = await prisma.appSubscription.findFirst({
-      where: {
-        userId: user.id,
-        publishedAppId: app.id,
-        status: 'ACTIVE',
-      },
-    });
-
-    if (existingSubscription) {
-      return NextResponse.json(
-        { error: 'You already have access to this app' },
-        { status: 400 }
-      );
-    }
-
-    // 6. Create or get Stripe customer
-    let stripeCustomerId = user.stripeCustomerId;
-
-    if (!stripeCustomerId) {
-      const customer = await stripe.customers.create({
-        email: user.email!,
-        name: user.name || undefined,
-        metadata: {
+    // 5. Check if authenticated user already owns this app
+    if (user) {
+      const existingSubscription = await prisma.appSubscription.findFirst({
+        where: {
           userId: user.id,
+          publishedAppId: app.id,
+          status: 'ACTIVE',
         },
       });
 
-      stripeCustomerId = customer.id;
-
-      await prisma.user.update({
-        where: { id: user.id },
-        data: { stripeCustomerId },
-      });
+      if (existingSubscription) {
+        return NextResponse.json(
+          { error: 'You already have access to this app' },
+          { status: 400 }
+        );
+      }
     }
+
+    // 6. Create or get Stripe customer (if authenticated)
+    let stripeCustomerId: string | undefined = undefined;
+
+    if (user) {
+      // Authenticated user - use their Stripe customer
+      if (user.stripeCustomerId) {
+        stripeCustomerId = user.stripeCustomerId;
+      } else {
+        const customer = await stripe.customers.create({
+          email: user.email!,
+          name: user.name || undefined,
+          metadata: {
+            userId: user.id,
+          },
+        });
+
+        stripeCustomerId = customer.id;
+
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { stripeCustomerId },
+        });
+      }
+    }
+    // For guest users: stripeCustomerId remains undefined
+    // Stripe will create a new customer during checkout
 
     // 7. Determine price and mode
     const price = pricingModel === 'SUBSCRIPTION' ? app.monthlyPrice : app.oneTimePrice;
@@ -128,7 +128,8 @@ export async function POST(request: NextRequest) {
 
     // 8. Create Stripe Checkout session
     const checkoutSession = await stripe.checkout.sessions.create({
-      customer: stripeCustomerId,
+      customer: stripeCustomerId, // undefined for guests (Stripe creates new customer)
+      customer_email: stripeCustomerId ? undefined : undefined, // Let Stripe collect it
       mode,
       payment_method_types: ['card'],
       line_items: [
@@ -150,13 +151,15 @@ export async function POST(request: NextRequest) {
           quantity: 1,
         },
       ],
-      success_url: `${process.env.NEXTAUTH_URL}/portal?purchase=success&app=${app.id}`,
+      success_url: `${process.env.NEXTAUTH_URL}/apps/activated?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${process.env.NEXTAUTH_URL}/marketplace/${app.slug}?purchase=cancelled`,
       metadata: {
-        userId: user.id,
+        userId: user?.id || 'guest', // Mark as guest if no user
         appId: app.id,
+        appName: app.name,
         pricingModel: app.pricingModel,
         creatorId: app.userId,
+        isGuest: user ? 'false' : 'true',
       },
       // Enable automatic tax collection if configured
       automatic_tax: {
@@ -164,15 +167,19 @@ export async function POST(request: NextRequest) {
       },
       // Collect billing address
       billing_address_collection: 'auto',
-      // Customer can update email
-      customer_update: {
-        address: 'auto',
-      },
+      // For guest users, allow email collection
+      ...(user && {
+        customer_update: {
+          address: 'auto',
+        },
+      }),
     });
 
-    console.log(`💳 Checkout created: ${app.name} for ${user.email}`);
+    const buyerInfo = user?.email || 'guest (Stripe will collect email)';
+    console.log(`💳 Checkout created: ${app.name} for ${buyerInfo}`);
     console.log(`   Session: ${checkoutSession.id}`);
     console.log(`   Price: $${price} (${pricingModel})`);
+    console.log(`   Guest purchase: ${!user}`);
 
     return NextResponse.json({
       success: true,
