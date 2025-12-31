@@ -222,7 +222,7 @@ client.on('ready', () => {
             <div
               className="relative w-full max-w-6xl transition-transform duration-200 ease-out"
               style={{
-                transform: `perspective(1500px) rotateX(${6 + parallax.y * 0.5}deg) rotateY(${-8 + parallax.x * 0.5}deg)`,
+                transform: `perspective(2000px) rotateX(${2 + parallax.y * 0.2}deg) rotateY(${-1 + parallax.x * 0.2}deg)`,
                 transformStyle: 'preserve-3d',
               }}
             >
@@ -231,7 +231,7 @@ client.on('ready', () => {
                 {/* Input Window - CENTER */}
                 <div
                   className="absolute top-0 left-1/2 -translate-x-1/2 w-[750px] z-30 transition-transform duration-200"
-                  style={{ transform: `translateZ(40px) translateX(${parallax.x * 2}px) translateY(${parallax.y * 2}px)` }}
+                  style={{ transform: `translateZ(40px) translateX(${parallax.x * 0.5}px) translateY(${parallax.y * 0.5}px)` }}
                 >
                   <div className="bg-black/98 backdrop-blur-2xl border border-white/20 rounded-2xl overflow-hidden shadow-2xl shadow-blue-500/10">
                     <div className="flex items-center gap-2 px-4 py-3 border-b border-white/10 bg-gradient-to-r from-white/5 to-white/[0.02]">
@@ -276,7 +276,7 @@ client.on('ready', () => {
                 {/* Terminal - LEFT */}
                 <div
                   className="absolute top-56 left-0 w-[580px] z-20 transition-transform duration-200"
-                  style={{ transform: `translateZ(20px) translateX(${parallax.x}px) translateY(${parallax.y}px)` }}
+                  style={{ transform: `translateZ(20px) translateX(${parallax.x * 0.3}px) translateY(${parallax.y * 0.3}px)` }}
                 >
                   <div className="bg-black/98 backdrop-blur-2xl border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
                     <div className="flex items-center gap-2 px-4 py-3 border-b border-white/10 bg-white/5">
@@ -317,7 +317,7 @@ client.on('ready', () => {
                 {/* Code Editor - RIGHT */}
                 <div
                   className="absolute top-56 right-0 w-[580px] z-20 transition-transform duration-200"
-                  style={{ transform: `translateZ(20px) translateX(${-parallax.x}px) translateY(${parallax.y}px)` }}
+                  style={{ transform: `translateZ(20px) translateX(${-parallax.x * 0.3}px) translateY(${parallax.y * 0.3}px)` }}
                 >
                   <div className="bg-black/98 backdrop-blur-2xl border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
                     <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 bg-white/5">
@@ -347,7 +347,7 @@ client.on('ready', () => {
                 {/* Console - BOTTOM */}
                 <div
                   className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[520px] z-10 transition-transform duration-200"
-                  style={{ transform: `translateZ(10px) translateY(${parallax.y * 0.5}px)` }}
+                  style={{ transform: `translateZ(10px) translateY(${parallax.y * 0.2}px)` }}
                 >
                   <div className="bg-black/98 backdrop-blur-2xl border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
                     <div className="px-4 py-3 border-b border-white/10 bg-white/5">
