@@ -66,6 +66,13 @@ model VerificationToken {
 // USER MODEL
 // =============================================================================
 
+enum UserRole {
+  CREATOR   // Can build and sell apps
+  CUSTOMER  // Can only buy and use apps
+  PARTNER   // Can refer and earn
+  ADMIN     // Platform admin
+}
+
 model User {
   id               String    @id @default(cuid())
   name             String?
@@ -74,21 +81,24 @@ model User {
   image            String?
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @default(now()) @updatedAt
-  
+
+  // NEW: User role for guest checkout
+  role             UserRole  @default(CREATOR)
+
   // Stripe Customer ID (for platform subscription)
   stripeCustomerId String?   @unique
-  
+
   // Relations
   accounts         Account[]
   sessions         Session[]
   generationJobs   GenerationJob[]
-  
+
   // Monetization relations
   subscription     CreatorSubscription?
   connectedAccount StripeConnectedAccount?
   publishedApps    PublishedApp[]
   payouts          Payout[]
-  
+
   // NEW: Managed Infrastructure
   managedProjects  ManagedProject[]
   managedApps      ManagedApp[]
@@ -99,8 +109,14 @@ model User {
   // Integration credentials
   integrationCredentials IntegrationCredential[]
 
+  // NEW: Guest checkout - magic links and app subscriptions
+  magicLinks       MagicLink[]
+  appSubscriptions AppSubscription[]
+  partner          Partner?
+
   @@index([email])
   @@index([stripeCustomerId])
+  @@index([role])
 }
 
 // =============================================================================
@@ -256,11 +272,12 @@ model PublishedApp {
   updatedAt         DateTime     @updatedAt
 
   // Relations
-  user              User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  generationJob     GenerationJob  @relation(fields: [generationJobId], references: [id], onDelete: Cascade)
-  category          AppCategory?   @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  generationJob     GenerationJob     @relation(fields: [generationJobId], references: [id], onDelete: Cascade)
+  category          AppCategory?      @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   customers         AppCustomer[]
   transactions      Transaction[]
+  appSubscriptions  AppSubscription[] // NEW: Guest checkout subscriptions
 
   @@index([userId])
   @@index([slug])
@@ -288,35 +305,48 @@ enum AppStatus {
 // APP CUSTOMER (End-users who pay for published apps)
 // =============================================================================
 
+enum AppCustomerStatus {
+  ACTIVE
+  CANCELLED
+  EXPIRED
+  SUSPENDED
+}
+
 model AppCustomer {
   id                     String       @id @default(cuid())
-  
+
   // Which app
   publishedAppId         String
-  
+
   // Customer details
   email                  String
   name                   String?
-  
+
+  // NEW: Link to User account (for guest checkout)
+  userId                 String?
+
   // Stripe customer (on the connected account)
   stripeCustomerId       String
-  
+
   // Subscription details (if subscription model)
   stripeSubscriptionId   String?
   subscriptionStatus     String?      // active, canceled, past_due, etc.
   currentPeriodEnd       DateTime?
-  
+
   // One-time purchase (if one-time model)
   purchasedAt            DateTime?
-  
+
   // Access control
   hasAccess              Boolean      @default(true)
   accessExpiresAt        DateTime?
-  
+
+  // NEW: Status tracking
+  status                 AppCustomerStatus @default(ACTIVE)
+
   // Timestamps
   createdAt              DateTime     @default(now())
   updatedAt              DateTime     @updatedAt
-  
+
   // Relations
   publishedApp           PublishedApp @relation(fields: [publishedAppId], references: [id], onDelete: Cascade)
 
@@ -324,6 +354,147 @@ model AppCustomer {
   @@index([publishedAppId])
   @@index([stripeCustomerId])
   @@index([email])
+  @@index([userId])
+  @@index([status])
+}
+
+// =============================================================================
+// APP SUBSCRIPTION (Guest checkout - Customer account linked to app)
+// =============================================================================
+
+model AppSubscription {
+  id                   String       @id @default(cuid())
+
+  // Customer (now has an account)
+  userId               String
+
+  // Which app
+  publishedAppId       String
+
+  // Subscription details
+  stripeSubscriptionId String?      @unique
+  status               String       @default("ACTIVE")  // ACTIVE, CANCELLED, EXPIRED
+
+  // Lifecycle
+  startedAt            DateTime     @default(now())
+  cancelledAt          DateTime?
+  expiresAt            DateTime?
+
+  // Timestamps
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
+
+  // Relations
+  user                 User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  publishedApp         PublishedApp @relation(fields: [publishedAppId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, publishedAppId])
+  @@index([userId])
+  @@index([publishedAppId])
+  @@index([status])
+  @@index([stripeSubscriptionId])
+}
+
+// =============================================================================
+// MAGIC LINK AUTHENTICATION (Passwordless auth for guest customers)
+// =============================================================================
+
+model MagicLink {
+  id        String    @id @default(cuid())
+  userId    String
+
+  // Token
+  token     String    @unique
+
+  // Lifecycle
+  expiresAt DateTime
+  usedAt    DateTime?
+
+  // Timestamps
+  createdAt DateTime  @default(now())
+
+  // Relations
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+// =============================================================================
+// PARTNER PROGRAM (Referrals and revenue sharing)
+// =============================================================================
+
+enum PartnerTier {
+  AFFILIATE  // 20% commission
+  AGENCY     // 30% commission
+  RESELLER   // 40% commission
+}
+
+enum PartnerStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+  TERMINATED
+}
+
+model Partner {
+  id              String        @id @default(cuid())
+  userId          String        @unique
+
+  // Partner tier and status
+  tier            PartnerTier
+  status          PartnerStatus @default(ACTIVE)
+
+  // Referral code
+  referralCode    String        @unique
+
+  // Commission rate (percentage)
+  commissionRate  Int           // 20, 30, or 40
+
+  // Analytics
+  totalReferrals  Int           @default(0)
+  totalEarnings   Int           @default(0)  // In cents
+
+  // Timestamps
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  // Relations
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  referrals       Referral[]
+
+  @@index([referralCode])
+  @@index([tier])
+  @@index([status])
+}
+
+model Referral {
+  id              String    @id @default(cuid())
+  partnerId       String
+
+  // Referred user
+  referredUserId  String
+  referredEmail   String
+
+  // Conversion tracking
+  converted       Boolean   @default(false)
+  convertedAt     DateTime?
+
+  // Revenue from this referral (in cents)
+  totalRevenue    Int       @default(0)
+  commissionEarned Int      @default(0)
+
+  // Timestamps
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relations
+  partner         Partner   @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+
+  @@index([partnerId])
+  @@index([referredUserId])
+  @@index([converted])
 }
 
 // =============================================================================

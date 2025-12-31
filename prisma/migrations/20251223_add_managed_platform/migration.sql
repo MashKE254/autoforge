@@ -1,3 +1,10 @@
+-- CreateEnum: PlanTier (if not exists)
+DO $$ BEGIN
+    CREATE TYPE "PlanTier" AS ENUM ('FREE', 'STARTER', 'PRO', 'BUSINESS', 'ENTERPRISE');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
+
 -- CreateEnum: ManagedAppStatus
 CREATE TYPE "ManagedAppStatus" AS ENUM ('PROVISIONING', 'ACTIVE', 'SUSPENDED', 'DELETED');
 
