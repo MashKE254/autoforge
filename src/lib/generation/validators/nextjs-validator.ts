@@ -166,10 +166,13 @@ export class NextjsValidator implements Validator {
       switch (issue.type) {
         case 'nextjs-metadata-client-conflict':
         case 'nextjs-layout-client-component':
-          // Remove 'use client' directive (handle all whitespace variations)
-          content = content.replace(/^['"]use client['"];?\s*(\r?\n)?/m, '');
-          // Also remove any subsequent empty lines left behind
-          content = content.replace(/^\s*\n/, '');
+          // Remove 'use client' directive (handle all variations - single/double quotes, with/without semicolon)
+          // Handle cases where it might not be at the very start (comments, whitespace)
+          content = content.replace(/^(\s*)['"]use client['"];?\s*$/gm, '');
+          // Remove any multiple consecutive blank lines left behind
+          content = content.replace(/\n\n\n+/g, '\n\n');
+          // Trim any leading whitespace
+          content = content.trim();
           console.log(`     ✅ Removed "use client" from ${file.path}`);
           break;
 
