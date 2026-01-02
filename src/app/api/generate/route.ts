@@ -185,67 +185,68 @@ export async function POST(request: NextRequest) {
       // Generate fresh (cache miss or expired)
       console.log(`🎨 Cache miss - generating fresh...`);
 
-    if (forceType) {
-      // Use EnhancedUnifiedGenerator when generator type is specified (from recommender)
-      console.log(`\n🎯 Using ENHANCED UNIFIED GENERATOR with forced type: ${forceType}`);
+      if (forceType) {
+        // Use EnhancedUnifiedGenerator when generator type is specified (from recommender)
+        console.log(`\n🎯 Using ENHANCED UNIFIED GENERATOR with forced type: ${forceType}`);
 
-      result = await enhancedGenerator.generate(trimmedPrompt, {
-        jobId: job.id,
-        forceType,
-        callbacks: {
-          onProgress: (message) => {
-            console.log(`   📝 ${message}`);
+        result = await enhancedGenerator.generate(trimmedPrompt, {
+          jobId: job.id,
+          forceType,
+          callbacks: {
+            onProgress: (message) => {
+              console.log(`   📝 ${message}`);
+            },
           },
-        },
-      });
-    } else {
-      // Use UnifiedGenerator for legacy PERSONAL/SAAS mode flow
-      console.log(`\n🎯 Using UNIFIED GENERATOR with mode: ${mode}`);
+        });
+      } else {
+        // Use UnifiedGenerator for legacy PERSONAL/SAAS mode flow
+        console.log(`\n🎯 Using UNIFIED GENERATOR with mode: ${mode}`);
 
-      result = await unifiedGenerator.generate(
-        trimmedPrompt,
-        mode as 'PREVIEW' | 'PERSONAL' | 'SINGLE_USER' | 'SAAS' | 'AUTO',
-        job.id,
-        {
-          onProgress: (message) => {
-            console.log(`   📝 ${message}`);
-          },
-          onModeSelected: (selectedMode) => {
-            console.log(`\n🎯 Final Mode: ${selectedMode}`);
+        result = await unifiedGenerator.generate(
+          trimmedPrompt,
+          mode as 'PREVIEW' | 'PERSONAL' | 'SINGLE_USER' | 'SAAS' | 'AUTO',
+          job.id,
+          {
+            onProgress: (message) => {
+              console.log(`   📝 ${message}`);
+            },
+            onModeSelected: (selectedMode) => {
+              console.log(`\n🎯 Final Mode: ${selectedMode}`);
 
-            // Update job with actual mode if AUTO was used
-            if (mode === 'AUTO') {
-              prisma.generationJob.update({
-                where: { id: job.id },
-                data: { generationMode: selectedMode },
-              }).catch(err => console.error('Failed to update job mode:', err));
-            }
-          },
-          onComplexityAnalysis: (analysis) => {
-            console.log(`\n📊 Complexity Analysis:`);
-            console.log(`   Score: ${analysis.score}/100`);
-            console.log(`   Is Complex: ${analysis.isComplex}`);
-            console.log(`   Reasons: ${analysis.reasons.join(', ')}`);
-          },
-          onStrategySelected: (strategy) => {
-            const strategyName = strategy === 'personal'
-              ? 'PERSONAL TOOL'
-              : strategy === 'simple'
-              ? 'SINGLE-PASS SAAS'
-              : 'MULTI-PASS ORCHESTRATED SAAS';
-            console.log(`\n🎯 Strategy: ${strategyName}`);
-          },
-          onModulesDetected: (modules) => {
-            if (modules.length > 0) {
-              console.log(`\n🔌 Dynamic Modules Generated:`);
-              modules.forEach(m => {
-                console.log(`   - ${m.name}: ${m.description}`);
-                console.log(`     Files: ${m.files.length}, Deps: ${m.dependencies.length}`);
-              });
-            }
-          },
-        }
-      );
+              // Update job with actual mode if AUTO was used
+              if (mode === 'AUTO') {
+                prisma.generationJob.update({
+                  where: { id: job.id },
+                  data: { generationMode: selectedMode },
+                }).catch(err => console.error('Failed to update job mode:', err));
+              }
+            },
+            onComplexityAnalysis: (analysis) => {
+              console.log(`\n📊 Complexity Analysis:`);
+              console.log(`   Score: ${analysis.score}/100`);
+              console.log(`   Is Complex: ${analysis.isComplex}`);
+              console.log(`   Reasons: ${analysis.reasons.join(', ')}`);
+            },
+            onStrategySelected: (strategy) => {
+              const strategyName = strategy === 'personal'
+                ? 'PERSONAL TOOL'
+                : strategy === 'simple'
+                ? 'SINGLE-PASS SAAS'
+                : 'MULTI-PASS ORCHESTRATED SAAS';
+              console.log(`\n🎯 Strategy: ${strategyName}`);
+            },
+            onModulesDetected: (modules) => {
+              if (modules.length > 0) {
+                console.log(`\n🔌 Dynamic Modules Generated:`);
+                modules.forEach(m => {
+                  console.log(`   - ${m.name}: ${m.description}`);
+                  console.log(`     Files: ${m.files.length}, Deps: ${m.dependencies.length}`);
+                });
+              }
+            },
+          }
+        );
+      }
 
       // Cache the result for future requests
       if (result.success && result.files && result.files.length > 0) {
