@@ -152,20 +152,33 @@ export class NextjsValidator implements Validator {
   }
 
   async autoFix(files: GeneratedFile[], issues: ValidationIssue[]): Promise<GeneratedFile[]> {
+    console.log(`     🔧 NextJS autoFix called with ${issues.length} issues`);
     const fixedFiles = [...files];
 
     for (const issue of issues) {
-      if (!issue.fixable) continue;
+      console.log(`     🔧 Processing issue: ${issue.type} in ${issue.file}`);
+
+      if (!issue.fixable) {
+        console.log(`     ⏭️  Skipping non-fixable issue: ${issue.type}`);
+        continue;
+      }
 
       const fileIndex = fixedFiles.findIndex(f => f.path === issue.file);
-      if (fileIndex === -1) continue;
+      if (fileIndex === -1) {
+        console.log(`     ⚠️  File not found: ${issue.file}`);
+        continue;
+      }
 
       const file = fixedFiles[fileIndex];
       let content = file.content;
+      const originalContent = content;
 
       switch (issue.type) {
         case 'nextjs-metadata-client-conflict':
         case 'nextjs-layout-client-component':
+          console.log(`     🔍 Checking for "use client" in ${file.path}...`);
+          console.log(`     📄 File has ${content.split('\n').length} lines`);
+
           // Remove 'use client' directive (handle all variations - single/double quotes, with/without semicolon)
           // Handle cases where it might not be at the very start (comments, whitespace)
           content = content.replace(/^(\s*)['"]use client['"];?\s*$/gm, '');
@@ -173,7 +186,13 @@ export class NextjsValidator implements Validator {
           content = content.replace(/\n\n\n+/g, '\n\n');
           // Trim any leading whitespace
           content = content.trim();
-          console.log(`     ✅ Removed "use client" from ${file.path}`);
+
+          if (content !== originalContent) {
+            console.log(`     ✅ Removed "use client" from ${file.path}`);
+          } else {
+            console.log(`     ⚠️  No changes made to ${file.path} - regex didn't match`);
+            console.log(`     📝 First 200 chars: ${content.substring(0, 200)}`);
+          }
           break;
 
         case 'nextjs-client-hook-in-server':
@@ -191,6 +210,7 @@ export class NextjsValidator implements Validator {
       };
     }
 
+    console.log(`     ✅ NextJS autoFix completed`);
     return fixedFiles;
   }
 }
