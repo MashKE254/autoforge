@@ -1680,11 +1680,21 @@ export class BoltGenerator {
       // Save files to database if jobId provided
       if (jobId) {
         callbacks?.onProgress?.('Saving to database...');
-        
+
+        // Deduplicate files by path (keep last occurrence to allow integration overrides)
+        const uniqueFiles = Array.from(
+          files.reduce((map, file) => {
+            map.set(file.path, file);
+            return map;
+          }, new Map<string, GeneratedFile>()).values()
+        );
+
+        console.log(`   💾 Saving ${uniqueFiles.length} unique files to database (deduplicated from ${files.length})...`);
+
         await prisma.$transaction([
           prisma.generatedFile.deleteMany({ where: { generationJobId: jobId } }),
           prisma.generatedFile.createMany({
-            data: files.map((f: GeneratedFile) => ({
+            data: uniqueFiles.map((f: GeneratedFile) => ({
               generationJobId: jobId,
               path: f.path,
               content: f.content,
