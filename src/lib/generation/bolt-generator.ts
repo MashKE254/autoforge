@@ -357,6 +357,8 @@ export const config = {
 
 ## ROOT LAYOUT (app/layout.tsx)
 
+**CRITICAL: Layout files are Server Components - NEVER add "use client" to layout.tsx files!**
+
 \`\`\`tsx
 import { ClerkProvider } from '@clerk/nextjs';
 import { Inter } from 'next/font/google';
