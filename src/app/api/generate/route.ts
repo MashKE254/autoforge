@@ -152,6 +152,28 @@ export async function POST(request: NextRequest) {
     }
     console.log(`   Prompt: "${trimmedPrompt.slice(0, 100)}..."`);
 
+    // 3.5. Check for duplicate requests (same user, same prompt, RUNNING status, within last 2 minutes)
+    const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000);
+    const existingJob = await prisma.generationJob.findFirst({
+      where: {
+        userId: user.id,
+        prompt: trimmedPrompt,
+        status: 'RUNNING',
+        createdAt: { gte: twoMinutesAgo },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (existingJob) {
+      console.log(`⚠️  DUPLICATE REQUEST DETECTED - Returning existing job: ${existingJob.id}`);
+      return NextResponse.json({
+        success: false,
+        error: 'A generation with this prompt is already in progress',
+        jobId: existingJob.id,
+        message: 'Please wait for the existing generation to complete',
+      }, { status: 409 }); // 409 Conflict
+    }
+
     // 4. Create job record with generation mode
     const job = await prisma.generationJob.create({
       data: {
