@@ -751,6 +751,22 @@ function isPersonalTool(files: Array<{ path: string; content: string }>): boolea
 function sanitizeCodeFile(content: string, filePath: string, isPersonal: boolean = false): string {
   let sanitized = content;
 
+  // OPTION 3: Early return for layout files to prevent 'use client' injection
+  // Layout files are Server Components and must NOT have 'use client' directive
+  // even if they import components that use client-only libraries
+  if (filePath.includes('layout.tsx')) {
+    // Only strip ClerkProvider wrapper, don't add 'use client'
+    sanitized = sanitized.replace(/import\s+.*from\s+['"]@clerk\/nextjs\/server['"];?\s*/g, '');
+    sanitized = sanitized.replace(/import\s+.*from\s+['"]@clerk\/nextjs['"];?\s*/g, '');
+    sanitized = sanitized.replace(/import\s+\{[^}]*\}\s+from\s+['"]@clerk\/nextjs\/server['"];?\s*/g, '');
+    sanitized = sanitized.replace(/import\s+\{[^}]*\}\s+from\s+['"]@clerk\/nextjs['"];?\s*/g, '');
+    sanitized = sanitized.replace(/<ClerkProvider[^>]*>/g, '<>');
+    sanitized = sanitized.replace(/<\/ClerkProvider>/g, '</>');
+
+    console.log(`   🛡️  Protected ${filePath} from 'use client' injection (layout files must be Server Components)`);
+    return sanitized;
+  }
+
   // CRITICAL: Add 'use client' directive for components that import client-only libraries
   // This prevents "Super expression must either be null or a function" errors
   const clientOnlyLibraries = [
@@ -774,8 +790,10 @@ function sanitizeCodeFile(content: string, filePath: string, isPersonal: boolean
 
   // Add 'use client' to component files that need it
   // Include page.tsx if it imports client libraries (like recharts)
+  // OPTION 1: Exclude layout.tsx files (Server Components can't have 'use client')
   if (needsUseClient &&
       (filePath.endsWith('.tsx') || filePath.endsWith('.jsx')) &&
+      !filePath.includes('layout.tsx') &&
       !sanitized.includes("'use client'") &&
       !sanitized.includes('"use client"')) {
 
@@ -836,12 +854,8 @@ export const config = {
   sanitized = sanitized.replace(/import\s+\{[^}]*\}\s+from\s+['"]@clerk\/nextjs\/server['"];?\s*/g, '');
   sanitized = sanitized.replace(/import\s+\{[^}]*\}\s+from\s+['"]@clerk\/nextjs['"];?\s*/g, '');
 
-  // Remove ClerkProvider wrapping in layout files
-  if (filePath.includes('layout.tsx')) {
-    // Replace ClerkProvider with Fragment
-    sanitized = sanitized.replace(/<ClerkProvider[^>]*>/g, '<>');
-    sanitized = sanitized.replace(/<\/ClerkProvider>/g, '</>');
-  }
+  // Note: ClerkProvider removal for layout files is now handled in early return (line 757)
+  // This prevents code duplication and ensures layout files are properly protected
 
   // Replace auth() and currentUser() server calls with mock values
   // CRITICAL: Must provide mock values, not remove entirely, or userId/user will be undefined
