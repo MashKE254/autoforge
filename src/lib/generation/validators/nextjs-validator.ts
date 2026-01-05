@@ -19,6 +19,10 @@ export class NextjsValidator implements Validator {
   async validate(files: GeneratedFile[]): Promise<ValidationResult> {
     const issues: ValidationIssue[] = [];
 
+    console.log(`\n   🔍 Next.js Validator checking ${files.length} files...`);
+    const layoutFiles = files.filter(f => f.path.includes('layout.tsx'));
+    console.log(`   📋 Layout files found: ${layoutFiles.map(f => f.path).join(', ') || 'NONE'}`);
+
     for (const file of files) {
       // Only validate TypeScript/JavaScript files
       if (!file.path.match(/\.(tsx?|jsx?)$/)) continue;
@@ -26,9 +30,23 @@ export class NextjsValidator implements Validator {
       const content = file.content;
       const lines = content.split('\n');
 
+      // Extra logging for layout files
+      if (file.path.includes('layout.tsx')) {
+        console.log(`\n   🔎 Examining ${file.path}:`);
+        console.log(`      First 500 chars: ${content.substring(0, 500).replace(/\n/g, '\\n')}`);
+      }
+
       // Rule 1: Check for 'use client' + metadata conflicts
-      const hasUseClient = /['"]use client['"];?/.test(content);
+      // Check for "use client" in ANY format (with/without quotes mixing, with/without semicolon, with trailing spaces, comments, etc.)
+      const hasUseClient =
+        /['"]use client['"];?\s*$/m.test(content) ||  // Standard format on its own line
+        /^['"]use client['"];?\s*$/m.test(content) ||  // At start of line
+        /['"]use client['"]/.test(content);            // Anywhere in content (catch-all)
       const hasMetadata = /export\s+(const\s+metadata|async\s+function\s+generateMetadata)/.test(content);
+
+      if (file.path.includes('layout.tsx')) {
+        console.log(`      hasUseClient: ${hasUseClient}, hasMetadata: ${hasMetadata}`);
+      }
 
       if (hasUseClient && hasMetadata) {
         const metadataLine = lines.findIndex(line => /export\s+(const\s+metadata|async\s+function\s+generateMetadata)/.test(line));
@@ -196,14 +214,18 @@ export class NextjsValidator implements Validator {
         case 'nextjs-layout-client-component':
           console.log(`     🔍 Checking for "use client" in ${file.path}...`);
           console.log(`     📄 File has ${content.split('\n').length} lines`);
+          console.log(`     📝 First 300 chars BEFORE fix: ${content.substring(0, 300)}`);
 
-          // Remove 'use client' directive (handle all variations - single/double quotes, with/without semicolon)
-          // Handle cases where it might not be at the very start (comments, whitespace)
-          content = content.replace(/^(\s*)['"]use client['"];?\s*$/gm, '');
+          // Remove 'use client' directive with COMPREHENSIVE matching
+          // Match ANY line that contains "use client" (quotes can be mixed, with/without semicolon, with/without trailing content)
+          content = content.replace(/^(\s*)['"]use client['"];?(\s*\/\/.*)?$/gm, ''); // With optional comment
+          content = content.replace(/^(\s*)['"]use client['"];?\s*$/gm, '');         // Without comment (redundant but safe)
           // Remove any multiple consecutive blank lines left behind
           content = content.replace(/\n\n\n+/g, '\n\n');
           // Trim any leading whitespace
           content = content.trim();
+
+          console.log(`     📝 First 300 chars AFTER fix: ${content.substring(0, 300)}`);
 
           if (content !== originalContent) {
             console.log(`     ✅ Removed "use client" from ${file.path}`);
