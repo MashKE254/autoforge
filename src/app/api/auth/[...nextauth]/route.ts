@@ -32,6 +32,8 @@ export const authOptions: NextAuthOptions = {
   session: {
     strategy: "jwt",
   },
+  basePath: "/api/auth",
+  useSecureCookies: process.env.NODE_ENV === "production",
   // ADD THIS SECTION
   pages: {
     signIn: '/login',
