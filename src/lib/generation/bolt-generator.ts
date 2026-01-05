@@ -1576,16 +1576,27 @@ export class BoltGenerator {
     }
 
     try {
+      // CRITICAL: Verify job still exists (race condition protection)
       if (jobId) {
+        const jobExists = await prisma.generationJob.findUnique({
+          where: { id: jobId },
+          select: { id: true, status: true }
+        });
+
+        if (!jobExists) {
+          console.log(`⚠️  Job ${jobId} was deleted (likely duplicate) - aborting generation`);
+          throw new Error('Job was deleted due to duplicate detection');
+        }
+
         await prisma.generationJob.update({
           where: { id: jobId },
-          data: { 
+          data: {
             status: 'RUNNING',
             generationStartedAt: new Date()
           }
         });
       }
-      
+
       callbacks?.onProgress?.('Starting AI generation with managed stack...');
 
       // Build system prompt based on mode
