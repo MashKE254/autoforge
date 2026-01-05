@@ -406,6 +406,9 @@ export class PersonalToolGenerator {
       // Verify required files
       this.verifyRequiredFiles(files);
 
+      // Sanitize generated files to fix common issues
+      files = this.sanitizeFiles(files);
+
       callbacks?.onProgress?.(`Generated ${files.length} files`);
 
       return {
@@ -492,6 +495,60 @@ Generate ALL necessary files now.`;
     };
 
     return languageMap[ext || ''] || 'text';
+  }
+
+  /**
+   * Sanitize generated files to fix common issues
+   */
+  private sanitizeFiles(files: GeneratedFile[]): GeneratedFile[] {
+    return files.map(file => {
+      let content = file.content;
+
+      // Sanitize globals.css
+      if (file.path === 'app/globals.css' || file.path.endsWith('/globals.css')) {
+        // Remove Google Fonts imports
+        content = content.replace(/@import\s+url\([^)]+fonts\.googleapis\.com[^)]+\);?\s*/g, '');
+
+        // Fix Tailwind imports
+        content = content.replace(/@import\s+['"]tailwindcss\/base['"];?/g, '@tailwind base;');
+        content = content.replace(/@import\s+['"]tailwindcss\/components['"];?/g, '@tailwind components;');
+        content = content.replace(/@import\s+['"]tailwindcss\/utilities['"];?/g, '@tailwind utilities;');
+
+        // Replace problematic @apply classes
+        content = content.replace(
+          /@apply\s+[^;]*(?:bg-dark-\d+|border-border|bg-background|text-foreground|bg-card|bg-muted|text-muted-foreground)[^;]*/g,
+          (match) => {
+            return match
+              .replace(/bg-dark-\d+/g, 'bg-zinc-900')
+              .replace(/border-border/g, 'border-white/10')
+              .replace(/bg-background/g, 'bg-zinc-950')
+              .replace(/text-foreground/g, 'text-white')
+              .replace(/bg-card/g, 'bg-zinc-900')
+              .replace(/bg-muted/g, 'bg-zinc-800')
+              .replace(/text-muted-foreground/g, 'text-gray-400') + ';';
+          }
+        );
+      }
+
+      // Sanitize TSX/JSX files - replace problematic className values
+      if (file.path.endsWith('.tsx') || file.path.endsWith('.jsx')) {
+        content = content.replace(/\bbg-dark-(\d+)\b/g, 'bg-zinc-900');
+        content = content.replace(/\btext-dark-(\d+)\b/g, 'text-gray-400');
+        content = content.replace(/\bborder-dark-(\d+)\b/g, 'border-zinc-800');
+
+        // Replace shadcn/custom classes with standard Tailwind
+        content = content.replace(/\bborder-border\b/g, 'border-white/10');
+        content = content.replace(/\bbg-background\b/g, 'bg-zinc-950');
+        content = content.replace(/\btext-foreground\b/g, 'text-white');
+        content = content.replace(/\bbg-card\b/g, 'bg-zinc-900');
+        content = content.replace(/\bbg-muted\b/g, 'bg-zinc-800');
+        content = content.replace(/\btext-muted-foreground\b/g, 'text-gray-400');
+        content = content.replace(/\bbg-primary\b/g, 'bg-violet-600');
+        content = content.replace(/\btext-primary\b/g, 'text-violet-600');
+      }
+
+      return { ...file, content };
+    });
   }
 
   /**
