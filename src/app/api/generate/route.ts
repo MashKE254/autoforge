@@ -152,26 +152,26 @@ export async function POST(request: NextRequest) {
     }
     console.log(`   Prompt: "${trimmedPrompt.slice(0, 100)}..."`);
 
-    // 3.5. Check for duplicate requests (same user, same prompt, RUNNING status, within last 2 minutes)
-    const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000);
+    // 3.5. STRICT duplicate check - check for ANY active job with same prompt (no time limit)
     const existingJob = await prisma.generationJob.findFirst({
       where: {
         userId: user.id,
         prompt: trimmedPrompt,
-        status: 'RUNNING',
-        createdAt: { gte: twoMinutesAgo },
+        status: { in: ['RUNNING', 'PENDING'] },
       },
       orderBy: { createdAt: 'desc' },
     });
 
     if (existingJob) {
-      console.log(`⚠️  DUPLICATE REQUEST DETECTED - Returning existing job: ${existingJob.id}`);
+      console.log(`⚠️  DUPLICATE REQUEST BLOCKED - Returning existing job: ${existingJob.id}`);
+      console.log(`   Created: ${existingJob.createdAt.toISOString()}`);
+      console.log(`   Status: ${existingJob.status}`);
       return NextResponse.json({
-        success: false,
-        error: 'A generation with this prompt is already in progress',
+        success: true,
         jobId: existingJob.id,
-        message: 'Please wait for the existing generation to complete',
-      }, { status: 409 }); // 409 Conflict
+        message: 'Generation already in progress',
+        isDuplicate: true,
+      });
     }
 
     // 4. Create job record with generation mode
@@ -188,6 +188,45 @@ export async function POST(request: NextRequest) {
 
     console.log(`   Job ID: ${job.id}`);
     console.log(`${'='.repeat(80)}\n`);
+
+    // 4.5. Race condition safety check - if another job was created simultaneously, use the older one
+    const fiveSecondsAgo = new Date(Date.now() - 5000);
+    const duplicateJobs = await prisma.generationJob.findMany({
+      where: {
+        userId: user.id,
+        prompt: trimmedPrompt,
+        status: { in: ['RUNNING', 'PENDING'] },
+        createdAt: { gte: fiveSecondsAgo },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    if (duplicateJobs.length > 1) {
+      console.log(`⚠️  RACE CONDITION DETECTED - ${duplicateJobs.length} jobs created simultaneously!`);
+      const oldestJob = duplicateJobs[0];
+      const duplicatesToDelete = duplicateJobs.slice(1);
+
+      // If this is NOT the oldest job, delete it and return the oldest one
+      if (job.id !== oldestJob.id) {
+        console.log(`   Deleting duplicate job: ${job.id}`);
+        console.log(`   Using oldest job: ${oldestJob.id}`);
+
+        await prisma.generationJob.delete({ where: { id: job.id } });
+
+        return NextResponse.json({
+          success: true,
+          jobId: oldestJob.id,
+          message: 'Duplicate request merged with existing generation',
+          isDuplicate: true,
+        });
+      } else {
+        // This IS the oldest job - delete the duplicates
+        console.log(`   This is the oldest job - deleting ${duplicatesToDelete.length} duplicates`);
+        for (const dup of duplicatesToDelete) {
+          await prisma.generationJob.delete({ where: { id: dup.id } });
+        }
+      }
+    }
 
     // 5. Check cache before generating
     const cachedResult = await getCachedGeneration(trimmedPrompt, mode, forceType);
