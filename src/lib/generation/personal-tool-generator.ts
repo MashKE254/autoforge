@@ -395,7 +395,7 @@ export class PersonalToolGenerator {
       }
 
       // Parse files from response
-      const files = this.parseFiles(responseText);
+      let files = this.parseFiles(responseText);
 
       console.log(`\n✅ Personal Tool Generated`);
       console.log(`   Files: ${files.length}`);
