@@ -145,6 +145,24 @@ export class NextjsValidator implements Validator {
       }
     }
 
+    console.log(`\n   📋 Next.js Validator Summary:`);
+    console.log(`      Total issues: ${issues.length}`);
+    console.log(`      Fixable: ${issues.filter(i => i.fixable).length}`);
+    console.log(`      Non-fixable: ${issues.filter(i => !i.fixable).length}`);
+
+    if (issues.length > 0) {
+      console.log(`\n   📝 Issue breakdown:`);
+      const issuesByType = issues.reduce((acc, issue) => {
+        acc[issue.type] = (acc[issue.type] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+
+      Object.entries(issuesByType).forEach(([type, count]) => {
+        const fixable = issues.filter(i => i.type === type && i.fixable).length;
+        console.log(`      ${type}: ${count} (${fixable} fixable)`);
+      });
+    }
+
     return {
       success: issues.filter(i => i.severity === 'error').length === 0,
       issues,
