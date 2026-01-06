@@ -848,6 +848,62 @@ export const config = {
 `;
   }
 
+  // Special handling for Supabase server client - replace with mock (no cookies)
+  if (filePath.includes('lib/supabase/server.ts') || filePath.includes('lib\\supabase\\server.ts')) {
+    return `// WebContainer-compatible Supabase client (mocked for preview)
+export async function createClient() {
+  // Mock Supabase client for WebContainer preview
+  return {
+    from: (table: string) => ({
+      select: () => Promise.resolve({ data: [], error: null }),
+      insert: () => Promise.resolve({ data: null, error: null }),
+      update: () => Promise.resolve({ data: null, error: null }),
+      delete: () => Promise.resolve({ data: null, error: null }),
+      single: () => Promise.resolve({ data: null, error: null }),
+    }),
+    auth: {
+      getUser: () => Promise.resolve({
+        data: { user: { id: 'demo-user', email: 'demo@example.com' } },
+        error: null
+      }),
+      getSession: () => Promise.resolve({ data: { session: null }, error: null }),
+    },
+    storage: {
+      from: () => ({
+        upload: () => Promise.resolve({ data: null, error: null }),
+        getPublicUrl: () => ({ data: { publicUrl: '' } }),
+      }),
+    },
+  } as any;
+}
+`;
+  }
+
+  // Special handling for Supabase browser client - replace with mock
+  if (filePath.includes('lib/supabase/client.ts') || filePath.includes('lib\\supabase\\client.ts')) {
+    return `// WebContainer-compatible Supabase client (mocked for preview)
+export function createClient() {
+  // Mock Supabase client for WebContainer preview
+  return {
+    from: (table: string) => ({
+      select: () => Promise.resolve({ data: [], error: null }),
+      insert: () => Promise.resolve({ data: null, error: null }),
+      update: () => Promise.resolve({ data: null, error: null }),
+      delete: () => Promise.resolve({ data: null, error: null }),
+      single: () => Promise.resolve({ data: null, error: null }),
+    }),
+    auth: {
+      getUser: () => Promise.resolve({
+        data: { user: { id: 'demo-user', email: 'demo@example.com' } },
+        error: null
+      }),
+      getSession: () => Promise.resolve({ data: { session: null }, error: null }),
+    },
+  } as any;
+}
+`;
+  }
+
   // Remove Clerk imports and usage
   sanitized = sanitized.replace(/import\s+.*from\s+['"]@clerk\/nextjs\/server['"];?\s*/g, '');
   sanitized = sanitized.replace(/import\s+.*from\s+['"]@clerk\/nextjs['"];?\s*/g, '');
