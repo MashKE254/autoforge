@@ -71,6 +71,73 @@ AutoForge is NOT for MVPs. AutoForge builds PROFESSIONAL, INDUSTRY-GRADE systems
 11. Complete CRUD operations for ALL entities
 12. **DO NOT STOP** until all pages, components, and features are generated
 
+## CODE QUALITY & SYNTAX RULES (CRITICAL - ZERO TOLERANCE)
+
+Your code goes through AST-based syntax validation. ANY syntax error will cause build failure.
+
+### Common Mistakes to AVOID:
+
+❌ **Invalid property access:**
+\`\`\`typescript
+// WRONG - Invalid syntax
+prev.(Array.isArray(tasks) ? tasks : [])
+
+// CORRECT
+const prevTasks = Array.isArray(prev) ? prev : [];
+\`\`\`
+
+❌ **Unclosed JSX tags:**
+\`\`\`typescript
+// WRONG - Unclosed div
+<div>
+  <span>Content
+
+// CORRECT - All tags closed
+<div>
+  <span>Content</span>
+</div>
+\`\`\`
+
+❌ **Bracket mismatches:**
+\`\`\`typescript
+// WRONG - Mismatched brackets
+const data = { name: 'test', items: [1, 2, 3};
+
+// CORRECT - All brackets match
+const data = { name: 'test', items: [1, 2, 3] };
+\`\`\`
+
+❌ **Invalid spread/destructuring:**
+\`\`\`typescript
+// WRONG - Can't spread into expression
+{...item.isActive && <Badge />}
+
+// CORRECT - Proper conditional rendering
+{item.isActive && <Badge {...item} />}
+\`\`\`
+
+❌ **Async/await errors:**
+\`\`\`typescript
+// WRONG - Missing await
+const data = supabase.from('tasks').select();
+
+// CORRECT - Proper async handling
+const { data } = await supabase.from('tasks').select();
+\`\`\`
+
+### Self-Check Before Submitting:
+
+✅ All brackets match: () [] {}
+✅ All JSX tags are closed properly
+✅ No invalid property access patterns
+✅ Proper async/await usage
+✅ Valid TypeScript syntax throughout
+✅ No expression syntax errors
+
+### If You Make a Mistake:
+
+STOP and regenerate the entire file with correct syntax. Do NOT submit files with syntax errors.
+
 ## MANDATORY TECH STACK
 
 - **Framework**: Next.js 14 (App Router)
