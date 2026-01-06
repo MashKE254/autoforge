@@ -211,7 +211,15 @@ export async function POST(request: NextRequest) {
         console.log(`   Deleting duplicate job: ${job.id}`);
         console.log(`   Using oldest job: ${oldestJob.id}`);
 
-        await prisma.generationJob.delete({ where: { id: job.id } });
+        try {
+          await prisma.generationJob.delete({ where: { id: job.id } });
+        } catch (error: any) {
+          // Ignore "record not found" - another request already deleted it
+          if (error.code !== 'P2025') {
+            throw error;
+          }
+          console.log(`   Job already deleted by another request`);
+        }
 
         return NextResponse.json({
           success: true,
@@ -223,7 +231,15 @@ export async function POST(request: NextRequest) {
         // This IS the oldest job - delete the duplicates
         console.log(`   This is the oldest job - deleting ${duplicatesToDelete.length} duplicates`);
         for (const dup of duplicatesToDelete) {
-          await prisma.generationJob.delete({ where: { id: dup.id } });
+          try {
+            await prisma.generationJob.delete({ where: { id: dup.id } });
+          } catch (error: any) {
+            // Ignore "record not found" - another request already deleted it
+            if (error.code !== 'P2025') {
+              throw error;
+            }
+            console.log(`   Duplicate ${dup.id} already deleted by another request`);
+          }
         }
       }
     }
@@ -408,8 +424,11 @@ export async function POST(request: NextRequest) {
             errorLog: error instanceof Error ? error.message : 'Unknown error',
           },
         });
-      } catch (dbError) {
-        console.error('Failed to update job status:', dbError);
+      } catch (dbError: any) {
+        // Ignore "record not found" - job was deleted as duplicate
+        if (dbError.code !== 'P2025') {
+          console.error('Failed to update job status:', dbError);
+        }
       }
     }
 
