@@ -751,6 +751,11 @@ function isPersonalTool(files: Array<{ path: string; content: string }>): boolea
 function sanitizeCodeFile(content: string, filePath: string, isPersonal: boolean = false): string {
   let sanitized = content;
 
+  // Debug: Log Supabase files specifically
+  if (filePath.includes('supabase')) {
+    console.log(`   📝 Sanitizing Supabase file: "${filePath}"`);
+  }
+
   // OPTION 3: Early return for layout files to prevent 'use client' injection
   // Layout files are Server Components and must NOT have 'use client' directive
   // even if they import components that use client-only libraries
@@ -856,7 +861,9 @@ export const config = {
   // Special handling for Supabase server client - replace with mock (no cookies)
   // Use regex to match ANY path ending with lib/supabase/server.ts (handles all directory structures)
   // (?:^|[/\\]) matches either start of string OR a path separator
-  if (/(?:^|[/\\])lib[/\\]supabase[/\\]server\.tsx?$/i.test(filePath)) {
+  const isSupabaseServer = /(?:^|[/\\])lib[/\\]supabase[/\\]server\.tsx?$/i.test(filePath);
+  if (isSupabaseServer) {
+    console.log(`   🔄 Replacing Supabase server.ts with WebContainer mock: ${filePath}`);
     return `// WebContainer-compatible Supabase client (mocked for preview)
 export async function createClient() {
   // Mock Supabase client for WebContainer preview
@@ -889,7 +896,9 @@ export async function createClient() {
   // Special handling for Supabase browser client - replace with mock
   // Use regex to match ANY path ending with lib/supabase/client.ts (handles all directory structures)
   // (?:^|[/\\]) matches either start of string OR a path separator
-  if (/(?:^|[/\\])lib[/\\]supabase[/\\]client\.tsx?$/i.test(filePath)) {
+  const isSupabaseClient = /(?:^|[/\\])lib[/\\]supabase[/\\]client\.tsx?$/i.test(filePath);
+  if (isSupabaseClient) {
+    console.log(`   🔄 Replacing Supabase client.ts with WebContainer mock: ${filePath}`);
     return `// WebContainer-compatible Supabase client (mocked for preview)
 export function createClient() {
   // Mock Supabase client for WebContainer preview
