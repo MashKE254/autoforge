@@ -13,7 +13,15 @@ const createPrismaClient = () => {
         url: process.env.DATABASE_URL,
       },
     },
-  });
+    // CRITICAL: Aggressive connection pool settings for dev mode
+    // Prevents connection exhaustion during hot reloads
+    __internal: {
+      engine: {
+        connection_limit: 5, // Reduce from default 17 to force recycling
+        pool_timeout: 5, // 5 seconds instead of 10
+      },
+    },
+  } as any); // Type assertion needed for internal options
 };
 
 // Use global singleton in development to prevent multiple instances during hot-reloads
@@ -33,4 +41,18 @@ if (process.env.NODE_ENV !== 'production') {
   process.on('beforeExit', cleanup);
   process.on('SIGINT', cleanup);
   process.on('SIGTERM', cleanup);
+  process.on('SIGQUIT', cleanup);
+  process.on('exit', cleanup);
+}
+
+// CRITICAL: Export helper to manually clean stale connections in dev mode
+export async function cleanupStaleConnections() {
+  if (process.env.NODE_ENV === 'development') {
+    try {
+      await prisma.$disconnect();
+      console.log('🔄 Cleaned up stale Prisma connections');
+    } catch (error) {
+      console.warn('⚠️  Failed to cleanup connections:', error);
+    }
+  }
 }
