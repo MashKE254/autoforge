@@ -866,28 +866,72 @@ export const config = {
     console.log(`   🔄 Replacing Supabase server.ts with WebContainer mock: ${filePath}`);
     return `// WebContainer-compatible Supabase client (mocked for preview)
 export async function createClient() {
+  // Query builder that supports method chaining
+  const createQueryBuilder = () => {
+    const builder = {
+      select: () => builder,
+      insert: () => builder,
+      update: () => builder,
+      delete: () => builder,
+      upsert: () => builder,
+      eq: () => builder,
+      neq: () => builder,
+      gt: () => builder,
+      gte: () => builder,
+      lt: () => builder,
+      lte: () => builder,
+      like: () => builder,
+      ilike: () => builder,
+      is: () => builder,
+      in: () => builder,
+      contains: () => builder,
+      containedBy: () => builder,
+      rangeGt: () => builder,
+      rangeGte: () => builder,
+      rangeLt: () => builder,
+      rangeLte: () => builder,
+      rangeAdjacent: () => builder,
+      overlaps: () => builder,
+      textSearch: () => builder,
+      match: () => builder,
+      not: () => builder,
+      or: () => builder,
+      filter: () => builder,
+      order: () => builder,
+      limit: () => builder,
+      range: () => builder,
+      abortSignal: () => builder,
+      single: () => Promise.resolve({ data: null, error: null }),
+      maybeSingle: () => Promise.resolve({ data: null, error: null }),
+      then: (resolve) => resolve({ data: [], error: null }),
+      catch: () => Promise.resolve({ data: [], error: null }),
+    };
+    return builder;
+  };
+
   // Mock Supabase client for WebContainer preview
   return {
-    from: (table: string) => ({
-      select: () => Promise.resolve({ data: [], error: null }),
-      insert: () => Promise.resolve({ data: null, error: null }),
-      update: () => Promise.resolve({ data: null, error: null }),
-      delete: () => Promise.resolve({ data: null, error: null }),
-      single: () => Promise.resolve({ data: null, error: null }),
-    }),
+    from: (table: string) => createQueryBuilder(),
     auth: {
       getUser: () => Promise.resolve({
         data: { user: { id: 'demo-user', email: 'demo@example.com' } },
         error: null
       }),
       getSession: () => Promise.resolve({ data: { session: null }, error: null }),
+      signIn: () => Promise.resolve({ data: null, error: null }),
+      signOut: () => Promise.resolve({ error: null }),
+      signUp: () => Promise.resolve({ data: null, error: null }),
     },
     storage: {
       from: () => ({
         upload: () => Promise.resolve({ data: null, error: null }),
+        download: () => Promise.resolve({ data: null, error: null }),
+        remove: () => Promise.resolve({ data: null, error: null }),
+        list: () => Promise.resolve({ data: [], error: null }),
         getPublicUrl: () => ({ data: { publicUrl: '' } }),
       }),
     },
+    rpc: () => Promise.resolve({ data: null, error: null }),
   } as any;
 }
 `;
@@ -901,22 +945,72 @@ export async function createClient() {
     console.log(`   🔄 Replacing Supabase client.ts with WebContainer mock: ${filePath}`);
     return `// WebContainer-compatible Supabase client (mocked for preview)
 export function createClient() {
+  // Query builder that supports method chaining
+  const createQueryBuilder = () => {
+    const builder = {
+      select: () => builder,
+      insert: () => builder,
+      update: () => builder,
+      delete: () => builder,
+      upsert: () => builder,
+      eq: () => builder,
+      neq: () => builder,
+      gt: () => builder,
+      gte: () => builder,
+      lt: () => builder,
+      lte: () => builder,
+      like: () => builder,
+      ilike: () => builder,
+      is: () => builder,
+      in: () => builder,
+      contains: () => builder,
+      containedBy: () => builder,
+      rangeGt: () => builder,
+      rangeGte: () => builder,
+      rangeLt: () => builder,
+      rangeLte: () => builder,
+      rangeAdjacent: () => builder,
+      overlaps: () => builder,
+      textSearch: () => builder,
+      match: () => builder,
+      not: () => builder,
+      or: () => builder,
+      filter: () => builder,
+      order: () => builder,
+      limit: () => builder,
+      range: () => builder,
+      abortSignal: () => builder,
+      single: () => Promise.resolve({ data: null, error: null }),
+      maybeSingle: () => Promise.resolve({ data: null, error: null }),
+      then: (resolve) => resolve({ data: [], error: null }),
+      catch: () => Promise.resolve({ data: [], error: null }),
+    };
+    return builder;
+  };
+
   // Mock Supabase client for WebContainer preview
   return {
-    from: (table: string) => ({
-      select: () => Promise.resolve({ data: [], error: null }),
-      insert: () => Promise.resolve({ data: null, error: null }),
-      update: () => Promise.resolve({ data: null, error: null }),
-      delete: () => Promise.resolve({ data: null, error: null }),
-      single: () => Promise.resolve({ data: null, error: null }),
-    }),
+    from: (table: string) => createQueryBuilder(),
     auth: {
       getUser: () => Promise.resolve({
         data: { user: { id: 'demo-user', email: 'demo@example.com' } },
         error: null
       }),
       getSession: () => Promise.resolve({ data: { session: null }, error: null }),
+      signIn: () => Promise.resolve({ data: null, error: null }),
+      signOut: () => Promise.resolve({ error: null }),
+      signUp: () => Promise.resolve({ data: null, error: null }),
     },
+    storage: {
+      from: () => ({
+        upload: () => Promise.resolve({ data: null, error: null }),
+        download: () => Promise.resolve({ data: null, error: null }),
+        remove: () => Promise.resolve({ data: null, error: null }),
+        list: () => Promise.resolve({ data: [], error: null }),
+        getPublicUrl: () => ({ data: { publicUrl: '' } }),
+      }),
+    },
+    rpc: () => Promise.resolve({ data: null, error: null }),
   } as any;
 }
 `;
