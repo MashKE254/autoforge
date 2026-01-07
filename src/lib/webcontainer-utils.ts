@@ -755,7 +755,8 @@ function sanitizeCodeFile(content: string, filePath: string, isPersonal: boolean
   // Layout files are Server Components and must NOT have 'use client' directive
   // even if they import components that use client-only libraries
   // Use regex to match ANY layout.tsx file regardless of directory depth
-  if (/[/\\]layout\.tsx$/i.test(filePath) || filePath === 'layout.tsx') {
+  // (?:^|[/\\]) matches either start of string OR a path separator
+  if (/(?:^|[/\\])layout\.tsx$/i.test(filePath)) {
     // Only strip ClerkProvider wrapper, don't add 'use client'
     sanitized = sanitized.replace(/import\s+.*from\s+['"]@clerk\/nextjs\/server['"];?\s*/g, '');
     sanitized = sanitized.replace(/import\s+.*from\s+['"]@clerk\/nextjs['"];?\s*/g, '');
@@ -793,7 +794,8 @@ function sanitizeCodeFile(content: string, filePath: string, isPersonal: boolean
   // Include page.tsx if it imports client libraries (like recharts)
   // OPTION 1: Exclude layout.tsx files (Server Components can't have 'use client')
   // Use regex to match layout files regardless of directory depth
-  const isLayoutFile = /[/\\]layout\.tsx$/i.test(filePath) || filePath === 'layout.tsx';
+  // (?:^|[/\\]) matches either start of string OR a path separator
+  const isLayoutFile = /(?:^|[/\\])layout\.tsx$/i.test(filePath);
   if (needsUseClient &&
       (filePath.endsWith('.tsx') || filePath.endsWith('.jsx')) &&
       !isLayoutFile &&
@@ -852,8 +854,9 @@ export const config = {
   }
 
   // Special handling for Supabase server client - replace with mock (no cookies)
-  // Use regex to match ANY path ending with /lib/supabase/server.ts (handles all directory structures)
-  if (/[/\\]lib[/\\]supabase[/\\]server\.tsx?$/i.test(filePath)) {
+  // Use regex to match ANY path ending with lib/supabase/server.ts (handles all directory structures)
+  // (?:^|[/\\]) matches either start of string OR a path separator
+  if (/(?:^|[/\\])lib[/\\]supabase[/\\]server\.tsx?$/i.test(filePath)) {
     return `// WebContainer-compatible Supabase client (mocked for preview)
 export async function createClient() {
   // Mock Supabase client for WebContainer preview
@@ -884,8 +887,9 @@ export async function createClient() {
   }
 
   // Special handling for Supabase browser client - replace with mock
-  // Use regex to match ANY path ending with /lib/supabase/client.ts (handles all directory structures)
-  if (/[/\\]lib[/\\]supabase[/\\]client\.tsx?$/i.test(filePath)) {
+  // Use regex to match ANY path ending with lib/supabase/client.ts (handles all directory structures)
+  // (?:^|[/\\]) matches either start of string OR a path separator
+  if (/(?:^|[/\\])lib[/\\]supabase[/\\]client\.tsx?$/i.test(filePath)) {
     return `// WebContainer-compatible Supabase client (mocked for preview)
 export function createClient() {
   // Mock Supabase client for WebContainer preview
@@ -1103,7 +1107,8 @@ if (typeof DELETE !== 'undefined') { const _DELETE = DELETE; DELETE = safeApiHan
 
   // Fix Card component file itself - add missing subcomponent exports
   // Use regex to match card component file regardless of directory structure
-  if (/[/\\]components[/\\]ui[/\\]card\.(tsx?|jsx?)$/i.test(filePath)) {
+  // (?:^|[/\\]) matches either start of string OR a path separator
+  if (/(?:^|[/\\])components[/\\]ui[/\\]card\.(tsx?|jsx?)$/i.test(filePath)) {
     // Check what's currently exported
     const hasCardHeader = /export.*CardHeader/.test(sanitized);
     const hasCardTitle = /export.*CardTitle/.test(sanitized);
