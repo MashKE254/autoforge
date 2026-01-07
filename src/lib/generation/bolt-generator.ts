@@ -138,6 +138,116 @@ const { data } = await supabase.from('tasks').select();
 
 STOP and regenerate the entire file with correct syntax. Do NOT submit files with syntax errors.
 
+## COMPONENT GENERATION RULES (CRITICAL - ZERO TOLERANCE)
+
+**EVERY component you import MUST have a corresponding file in your generation.**
+
+### Pre-Flight Checklist (Before Finishing):
+
+✅ **Scan ALL files for imports** - Every `import { Component } from './path'` must have a file
+✅ **No placeholder components** - Every component must be FULLY implemented
+✅ **No "TODO" comments** - Everything must be production-ready
+✅ **All components are interactive** - Buttons work, forms submit, data updates
+
+### What Makes a Component "Complete":
+
+**✅ CORRECT Example:**
+```tsx
+// components/tasks/task-list.tsx
+'use client';
+import { useState } from 'react';
+import { TaskCard } from './task-card';
+
+export function TaskList() {
+  // Demo data built-in for WebContainer
+  const [tasks, setTasks] = useState([
+    { id: '1', title: 'Design dashboard', status: 'in-progress', priority: 'high' },
+    { id: '2', title: 'Fix login bug', status: 'todo', priority: 'urgent' },
+    { id: '3', title: 'Write docs', status: 'done', priority: 'low' },
+  ]);
+
+  const handleStatusChange = (id: string, newStatus: string) => {
+    setTasks(tasks.map(t => t.id === id ? { ...t, status: newStatus } : t));
+  };
+
+  return (
+    <div className="space-y-4">
+      {tasks.map(task => (
+        <TaskCard
+          key={task.id}
+          task={task}
+          onStatusChange={handleStatusChange}
+        />
+      ))}
+    </div>
+  );
+}
+```
+
+**❌ WRONG - This creates placeholders:**
+```tsx
+// app/dashboard/page.tsx
+import { TaskList } from '@/components/tasks/task-list'; // ← File doesn't exist!
+
+// This will generate:
+// "Component: TaskList - This is a placeholder"
+```
+
+**❌ WRONG - Incomplete implementation:**
+```tsx
+export function TaskList() {
+  // TODO: Implement task list
+  return <div>Coming soon</div>;
+}
+```
+
+### Component Requirements:
+
+**1. Full UI Implementation:**
+- Complete JSX structure with proper styling
+- All child components must also be generated
+- Proper responsive design with Tailwind
+
+**2. Built-in Demo Data:**
+- Use `useState` with realistic mock data
+- Data should demonstrate all features
+- At least 3-5 items to show functionality
+
+**3. Full Interactivity:**
+- onClick handlers that DO something
+- Forms that submit and update state
+- Buttons that trigger actions
+- Smooth animations and transitions
+
+**4. Proper TypeScript:**
+- Full type definitions (no `any` unless WebContainer mocks)
+- Proper prop interfaces
+- Type-safe state management
+
+### Import Verification Protocol:
+
+**BEFORE you finish generation:**
+
+1. **List all imports** you've used across ALL files
+2. **Verify each imported component has a file** in your generation
+3. **If a component is missing**, generate it NOW with full implementation
+4. **Double-check** - scan the file list one more time
+
+**Example self-check:**
+```
+Files I'm importing:
+- TaskList from './task-list' ← Need to generate components/tasks/task-list.tsx
+- TaskCard from './task-card' ← Need to generate components/tasks/task-card.tsx
+- CreateTaskDialog from './create-task-dialog' ← Need to generate components/tasks/create-task-dialog.tsx
+
+Files I've generated:
+✅ components/tasks/task-list.tsx (complete with demo data)
+✅ components/tasks/task-card.tsx (complete with interactions)
+✅ components/tasks/create-task-dialog.tsx (complete form)
+
+All imports accounted for! ✅
+```
+
 ## MANDATORY TECH STACK
 
 - **Framework**: Next.js 14 (App Router)
