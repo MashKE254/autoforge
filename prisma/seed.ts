@@ -125,25 +125,36 @@ const categories = [
 async function main() {
   console.log('🌱 Seeding database with marketplace categories...');
 
-  for (const category of categories) {
-    const created = await prisma.appCategory.upsert({
-      where: { slug: category.slug },
-      update: {
-        name: category.name,
-        description: category.description,
-        icon: category.icon,
-        color: category.color,
-        sortOrder: category.sortOrder,
-        isFeatured: category.isFeatured,
-        isActive: true,
-      },
-      create: category,
-    });
+  try {
+    for (const category of categories) {
+      const created = await prisma.appCategory.upsert({
+        where: { slug: category.slug },
+        update: {
+          name: category.name,
+          description: category.description,
+          icon: category.icon,
+          color: category.color,
+          sortOrder: category.sortOrder,
+          isFeatured: category.isFeatured,
+          isActive: true,
+        },
+        create: category,
+      });
 
-    console.log(`✅ Created/Updated category: ${created.name} (${created.slug})`);
+      console.log(`✅ Created/Updated category: ${created.name} (${created.slug})`);
+    }
+
+    console.log('✨ Seeding complete!');
+  } catch (error: any) {
+    // Check if error is due to missing table
+    if (error.code === 'P2021') {
+      console.log('⚠️  AppCategory table does not exist yet.');
+      console.log('   Run migrations first: npx prisma migrate dev');
+      console.log('   Skipping seed for now...');
+    } else {
+      throw error;
+    }
   }
-
-  console.log('✨ Seeding complete!');
 }
 
 main()
