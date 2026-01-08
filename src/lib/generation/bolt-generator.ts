@@ -144,7 +144,7 @@ STOP and regenerate the entire file with correct syntax. Do NOT submit files wit
 
 ### Pre-Flight Checklist (Before Finishing):
 
-✅ **Scan ALL files for imports** - Every `import { Component } from './path'` must have a file
+✅ **Scan ALL files for imports** - Every \`import { Component } from './path'\` must have a file
 ✅ **No placeholder components** - Every component must be FULLY implemented
 ✅ **No "TODO" comments** - Everything must be production-ready
 ✅ **All components are interactive** - Buttons work, forms submit, data updates
@@ -152,7 +152,7 @@ STOP and regenerate the entire file with correct syntax. Do NOT submit files wit
 ### What Makes a Component "Complete":
 
 **✅ CORRECT Example:**
-```tsx
+\`\`\`tsx
 // components/tasks/task-list.tsx
 'use client';
 import { useState } from 'react';
@@ -182,24 +182,24 @@ export function TaskList() {
     </div>
   );
 }
-```
+\`\`\`
 
 **❌ WRONG - This creates placeholders:**
-```tsx
+\`\`\`tsx
 // app/dashboard/page.tsx
 import { TaskList } from '@/components/tasks/task-list'; // ← File doesn't exist!
 
 // This will generate:
 // "Component: TaskList - This is a placeholder"
-```
+\`\`\`
 
 **❌ WRONG - Incomplete implementation:**
-```tsx
+\`\`\`tsx
 export function TaskList() {
   // TODO: Implement task list
   return <div>Coming soon</div>;
 }
-```
+\`\`\`
 
 ### Component Requirements:
 
@@ -234,7 +234,7 @@ export function TaskList() {
 4. **Double-check** - scan the file list one more time
 
 **Example self-check:**
-```
+\`\`\`
 Files I'm importing:
 - TaskList from './task-list' ← Need to generate components/tasks/task-list.tsx
 - TaskCard from './task-card' ← Need to generate components/tasks/task-card.tsx
@@ -246,7 +246,7 @@ Files I've generated:
 ✅ components/tasks/create-task-dialog.tsx (complete form)
 
 All imports accounted for! ✅
-```
+\`\`\`
 
 ## MANDATORY TECH STACK
 
