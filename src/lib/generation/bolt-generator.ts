@@ -1876,12 +1876,41 @@ export class BoltGenerator {
         });
       }
 
+      // CRITICAL: Final syntax validation after all post-processing
+      // Sanitization and integration injection could have introduced errors
+      callbacks?.onProgress?.('🔍 Final syntax validation...');
+      const finalSyntaxCheck = await syntaxValidator.validate(files);
+
+      if (!finalSyntaxCheck.success) {
+        const syntaxErrors = finalSyntaxCheck.issues.filter(i => i.severity === 'error');
+        if (syntaxErrors.length > 0) {
+          console.error(`❌ Final validation failed: Post-processing introduced ${syntaxErrors.length} syntax errors:`);
+          syntaxErrors.forEach(issue => {
+            console.error(`   ${issue.file}:${issue.line} - ${issue.message}`);
+          });
+
+          callbacks?.onError?.(`Post-processing broke the code: ${syntaxErrors.length} syntax errors`);
+
+          if (jobId) {
+            await prisma.generationJob.update({
+              where: { id: jobId },
+              data: {
+                status: 'FAILED',
+                errorLog: `Post-processing validation failed:\n${syntaxErrors.map(e => `${e.file}:${e.line} - ${e.message}`).join('\n')}`,
+              },
+            });
+          }
+
+          throw new Error(`Post-processing introduced syntax errors. ${syntaxErrors[0]?.file}: ${syntaxErrors[0]?.message}`);
+        }
+      }
+
       console.log('   Generated files:');
       files.forEach((f: GeneratedFile) => {
         console.log(`   - ${f.path} (${f.content.length} chars)`);
         callbacks?.onFileComplete?.(f.path, f.content);
       });
-      
+
       // Save files to database if jobId provided
       if (jobId) {
         callbacks?.onProgress?.('Saving to database...');
