@@ -1183,6 +1183,26 @@ export function createClient() {
     (match, varName) => `(Array.isArray(${varName}) ? ${varName}.length : 0)`
   );
 
+  // CRITICAL: Fix Radix UI Select.Item with empty value prop
+  // Radix UI validates that Select.Item value cannot be an empty string
+  // Common AI mistake: <Select.Item value="">All</Select.Item>
+  // Fix: Replace empty string with "all" or based on the text content
+  sanitized = sanitized.replace(
+    /<(Select\.Item|SelectItem)(\s+[^>]*?)value=""/gi,
+    (match, componentName, attrs) => {
+      // Use "all" as default value for empty strings
+      return `<${componentName}${attrs}value="all"`;
+    }
+  );
+
+  // Also fix Select.Item with value='' (single quotes)
+  sanitized = sanitized.replace(
+    /<(Select\.Item|SelectItem)(\s+[^>]*?)value=''/gi,
+    (match, componentName, attrs) => {
+      return `<${componentName}${attrs}value="all"`;
+    }
+  );
+
   // Mock API routes to return safe defaults (prevents crashes from DB errors)
   if (filePath.startsWith('app/api/') && (filePath.endsWith('route.ts') || filePath.endsWith('route.js'))) {
     // Wrap API route exports to catch errors and return safe defaults
