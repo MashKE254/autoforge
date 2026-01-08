@@ -1824,13 +1824,32 @@ export class BoltGenerator {
       const { validationPipeline } = await import('./validators');
       const validationResult = await validationPipeline.validateAndFix(files);
 
-      if (!validationResult.success) {
-        console.warn(`⚠️  Validation found ${validationResult.summary.remainingIssues} issues`);
-        validationResult.allIssues
-          .filter(i => i.severity === 'error')
-          .forEach(issue => {
-            console.warn(`   ❌ ${issue.file}: ${issue.message}`);
+      // Check for critical errors that prevent deployment
+      const criticalErrors = validationResult.allIssues.filter(i => i.severity === 'error');
+
+      if (criticalErrors.length > 0) {
+        console.error(`❌ Validation failed with ${criticalErrors.length} critical errors:`);
+        criticalErrors.forEach(issue => {
+          console.error(`   ${issue.file}:${issue.line} - ${issue.message}`);
+        });
+
+        callbacks?.onError?.(`Code validation failed: ${criticalErrors.length} syntax/import errors detected`);
+
+        if (jobId) {
+          await prisma.generationJob.update({
+            where: { id: jobId },
+            data: {
+              status: 'FAILED',
+              errorLog: `Validation failed:\n${criticalErrors.map(e => `${e.file}:${e.line} - ${e.message}`).join('\n')}`,
+            },
           });
+        }
+
+        throw new Error(`Validation failed: Generated code has ${criticalErrors.length} critical errors. ${criticalErrors[0]?.file}: ${criticalErrors[0]?.message}`);
+      }
+
+      if (!validationResult.success) {
+        console.warn(`⚠️  Validation found ${validationResult.summary.remainingIssues} non-critical issues`);
       } else {
         console.log(`✅ Validation passed: ${validationResult.summary.fixedIssues} issues auto-fixed`);
       }
