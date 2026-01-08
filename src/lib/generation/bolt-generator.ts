@@ -209,7 +209,7 @@ export function TaskList() {
 - Proper responsive design with Tailwind
 
 **2. Built-in Demo Data:**
-- Use `useState` with realistic mock data
+- Use \`useState\` with realistic mock data
 - Data should demonstrate all features
 - At least 3-5 items to show functionality
 
@@ -220,7 +220,7 @@ export function TaskList() {
 - Smooth animations and transitions
 
 **4. Proper TypeScript:**
-- Full type definitions (no `any` unless WebContainer mocks)
+- Full type definitions (no \`any\` unless WebContainer mocks)
 - Proper prop interfaces
 - Type-safe state management
 
