@@ -628,7 +628,7 @@ function PreviewBanner({ onUpgrade }: { onUpgrade: () => void }) {
       <div className="flex items-center gap-2 text-violet-400 text-sm">
         <Sparkles className="w-4 h-4" />
         <span>
-          <strong>FREE Preview:</strong> This is a mock preview with hardcoded data. Upgrade to production for real functionality.
+          <strong>FREE Preview:</strong> This is a fully simulated app with live mock APIs, seeded data, and background activity. Upgrade to production for real infrastructure.
         </span>
       </div>
       <button
@@ -948,8 +948,8 @@ export default function AIWorkspace({
   useEffect(() => {
     if (messages.length === 0) {
       const welcomeMessage = generationMode === 'PREVIEW'
-        ? `Welcome to your FREE preview! Your app "${projectName}" is ready.\n\nThis preview uses mock data to show what your app will look like. Click "Upgrade to Production" to regenerate with real integrations.`
-        : `Welcome to your workspace! Your app "${projectName}" is ready to preview.\n\nThis is a **sandbox preview** — database and auth are simulated. Click "Go Live" to provision real infrastructure.`;
+        ? `Welcome to your FREE preview! Your app "${projectName}" is ready.\n\nThis preview runs a full UI with simulated APIs, seeded data, and background activity so you can explore the complete experience. Click "Upgrade to Production" to regenerate with real integrations.`
+        : `Welcome to your workspace! Your app "${projectName}" is ready to preview.\n\nThis is a **sandbox preview** — database, auth, and APIs are simulated so everything works end-to-end. Click "Go Live" to provision real infrastructure.`;
 
       setMessages([
         {
@@ -1064,7 +1064,7 @@ export default function AIWorkspace({
           addTerminalOutput('');
           addTerminalOutput('📍 This is a SANDBOX preview.');
           addTerminalOutput('   ⚠️  Some dependencies removed for browser compatibility');
-          addTerminalOutput('   ⚠️  Database and auth are mocked (not real)');
+          addTerminalOutput('   ✅ APIs, auth, and data are fully simulated in-browser');
           addTerminalOutput('   ✅ Click "Go Live" for full production deployment');
           addTerminalOutput('   ✅ Or download to run locally with all features');
           setSandboxUrl(url);
