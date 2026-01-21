@@ -66,6 +66,499 @@ const PACKAGE_REPLACEMENTS: Record<string, string> = {
 };
 
 // ============================================================================
+// PREVIEW RUNTIME INJECTION
+// ============================================================================
+
+const PREVIEW_RUNTIME_STORAGE_KEY = 'autoforge_preview_store_v1';
+
+function detectAppBasePath(files: Array<{ path: string }>): string {
+  return files.some(file => file.path.startsWith('src/app/')) ? 'src/app' : 'app';
+}
+
+function buildPreviewRuntimeFileContent(): string {
+  return `'use client';
+
+import { useEffect } from 'react';
+
+type PreviewStore = {
+  data: Record<string, any[]>;
+  meta: {
+    createdAt: string;
+    updatedAt: string;
+    activityCount: number;
+    notifications: Array<{ id: string; message: string; createdAt: string }>;
+  };
+  jobs: Array<{ id: string; name: string; status: 'queued' | 'running' | 'completed'; lastRun: string }>;
+  integrations: Array<{ id: string; name: string; status: 'connected' | 'warning' | 'disconnected'; updatedAt: string }>;
+  events: Array<{ id: string; type: string; message: string; createdAt: string }>;
+};
+
+const PREVIEW_USERS = [
+  { id: 'demo-user', name: 'Demo User', email: 'demo@autoforge.app', role: 'admin' },
+  { id: 'demo-user-2', name: 'Jordan Smith', email: 'jordan@autoforge.app', role: 'member' },
+  { id: 'demo-user-3', name: 'Taylor Lee', email: 'taylor@autoforge.app', role: 'viewer' },
+];
+
+const PREVIEW_RESOURCES = [
+  'projects',
+  'tasks',
+  'customers',
+  'orders',
+  'invoices',
+  'messages',
+  'tickets',
+  'teams',
+  'reports',
+  'products',
+  'subscriptions',
+];
+
+const randomId = (prefix: string) => \`\${prefix}-\${Math.random().toString(36).slice(2, 10)}\`;
+
+const createSeededItems = (resource: string, count: number) => {
+  const items: any[] = [];
+  for (let i = 0; i < count; i += 1) {
+    items.push({
+      id: randomId(resource.slice(0, 3)),
+      name: \`\${resource.slice(0, 1).toUpperCase()}\${resource.slice(1, -1)} \${i + 1}\`,
+      status: ['active', 'pending', 'completed', 'archived'][i % 4],
+      createdAt: new Date(Date.now() - i * 36e5).toISOString(),
+      updatedAt: new Date(Date.now() - i * 18e5).toISOString(),
+      owner: PREVIEW_USERS[i % PREVIEW_USERS.length],
+      metrics: {
+        value: 1200 + i * 87,
+        delta: i % 2 === 0 ? 12.5 : -4.3,
+      },
+    });
+  }
+  return items;
+};
+
+const buildInitialStore = (): PreviewStore => {
+  const data: Record<string, any[]> = {
+    users: PREVIEW_USERS,
+  };
+
+  PREVIEW_RESOURCES.forEach((resource, index) => {
+    data[resource] = createSeededItems(resource, 8 + (index % 4));
+  });
+
+  return {
+    data,
+    meta: {
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      activityCount: 4,
+      notifications: [
+        { id: randomId('note'), message: 'Welcome to your preview environment!', createdAt: new Date().toISOString() },
+        { id: randomId('note'), message: 'All data shown here is simulated.', createdAt: new Date().toISOString() },
+      ],
+    },
+    jobs: [
+      { id: randomId('job'), name: 'Daily sync', status: 'completed', lastRun: new Date().toISOString() },
+      { id: randomId('job'), name: 'Weekly report', status: 'running', lastRun: new Date().toISOString() },
+    ],
+    integrations: [
+      { id: randomId('int'), name: 'Stripe', status: 'connected', updatedAt: new Date().toISOString() },
+      { id: randomId('int'), name: 'Slack', status: 'connected', updatedAt: new Date().toISOString() },
+      { id: randomId('int'), name: 'Webhook', status: 'warning', updatedAt: new Date().toISOString() },
+    ],
+    events: [
+      { id: randomId('evt'), type: 'deployment', message: 'Preview environment ready', createdAt: new Date().toISOString() },
+    ],
+  };
+};
+
+const loadStore = (): PreviewStore => {
+  if (typeof window === 'undefined') {
+    return buildInitialStore();
+  }
+
+  const raw = window.localStorage.getItem('${PREVIEW_RUNTIME_STORAGE_KEY}');
+  if (!raw) {
+    const seeded = buildInitialStore();
+    window.localStorage.setItem('${PREVIEW_RUNTIME_STORAGE_KEY}', JSON.stringify(seeded));
+    return seeded;
+  }
+
+  try {
+    return JSON.parse(raw) as PreviewStore;
+  } catch {
+    const seeded = buildInitialStore();
+    window.localStorage.setItem('${PREVIEW_RUNTIME_STORAGE_KEY}', JSON.stringify(seeded));
+    return seeded;
+  }
+};
+
+const saveStore = (store: PreviewStore) => {
+  if (typeof window !== 'undefined') {
+    window.localStorage.setItem('${PREVIEW_RUNTIME_STORAGE_KEY}', JSON.stringify(store));
+  }
+};
+
+const getResourceKey = (pathname: string) => {
+  const trimmed = pathname.replace(/^\\/(api|trpc)(\\/preview)?\\//, '');
+  const segments = trimmed.split('/').filter(Boolean);
+  return {
+    resource: segments[0] || 'items',
+    id: segments[1] || null,
+  };
+};
+
+const parseBody = (body: BodyInit | null | undefined) => {
+  if (!body) return null;
+  if (typeof body === 'string') {
+    try {
+      return JSON.parse(body);
+    } catch {
+      return body;
+    }
+  }
+  if (body instanceof FormData) {
+    const data: Record<string, any> = {};
+    body.forEach((value, key) => {
+      data[key] = value;
+    });
+    return data;
+  }
+  return body;
+};
+
+const updateStoreMeta = (store: PreviewStore, note?: string) => {
+  store.meta.updatedAt = new Date().toISOString();
+  store.meta.activityCount += 1;
+  if (note) {
+    store.meta.notifications.unshift({ id: randomId('note'), message: note, createdAt: new Date().toISOString() });
+  }
+};
+
+const simulateLatency = async () => {
+  const delay = 180 + Math.random() * 420;
+  await new Promise(resolve => setTimeout(resolve, delay));
+};
+
+const handlePreviewRequest = async (url: URL, init?: RequestInit): Promise<Response> => {
+  const method = (init?.method || 'GET').toUpperCase();
+  const body = parseBody(init?.body || null);
+  const store = loadStore();
+
+  if (url.pathname === '/api/auth/session') {
+    return new Response(JSON.stringify({ user: PREVIEW_USERS[0], expires: new Date(Date.now() + 86400000).toISOString() }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  if (url.pathname === '/api/preview/reset') {
+    const seeded = buildInitialStore();
+    saveStore(seeded);
+    return new Response(JSON.stringify({ ok: true, data: seeded }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  const { resource, id } = getResourceKey(url.pathname);
+  if (!store.data[resource]) {
+    store.data[resource] = createSeededItems(resource, 6);
+  }
+
+  const collection = store.data[resource];
+
+  if (method === 'GET') {
+    const payload = id ? collection.find(item => item.id === id) || null : collection;
+    await simulateLatency();
+    return new Response(JSON.stringify(payload ?? {}), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  if (method === 'POST') {
+    const newItem = { id: randomId(resource.slice(0, 3)), ...body, createdAt: new Date().toISOString() };
+    collection.unshift(newItem);
+    updateStoreMeta(store, \`Created \${resource} item\`);
+    saveStore(store);
+    await simulateLatency();
+    return new Response(JSON.stringify(newItem), {
+      status: 201,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  if (method === 'PUT' || method === 'PATCH') {
+    const targetIndex = collection.findIndex(item => item.id === id);
+    const updated = targetIndex >= 0 ? { ...collection[targetIndex], ...body, updatedAt: new Date().toISOString() } : null;
+    if (updated && targetIndex >= 0) {
+      collection[targetIndex] = updated;
+      updateStoreMeta(store, \`Updated \${resource} item\`);
+      saveStore(store);
+    }
+    await simulateLatency();
+    return new Response(JSON.stringify(updated ?? {}), {
+      status: updated ? 200 : 404,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  if (method === 'DELETE') {
+    const nextCollection = collection.filter(item => item.id !== id);
+    store.data[resource] = nextCollection;
+    updateStoreMeta(store, \`Deleted \${resource} item\`);
+    saveStore(store);
+    await simulateLatency();
+    return new Response(JSON.stringify({ ok: true }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  return new Response(JSON.stringify({ ok: true }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  });
+};
+
+const installFetchMock = () => {
+  if (typeof window === 'undefined') return;
+  const win = window as Window & { __AUTOFORGE_PREVIEW_FETCH__?: boolean; __AUTOFORGE_PREVIEW__?: boolean };
+  if (win.__AUTOFORGE_PREVIEW_FETCH__) return;
+  win.__AUTOFORGE_PREVIEW_FETCH__ = true;
+  win.__AUTOFORGE_PREVIEW__ = true;
+
+  const originalFetch = window.fetch.bind(window);
+  window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+    const requestUrl = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+    const url = new URL(requestUrl, window.location.origin);
+
+    if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/trpc/')) {
+      return handlePreviewRequest(url, init);
+    }
+
+    return originalFetch(input, init);
+  };
+};
+
+const startPreviewSimulation = () => {
+  if (typeof window === 'undefined') return;
+  const store = loadStore();
+  saveStore(store);
+
+  setInterval(() => {
+    const nextStore = loadStore();
+    const now = new Date().toISOString();
+    nextStore.jobs = nextStore.jobs.map(job => ({
+      ...job,
+      status: job.status === 'running' ? 'completed' : job.status,
+      lastRun: now,
+    }));
+    nextStore.events.unshift({
+      id: randomId('evt'),
+      type: 'activity',
+      message: 'Background job completed successfully',
+      createdAt: now,
+    });
+    updateStoreMeta(nextStore);
+    saveStore(nextStore);
+    window.dispatchEvent(new CustomEvent('autoforge:preview:update', { detail: nextStore }));
+  }, 15000);
+};
+
+export function PreviewRuntime() {
+  useEffect(() => {
+    installFetchMock();
+    startPreviewSimulation();
+  }, []);
+
+  return null;
+}
+`;
+}
+
+function buildPreviewApiRouteContent(): string {
+  return `import { NextResponse } from 'next/server';
+
+type PreviewStore = {
+  data: Record<string, any[]>;
+  meta: {
+    createdAt: string;
+    updatedAt: string;
+    activityCount: number;
+  };
+};
+
+const PREVIEW_USERS = [
+  { id: 'demo-user', name: 'Demo User', email: 'demo@autoforge.app', role: 'admin' },
+  { id: 'demo-user-2', name: 'Jordan Smith', email: 'jordan@autoforge.app', role: 'member' },
+];
+
+const randomId = (prefix: string) => \`\${prefix}-\${Math.random().toString(36).slice(2, 10)}\`;
+
+const createSeededItems = (resource: string, count: number) => {
+  const items: any[] = [];
+  for (let i = 0; i < count; i += 1) {
+    items.push({
+      id: randomId(resource.slice(0, 3)),
+      name: \`\${resource.slice(0, 1).toUpperCase()}\${resource.slice(1, -1)} \${i + 1}\`,
+      status: ['active', 'pending', 'completed', 'archived'][i % 4],
+      createdAt: new Date(Date.now() - i * 36e5).toISOString(),
+      updatedAt: new Date(Date.now() - i * 18e5).toISOString(),
+      owner: PREVIEW_USERS[i % PREVIEW_USERS.length],
+    });
+  }
+  return items;
+};
+
+const getStore = (): PreviewStore => {
+  const globalAny = globalThis as typeof globalThis & { __autoforgePreviewStore?: PreviewStore };
+  if (!globalAny.__autoforgePreviewStore) {
+    const data: Record<string, any[]> = {
+      users: PREVIEW_USERS,
+      projects: createSeededItems('projects', 8),
+      tasks: createSeededItems('tasks', 10),
+      customers: createSeededItems('customers', 6),
+    };
+    globalAny.__autoforgePreviewStore = {
+      data,
+      meta: {
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        activityCount: 1,
+      },
+    };
+  }
+  return globalAny.__autoforgePreviewStore;
+};
+
+const updateStore = (store: PreviewStore) => {
+  store.meta.updatedAt = new Date().toISOString();
+  store.meta.activityCount += 1;
+};
+
+const parsePath = (pathname: string) => {
+  const trimmed = pathname.replace(/^\\/api\\/preview\\//, '');
+  const segments = trimmed.split('/').filter(Boolean);
+  return {
+    resource: segments[0] || 'items',
+    id: segments[1] || null,
+  };
+};
+
+const parseBody = async (request: Request) => {
+  if (!request.body) return null;
+  try {
+    return await request.json();
+  } catch {
+    return null;
+  }
+};
+
+const handleRequest = async (request: Request) => {
+  const store = getStore();
+  const { resource, id } = parsePath(new URL(request.url).pathname);
+  if (!store.data[resource]) {
+    store.data[resource] = createSeededItems(resource, 6);
+  }
+  const collection = store.data[resource];
+  const method = request.method.toUpperCase();
+  const body = await parseBody(request);
+
+  if (method === 'GET') {
+    const payload = id ? collection.find(item => item.id === id) || null : collection;
+    return NextResponse.json(payload ?? {});
+  }
+
+  if (method === 'POST') {
+    const newItem = { id: randomId(resource.slice(0, 3)), ...body, createdAt: new Date().toISOString() };
+    collection.unshift(newItem);
+    updateStore(store);
+    return NextResponse.json(newItem, { status: 201 });
+  }
+
+  if (method === 'PUT' || method === 'PATCH') {
+    const targetIndex = collection.findIndex(item => item.id === id);
+    const updated = targetIndex >= 0 ? { ...collection[targetIndex], ...body, updatedAt: new Date().toISOString() } : null;
+    if (updated && targetIndex >= 0) {
+      collection[targetIndex] = updated;
+      updateStore(store);
+    }
+    return NextResponse.json(updated ?? {}, { status: updated ? 200 : 404 });
+  }
+
+  if (method === 'DELETE') {
+    store.data[resource] = collection.filter(item => item.id !== id);
+    updateStore(store);
+    return NextResponse.json({ ok: true });
+  }
+
+  return NextResponse.json({ ok: true });
+};
+
+export async function GET(request: Request) {
+  return handleRequest(request);
+}
+
+export async function POST(request: Request) {
+  return handleRequest(request);
+}
+
+export async function PUT(request: Request) {
+  return handleRequest(request);
+}
+
+export async function PATCH(request: Request) {
+  return handleRequest(request);
+}
+
+export async function DELETE(request: Request) {
+  return handleRequest(request);
+}
+`;
+}
+
+function injectPreviewRuntimeIntoLayout(content: string, filePath: string): string {
+  const isRootLayout = /(?:^|[/\\])app[/\\]layout\.tsx$/i.test(filePath);
+  if (!isRootLayout) {
+    return content;
+  }
+
+  let updated = content;
+  const importStatement = `import { PreviewRuntime } from './_preview/preview-runtime';`;
+
+  if (!updated.includes('PreviewRuntime')) {
+    if (updated.match(/^(?:import[^\n]*\n)+/)) {
+      updated = updated.replace(/^(?:import[^\n]*\n)+/, (match) => `${match}${importStatement}\n`);
+    } else {
+      updated = `${importStatement}\n${updated}`;
+    }
+  }
+
+  if (!updated.includes('<PreviewRuntime')) {
+    updated = updated.replace(/<body([^>]*)>/, '<body$1>\n      <PreviewRuntime />');
+  }
+
+  return updated;
+}
+
+function injectPreviewFiles(files: Array<{ path: string; content: string }>): Array<{ path: string; content: string }> {
+  const basePath = detectAppBasePath(files);
+  const runtimePath = `${basePath}/_preview/preview-runtime.tsx`;
+  const apiPath = `${basePath}/api/preview/[...path]/route.ts`;
+  const existingPaths = new Set(files.map(file => file.path));
+  const additions: Array<{ path: string; content: string }> = [];
+
+  if (!existingPaths.has(runtimePath)) {
+    additions.push({ path: runtimePath, content: buildPreviewRuntimeFileContent() });
+  }
+
+  if (!existingPaths.has(apiPath)) {
+    additions.push({ path: apiPath, content: buildPreviewApiRouteContent() });
+  }
+
+  return additions.length > 0 ? [...files, ...additions] : files;
+}
+
+// ============================================================================
 // NPM PACKAGE VALIDATION
 // ============================================================================
 
@@ -770,6 +1263,8 @@ function sanitizeCodeFile(content: string, filePath: string, isPersonal: boolean
     sanitized = sanitized.replace(/<ClerkProvider[^>]*>/g, '<>');
     sanitized = sanitized.replace(/<\/ClerkProvider>/g, '</>');
 
+    sanitized = injectPreviewRuntimeIntoLayout(sanitized, filePath);
+
     console.log(`   🛡️  Protected ${filePath} from 'use client' injection (layout files must be Server Components)`);
     return sanitized;
   }
@@ -848,7 +1343,15 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 export function middleware(request: NextRequest) {
-  // Pass through all requests in WebContainer preview mode
+  const { pathname } = request.nextUrl;
+
+  if (pathname.startsWith('/api/') && !pathname.startsWith('/api/preview')) {
+    const url = request.nextUrl.clone();
+    url.pathname = \`/api/preview\${pathname.slice('/api'.length)}\`;
+    return NextResponse.rewrite(url);
+  }
+
+  // Pass through all other requests in WebContainer preview mode
   return NextResponse.next();
 }
 
@@ -1381,7 +1884,8 @@ export async function sanitizeFilesForWebContainer(
     }
 
     // Combine original files with stub components
-    const allFiles = [...files, ...stubComponents];
+    const combinedFiles = [...files, ...stubComponents];
+    const allFiles = injectPreviewFiles(combinedFiles);
 
     // CRITICAL: Scan all files for imported packages
     // This ensures packages used in code are added to package.json
